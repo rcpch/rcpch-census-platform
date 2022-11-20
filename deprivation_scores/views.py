@@ -36,3 +36,11 @@ class IndexMultipleDeprivationViewSet(viewsets.ModelViewSet):
     queryset = IndexMultipleDeprivation.objects.all().order_by("-imd_rank")
     serializer_class = IndexMultipleDeprivationSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        lsoa_code = self.request.query_params.get("lsoa_code", None)
+        if lsoa_code:
+            lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
+            query_set = IndexMultipleDeprivation.objects.filter(lsoa=lsoa).all()
+            return query_set
+        return super().get_queryset()

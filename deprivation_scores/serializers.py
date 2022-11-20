@@ -86,4 +86,5 @@ class IndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer)
             "idaopi_score",
             "idaopi_rank",
             "idaopi_decile",
+            "lsoa",
         ]
