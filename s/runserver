@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# Starts the development census platform with reload on port 8080
+
+python manage.py runserver
