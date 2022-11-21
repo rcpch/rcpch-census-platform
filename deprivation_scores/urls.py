@@ -4,6 +4,7 @@ from .views import (
     IndexMultipleDeprivationViewSet,
     LocalAuthorityDistrictViewSet,
     LSOAViewSet,
+    PostcodeView,
 )
 
 router = routers.DefaultRouter()
@@ -16,6 +17,7 @@ router.register(
 drf_routes = [
     # rest framework paths
     path("api/v1/", include(router.urls)),
+    path("api/v1/boundaries", view=PostcodeView.as_view()),
     path("api-auth/", include("rest_framework.urls", namespace="rest_framework")),
 ]
 

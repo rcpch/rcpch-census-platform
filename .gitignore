@@ -119,3 +119,5 @@ staticfiles/
 .code-workspace
 .vscode/
 .vscode/*
+
+db.sqlite3
