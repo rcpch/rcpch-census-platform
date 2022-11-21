@@ -24,6 +24,7 @@ IMD_DATA_FILES_FOLDER = os.path.join(PROJECT_ROOT, "deprivation_scores/imd_data"
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+# NOTE THIS IS NOT ACTIVELY USED AND IS JUST AN EXAMPLE
 SECRET_KEY = "django-insecure-taj5j+tk=ehlabn6m84jw$5431d#1$xt)u#hej7xlbj@(@v9ra"
 
 # SECURITY WARNING: don't run with debug turned on in production!
