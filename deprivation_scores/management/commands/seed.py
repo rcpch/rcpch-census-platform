@@ -2,7 +2,14 @@ import csv
 from django.core.management.base import BaseCommand
 
 from django.conf import settings
-from ...models import LSOA, MSOA, LocalAuthority, Ward, IndexMultipleDeprivation
+from ...models import (
+    LSOA,
+    MSOA,
+    LocalAuthority,
+    Ward,
+    IndexMultipleDeprivation,
+    GreenSpace,
+)
 
 
 IMD_2019_DOMAINS_OF_DEPRIVATION = "File_2_-_IoD2019_Domains_of_Deprivation.csv"
@@ -16,6 +23,7 @@ IMD_2019_LSOA_2015_POPULATION_DENOMINATORS = (
     "File_6_-_IoD2019_Population_Denominators.csv"
 )
 LSOA_2011_WARD_LAD_2019 = "Lower_Layer_Super_Output_Area_(2011)_to_Ward_(2019)_Lookup_in_England_and_Wales.csv"
+ACCESS_TO_GREEN_SPACE = "access_to_green_space.csv"  # 2020 data https://www.ons.gov.uk/economy/environmentalaccounts/datasets/accesstogardensandpublicgreenspaceingreatbritain
 
 W = "\033[0m"  # white (normal)
 R = "\033[31m"  # red
@@ -51,6 +59,7 @@ def add_census_areas():
     else:
         add_lsoas_2011_wards_2019_to_LADS_2019()
         add_2015_population_denominators()
+        add_lad_access_to_outdoor_space()
 
     if IndexMultipleDeprivation.objects.count() == 32844:
         print("IMD Domains already added. Passing....")
@@ -290,6 +299,51 @@ def add_2015_population_denominators():
                 f"Updated {count} LSOAs with 2015 Population Denominators...", end="\r"
             )
     print(f"{BOLD}Complete.{END} Added {count} 2015 population denominators to LSOAs")
+
+
+def add_lad_access_to_outdoor_space():
+    # import domains of deprivation data
+    path = f"{settings.IMD_DATA_FILES_FOLDER}/{ACCESS_TO_GREEN_SPACE}"
+    with open(path, "r") as f:
+        print(G + "Adding Local Authority green space records." + W)
+        data = list(csv.reader(f, delimiter=","))
+        count = 0
+
+        for row in data[3:]:  # header is on row 3l
+            local_authority = LocalAuthority.objects.filter(
+                local_authority_district_code=row[4]
+            ).get()
+            GreenSpace.objects.create(
+                local_authority=local_authority,
+                houses_address_count=int(float(row[6])),
+                houses_addresses_with_private_outdoor_space_count=int(float(row[7])),
+                houses_outdoor_space_total_area=int(float(row[8])),
+                houses_outdoor_space_total_area=int(float(row[9])),
+                houses_percentage_of_addresses_with_private_outdoor_space=int(
+                    float(row[10])
+                ),
+                houses_average_size_private_outdoor_space=int(float(row[11])),
+                houses_median_size_private_outdoor_space=int(float(row[12])),
+                flats_address_count=int(float(row[13])),
+                flats_addresses_with_private_outdoor_space_count=int(float(row[14])),
+                flats_outdoor_space_total_area=int(float(row[15])),
+                flats_outdoor_space_count=int(float(row[16])),
+                flats_percentage_of_addresses_with_private_outdoor_space=int(
+                    float(row[17])
+                ),
+                flats_average_size_private_outdoor_space=int(float(row[18])),
+                flats_average_number_of_flats_sharing_a_garden=int(float(row[19])),
+                total_addresses_count=int(float(row[20])),
+                total_addresses_with_private_outdoor_space_count=int(float(row[21])),
+                total_percentage_addresses_with_private_outdoor_space_count=int(
+                    float(row[22])
+                ),
+                total_average_size_private_outdoor_space_count=int(float(row[23])),
+            )
+
+            count += 1
+            print(f"Created {count} Local Authority green space records...", end="\r")
+    print(f"{BOLD}Complete.{END} Added {count} Local Authority green space records.")
 
 
 def image():
