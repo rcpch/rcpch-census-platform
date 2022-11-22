@@ -13,7 +13,6 @@ def lsoa_for_postcode(postcode):
 
     serialised = response.json()
     lsoa = serialised["result"]["codes"]["lsoa"]
-    print(serialised["result"])
     return lsoa
 
 
