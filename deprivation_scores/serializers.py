@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import LSOA, LocalAuthority, IndexMultipleDeprivation
+from .models import LSOA, LocalAuthority, IndexMultipleDeprivation, GreenSpace
 
 
 class LSOASerializer(serializers.HyperlinkedModelSerializer):
@@ -87,4 +87,30 @@ class IndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer)
             "idaopi_rank",
             "idaopi_decile",
             "lsoa",
+        ]
+
+
+class GreenSpaceSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = GreenSpace
+        fields = [
+            "houses_address_count",
+            "houses_addresses_with_private_outdoor_space_count",
+            "houses_outdoor_space_total_area",
+            "houses_outdoor_space_total_area",
+            "houses_percentage_of_addresses_with_private_outdoor_space",
+            "houses_average_size_private_outdoor_space",
+            "houses_median_size_private_outdoor_space",
+            "flats_address_count",
+            "flats_addresses_with_private_outdoor_space_count",
+            "flats_outdoor_space_total_area",
+            "flats_outdoor_space_count",
+            "flats_percentage_of_addresses_with_private_outdoor_space",
+            "flats_average_size_private_outdoor_space",
+            "flats_average_number_of_flats_sharing_a_garden",
+            "total_addresses_count",
+            "total_addresses_with_private_outdoor_space_count",
+            "total_percentage_addresses_with_private_outdoor_space_count",
+            "total_average_size_private_outdoor_space_count",
+            "local_authority",
         ]
