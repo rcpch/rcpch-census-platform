@@ -51,7 +51,7 @@ Indices of Multiple Deprivation (IMDs) are not standardised across the devolved 
 6. barriers to housing and services
 7. living environment
 
-The are subdomains for education (children and young people and adult skills), barriers to housing and services (geographical barriers and wider barriers) and living environment (indoors and outdoors). These domains are then weighted and contribute to the final IMD. Based on the score in each LSOA, LSOAs are then ranked in order, and then split into deciles (with the lower deciles the most deprived). It is important to say that the rankings do not compare between countries - that is a given decile in one country is not the same as the same decile in another. An attempt to do this has been made by [MySociety](https://github.com/mysociety/composite_uk_imd) who have published a Composite UK IMD which brings together all the datasets across the devolved nations. In the process, however, a lot of the detail so whilst this allows the user to compare deprivation scores across countries, [it is not possible to compare the subdomains](https://github.com/mysociety/composite_uk_imd/issues/2). For our purposes, therefore, we will use the individual countries scores, but report these with an appropriate warning.
+The are subdomains for education (children and young people and adult skills), barriers to housing and services (geographical barriers and wider barriers) and living environment (indoors and outdoors). These domains are then weighted and contribute to the final IMD. Based on the score in each LSOA, LSOAs are then ranked in order, and then split into deciles (with the lower deciles the most deprived). It is important to say that the rankings do not compare between countries - that is a given decile in one country is not the same as the same decile in another. An attempt to do this has been made by [MySociety](https://github.com/mysociety/composite_uk_imd) who have published a Composite UK IMD which brings together all the datasets across the devolved nations. In the process, however, a lot of the detail is lost so whilst this allows the user to compare deprivation scores across countries, [it is not possible to compare the subdomains](https://github.com/mysociety/composite_uk_imd/issues/2). For our purposes, therefore, we will use the individual countries scores, but report these with an appropriate warning.
 
 The process in Scotland is similar, but Data Zones, rather than LSOAs are used, which comprise fewer people. In Northern Ireland, SOAs are used.
 
@@ -75,6 +75,7 @@ The final step is to run the server:
 If you navigate to ```http://localhost:8000//rcpch-census-platform/api/v1/``` and login, it should be possible then to view the data.
 
 There are 3 routes that accept GET requests:
+
 1. ```/local_authority_districts/```
 2. ```/lower_layer_super_output_areas/```
 3. ```/indices_of_multiple_deprivation/```
