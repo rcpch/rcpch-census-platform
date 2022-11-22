@@ -33,6 +33,18 @@ class LSOAViewSet(viewsets.ModelViewSet):
     serializer_class = LSOASerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        lsoa_code = self.request.query_params.get("lsoa_code", None)
+        if lsoa_code:
+            print(lsoa_code)
+            try:
+                return LSOA.objects.filter(lsoa_code=lsoa_code).all()
+            except Exception as e:
+                print(e)
+                return
+        query_set = LSOA.objects.all()
+        return query_set
+
 
 class IndexMultipleDeprivationViewSet(viewsets.ModelViewSet):
     queryset = IndexMultipleDeprivation.objects.all().order_by("-imd_rank")
