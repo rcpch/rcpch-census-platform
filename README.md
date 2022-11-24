@@ -68,7 +68,7 @@ Written in python 3.11 and django-rest-framework, these will need to be installe
 7. ```python manage.py seed --mode='add_census_areas'```console
 
 This latter step will take several minutes as it populates the database with all the census and deprivation data. If successful, it should yield the following message:
-![alt rcpch-census-db]('https://github.com/rcpch/rcpch-census-platform/blob/main/static/images/census_db_screenshot.png?raw=true)
+> ![alt rcpch-census-db](static/images/census_db_screenshot.png?raw=true)
 
 The final step is to run the server:
 ```python manage.py runserver```console
