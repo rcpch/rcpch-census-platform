@@ -344,12 +344,13 @@ class IndexMultipleDeprivation(models.Model):
 
 
 class DataZone(models.Model):
-    data_zone_code = (models.CharField("Data Zone Code", max_length=50, unique=True),)
+    data_zone_code = models.CharField("Data Zone Code", max_length=50, unique=True)
     data_zone_name = models.CharField(
         "Data Zone Name",
         max_length=50,
     )
-    year = models.IntegerField("MSOA Year")
+    year = models.IntegerField("Data Zone Year")
+    local_authority = models.ForeignKey(LocalAuthority, on_delete=models.CASCADE)
 
 
 class GreenSpace(models.Model):
@@ -395,10 +396,10 @@ class GreenSpace(models.Model):
     total_addresses_with_private_outdoor_space_count = models.IntegerField(
         "Total - count of all addresses with private outdoor space"
     )
-    total_percentage_addresses_with_private_outdoor_space_count = models.IntegerField(
+    total_percentage_addresses_with_private_outdoor_space = models.IntegerField(
         "Total - percentage of all addresses with private outdoor space"
     )
-    total_average_size_private_outdoor_space_count = models.IntegerField(
+    total_average_size_private_outdoor_space = models.IntegerField(
         "Total - average size of all private outdoor space"
     )
 

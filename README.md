@@ -67,7 +67,8 @@ Written in python 3.11 and django-rest-framework, these will need to be installe
 6. ```python manage.py migrate```console
 7. ```python manage.py seed --mode='add_census_areas'```console
 
-This latter step will take several minutes as it populates the database with all the census and deprivation data.
+This latter step will take several minutes as it populates the database with all the census and deprivation data. If successful, it should yield the following message:
+![image rcpch-census-db]('https://github.com/rcpch/rcpch-census-platform/blob/main/static/images/census_db_screenshot.png)
 
 The final step is to run the server:
 ```python manage.py runserver```console
@@ -76,10 +77,11 @@ If you navigate to ```http://localhost:8000//rcpch-census-platform/api/v1/``` an
 
 There are 3 routes that accept GET requests:
 
-1. ```/local_authority_districts/```
-2. ```/lower_layer_super_output_areas/```
-3. ```/indices_of_multiple_deprivation/```
-4. ```/boundaries?postcode=```
+1. ```/local_authority_districts/```: params include ```local_authority_district_code``` or if none is passed, a list of all local authorities in the UK is returned
+2. ```/lower_layer_super_output_areas/```: params include ```lsoa_code```. If none is passed, a list of all LSOAs is returned.
+3. ```/indices_of_multiple_deprivation/``` params include: ```postcode``` and ```lsoa_code```. If none is passed, all IMDs are returned.
+4. ```/boundaries?postcode=``` params include ```postcode``` and are mandatory.
+5. ```/greenspace/``` params include ```postcode``` and ```local_authority_district_code```. If none is passed, all IMDs are returned.
 
 The IMD route returns IMD data for a given lsoa_code eg:
 ```http://localhost:8000/rcpch-census-platform/api/v1/indices_of_multiple_deprivation/?lsoa_code=E01003474``` will return:

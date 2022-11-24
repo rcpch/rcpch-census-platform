@@ -9,6 +9,7 @@ from ...models import (
     Ward,
     IndexMultipleDeprivation,
     GreenSpace,
+    DataZone,
 )
 
 
@@ -23,6 +24,7 @@ IMD_2019_LSOA_2015_POPULATION_DENOMINATORS = (
     "File_6_-_IoD2019_Population_Denominators.csv"
 )
 LSOA_2011_WARD_LAD_2019 = "Lower_Layer_Super_Output_Area_(2011)_to_Ward_(2019)_Lookup_in_England_and_Wales.csv"
+SCOTTISH_DATA_ZONES_AND_LOCAL_AUTHORITIES = "scottish_dz_lookup.csv"
 ACCESS_TO_GREEN_SPACE = "access_to_green_space.csv"  # 2020 data https://www.ons.gov.uk/economy/environmentalaccounts/datasets/accesstogardensandpublicgreenspaceingreatbritain
 
 W = "\033[0m"  # white (normal)
@@ -59,6 +61,7 @@ def add_census_areas():
     else:
         add_lsoas_2011_wards_2019_to_LADS_2019()
         add_2015_population_denominators()
+        add_scottish_data_zones_and_local_authorities()
         add_lad_access_to_outdoor_space()
 
     if IndexMultipleDeprivation.objects.count() == 32844:
@@ -275,8 +278,50 @@ def update_imd_data_with_transformed_scores():
     )
 
 
+def add_scottish_data_zones_and_local_authorities():
+    """
+    Add data zones and scottish local authorities
+    """
+    path = (
+        f"{settings.IMD_DATA_FILES_FOLDER}/{SCOTTISH_DATA_ZONES_AND_LOCAL_AUTHORITIES}"
+    )
+    with open(path, "r", encoding="windows-1252") as f:
+        print(G + "Adding 2011 Scottish Data Zones and Local Authorities" + W)
+        data = list(csv.reader(f, delimiter=","))
+        lad_count = 0
+        dz_count = 0
+
+        for row in data[1:]:
+            local_authority, created = LocalAuthority.objects.get_or_create(
+                local_authority_district_code=row[6],
+                local_authority_district_name=row[7],
+                year=2011,
+            )
+
+            if created:
+                lad_count += 1
+
+            data_zone, created = DataZone.objects.get_or_create(
+                data_zone_code=row[0],
+                data_zone_name=[1],
+                year=2011,
+                local_authority=local_authority,
+            )
+
+            if created:
+                dz_count += 1
+            print(
+                f"Added {lad_count} Scottish Local Authorities and {dz_count} data zones...",
+                end="\r",
+            )
+    print(
+        f"{BOLD}Complete.{END} Added {lad_count} Scottish Local Authorities and {dz_count} data zones..."
+    )
+
+
 def add_2015_population_denominators():
     # import domains of deprivation data
+    # note this includes scotland so must load data zones first
     path = (
         f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_LSOA_2015_POPULATION_DENOMINATORS}"
     )
@@ -309,40 +354,51 @@ def add_lad_access_to_outdoor_space():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in data[3:]:  # header is on row 3l
-            local_authority = LocalAuthority.objects.filter(
+        for row in data[2:]:  # header is on row 3
+            local_authority = LocalAuthority.objects.get(
                 local_authority_district_code=row[4]
-            ).get()
-            GreenSpace.objects.create(
-                local_authority=local_authority,
-                houses_address_count=int(float(row[6])),
-                houses_addresses_with_private_outdoor_space_count=int(float(row[7])),
-                houses_outdoor_space_total_area=int(float(row[8])),
-                houses_outdoor_space_total_area=int(float(row[9])),
-                houses_percentage_of_addresses_with_private_outdoor_space=int(
-                    float(row[10])
-                ),
-                houses_average_size_private_outdoor_space=int(float(row[11])),
-                houses_median_size_private_outdoor_space=int(float(row[12])),
-                flats_address_count=int(float(row[13])),
-                flats_addresses_with_private_outdoor_space_count=int(float(row[14])),
-                flats_outdoor_space_total_area=int(float(row[15])),
-                flats_outdoor_space_count=int(float(row[16])),
-                flats_percentage_of_addresses_with_private_outdoor_space=int(
-                    float(row[17])
-                ),
-                flats_average_size_private_outdoor_space=int(float(row[18])),
-                flats_average_number_of_flats_sharing_a_garden=int(float(row[19])),
-                total_addresses_count=int(float(row[20])),
-                total_addresses_with_private_outdoor_space_count=int(float(row[21])),
-                total_percentage_addresses_with_private_outdoor_space_count=int(
-                    float(row[22])
-                ),
-                total_average_size_private_outdoor_space_count=int(float(row[23])),
             )
+            if GreenSpace.objects.filter(local_authority=local_authority).exists():
+                print("Greenspace data available for this Local Authority", end="\r")
+                pass
+            else:
+                GreenSpace.objects.create(
+                    local_authority=local_authority,
+                    houses_address_count=int(float(row[6])),
+                    houses_addresses_with_private_outdoor_space_count=int(
+                        float(row[7])
+                    ),
+                    houses_outdoor_space_total_area=int(float(row[8])),
+                    houses_percentage_of_addresses_with_private_outdoor_space=int(
+                        float(row[9])
+                    ),
+                    houses_average_size_private_outdoor_space=int(float(row[10])),
+                    houses_median_size_private_outdoor_space=int(float(row[11])),
+                    flats_address_count=int(float(row[12])),
+                    flats_addresses_with_private_outdoor_space_count=int(
+                        float(row[13])
+                    ),
+                    flats_outdoor_space_total_area=int(float(row[14])),
+                    flats_outdoor_space_count=int(float(row[15])),
+                    flats_percentage_of_addresses_with_private_outdoor_space=int(
+                        float(row[16])
+                    ),
+                    flats_average_size_private_outdoor_space=int(float(row[17])),
+                    flats_average_number_of_flats_sharing_a_garden=int(float(row[18])),
+                    total_addresses_count=int(float(row[19])),
+                    total_addresses_with_private_outdoor_space_count=int(
+                        float(row[20])
+                    ),
+                    total_percentage_addresses_with_private_outdoor_space=int(
+                        float(row[21])
+                    ),
+                    total_average_size_private_outdoor_space=int(float(row[22])),
+                )
 
-            count += 1
-            print(f"Created {count} Local Authority green space records...", end="\r")
+                count += 1
+                print(
+                    f"Created {count} Local Authority green space records...", end="\r"
+                )
     print(f"{BOLD}Complete.{END} Added {count} Local Authority green space records.")
 
 
