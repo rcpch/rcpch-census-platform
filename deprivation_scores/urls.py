@@ -5,6 +5,7 @@ from .views import (
     LocalAuthorityDistrictViewSet,
     LSOAViewSet,
     PostcodeView,
+    GreenSpaceViewSet,
 )
 
 router = routers.DefaultRouter()
@@ -13,6 +14,7 @@ router.register(r"lower_layer_super_output_areas", viewset=LSOAViewSet)
 router.register(
     r"indices_of_multiple_deprivation", viewset=IndexMultipleDeprivationViewSet
 )
+router.register(r"green_space", viewset=GreenSpaceViewSet)
 
 drf_routes = [
     # rest framework paths

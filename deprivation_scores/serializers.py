@@ -110,7 +110,7 @@ class GreenSpaceSerializer(serializers.HyperlinkedModelSerializer):
             "flats_average_number_of_flats_sharing_a_garden",
             "total_addresses_count",
             "total_addresses_with_private_outdoor_space_count",
-            "total_percentage_addresses_with_private_outdoor_space_count",
-            "total_average_size_private_outdoor_space_count",
+            "total_percentage_addresses_with_private_outdoor_space",
+            "total_average_size_private_outdoor_space",
             "local_authority",
         ]

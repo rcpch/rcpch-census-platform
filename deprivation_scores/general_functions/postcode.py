@@ -42,5 +42,5 @@ def local_authority_district_code_for_postcode(postcode):
         return None
 
     serialised = response.json()
-    lsoa = serialised["result"]["codes"]["lad"]
-    return serialised["result"]
+    lad = serialised["result"]["codes"]["admin_district"]
+    return lad
