@@ -30,7 +30,11 @@ SECRET_KEY = "django-insecure-taj5j+tk=ehlabn6m84jw$5431d#1$xt)u#hej7xlbj@(@v9ra
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") + [
+    "127.0.0.1",
+    "localhost",
+    "0.0.0.0",
+]
 
 
 # Application definition
@@ -44,6 +48,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "whitenoise.runserver_nostatic",
     "rest_framework",
+    "rest_framework.authtoken",
     "deprivation_scores",
 ]
 
@@ -84,8 +89,12 @@ WSGI_APPLICATION = "rcpch_census_platform.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("- RCPCH_CENSUS_PLATFORM_POSTGRES_DB_NAME"),
+        "USER": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_USER"),
+        "PASSWORD": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PASSWORD"),
+        "HOST": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_HOST"),
+        "PORT": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PORT"),
     }
 }
 
@@ -126,6 +135,10 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATICFILES_DIRS = (str(BASE_DIR.joinpath("static")),)
+STATIC_ROOT = str(BASE_DIR.joinpath("staticfiles"))
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+WHITENOISE_ROOT = os.path.join(BASE_DIR, "static/root")
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
@@ -135,4 +148,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 10,
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+        "rest_framework.authentication.TokenAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+        "rest_framework.permissions.DjangoModelPermissions",
+    ],
 }

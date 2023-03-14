@@ -59,6 +59,8 @@ The process in Scotland is similar, but Data Zones, rather than LSOAs are used, 
 
 Written in python 3.11 and django-rest-framework, these will need to be installed.
 
+### Option One
+
 1. clone the repo
 2. ```cd rcpch_census_platform```console
 3. ```pip install -r requirements/common-requirements.txt```console
@@ -73,7 +75,15 @@ This latter step will take several minutes as it populates the database with all
 The final step is to run the server:
 ```python manage.py runserver```console
 
-If you navigate to ```http://localhost:8000//rcpch-census-platform/api/v1/``` and login, it should be possible then to view the data.
+### Option Two
+
+1. clone the repo
+2. ```cd rcpch_census_platform```console
+3. ```s/docker-init```console
+4. grab the token from the console > ![alt drf_token](static/images/census_db_token.png)
+5. Add the token to your header when making an api call (```-H 'Authorization: *******'``` in curl statement for example)
+
+If you navigate to ```http://localhost:8001//rcpch-census-platform/api/v1/``` and login, it should be possible then to view the data.
 
 There are 3 routes that accept GET requests:
 
