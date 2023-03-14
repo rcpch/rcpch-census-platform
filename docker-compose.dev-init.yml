@@ -39,7 +39,7 @@ services:
             python manage.py collectstatic --noinput &&
             python manage.py makemigrations &&
             python manage.py migrate &&
-            python manage.py seed --mode=seed_add_census_areas &&
+            python manage.py seed --mode=add_census_areas &&
             python manage.py createsuperuser --noinput &&
             echo 'DEV SETUP SCRIPT: Development superuser username: rcpch-census-dev-user' &&
             echo 'DEV SETUP SCRIPT: Development superuser password: pw' &&
