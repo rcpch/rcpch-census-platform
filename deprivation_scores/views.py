@@ -62,6 +62,7 @@ class IndexMultipleDeprivationViewSet(viewsets.ModelViewSet):
             lsoa_code = lsoa_for_postcode(postcode=post_code)
         if lsoa_code:
             lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
+            print(lsoa.year)
             query_set = IndexMultipleDeprivation.objects.filter(lsoa=lsoa).all()
             return query_set
         return super().get_queryset()

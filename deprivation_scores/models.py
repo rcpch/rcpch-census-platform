@@ -86,10 +86,12 @@ class Ward(models.Model):
 
 
 class IndexMultipleDeprivation(models.Model):
-    imd_score = models.IntegerField(
+    imd_score = models.DecimalField(
         "Index of Multiple Deprivation (IMD) Score",
         help_text="Index of Multiple Deprivation (IMD) Score",
         null=True,
+        max_digits=5,
+        decimal_places=3,
     )
     imd_rank = models.IntegerField(
         "Index of Multiple Deprivation",
@@ -99,13 +101,19 @@ class IndexMultipleDeprivation(models.Model):
         "Index of Multiple Deprivation (IMD) Decile",
         help_text="Index of Multiple Deprivation (IMD) Decile (where 1 is most deprived 10% of LSOAs)",
     )
-    income_score = models.IntegerField(
-        "Income Score (rate)", help_text="Income Score (rate)", null=True
+    income_score = models.DecimalField(
+        "Income Score (rate)",
+        help_text="Income Score (rate)",
+        null=True,
+        max_digits=5,
+        decimal_places=3,
     )
-    income_score_exponentially_transformed = models.IntegerField(
+    income_score_exponentially_transformed = models.DecimalField(
         "Income Score exponentially tranformed",
         help_text="Income Score exponentially tranformed",
         null=True,
+        max_digits=6,
+        decimal_places=3,
     )
     income_rank = models.IntegerField(
         "Income Rank",
@@ -115,13 +123,19 @@ class IndexMultipleDeprivation(models.Model):
         "Income Decile",
         help_text="Income Decile (where 1 is most deprived 10% of LSOAs)",
     )
-    employment_score = models.IntegerField(
-        "Employment Score (rate)", help_text="Employment Score (rate)", null=True
+    employment_score = models.DecimalField(
+        "Employment Score (rate)",
+        help_text="Employment Score (rate)",
+        null=True,
+        max_digits=5,
+        decimal_places=3,
     )
-    employment_score_exponentially_transformed = models.IntegerField(
+    employment_score_exponentially_transformed = models.DecimalField(
         "Employment Score exponentially transformed",
         help_text="Employment Score exponentially transformed",
         null=True,
+        max_digits=6,
+        decimal_places=3,
     )
     employment_rank = models.IntegerField(
         "Employment Rank",
@@ -131,15 +145,19 @@ class IndexMultipleDeprivation(models.Model):
         "Employment Decile",
         help_text="Employment Decile (where 1 is most deprived 10% of LSOAs)",
     )
-    education_skills_training_score_exponentially_transformed = models.IntegerField(
+    education_skills_training_score_exponentially_transformed = models.DecimalField(
         "Education, Skills and Training Score exponentially transformed",
         help_text="Education, Skills and Training Score exponentially transformed",
         null=True,
+        max_digits=6,
+        decimal_places=3,
     )
-    education_skills_training_score = models.IntegerField(
+    education_skills_training_score = models.DecimalField(
         "Education, Skills and Training Score (rate)",
         help_text="Education, Skills and Training Score (rate)",
         null=True,
+        max_digits=5,
+        decimal_places=3,
     )
     education_skills_training_rank = models.IntegerField(
         "Education, Skills and Training Rank",
@@ -149,10 +167,12 @@ class IndexMultipleDeprivation(models.Model):
         "Education, Skills and Training Decile",
         help_text="Education, Skills and Training Decile (where 1 is most deprived 10% of LSOAs)",
     )
-    children_young_people_sub_domain_score = models.IntegerField(
+    children_young_people_sub_domain_score = models.DecimalField(
         "Children and Young People Sub-domain Score (rate)",
         help_text="Children and Young People Sub-domain Score (rate)",
         null=True,
+        max_digits=5,
+        decimal_places=3,
     )
     children_young_people_sub_domain_rank = models.IntegerField(
         "Children and Young People Sub-domain Rank (where 1 is most deprived)",
@@ -164,10 +184,12 @@ class IndexMultipleDeprivation(models.Model):
         help_text="Children and Young People Sub-domain Decile (where 1 is most deprived) Decile",
         null=True,
     )
-    adult_skills_sub_domain_score = models.IntegerField(
+    adult_skills_sub_domain_score = models.DecimalField(
         "Adult Skills Sub-domain Score (rate)",
         help_text="Adult Skills Sub-domain Score (rate)",
         null=True,
+        max_digits=5,
+        decimal_places=3,
     )
     adult_skills_sub_domain_rank = models.IntegerField(
         "Adult Skills Sub-domain Rank (where 1 is most deprived)",
@@ -179,15 +201,19 @@ class IndexMultipleDeprivation(models.Model):
         help_text="Adult Skills Sub-domain Decile (where 1 is most deprived) Decile",
         null=True,
     )
-    health_deprivation_disability_score_exponentially_transformed = models.IntegerField(
+    health_deprivation_disability_score_exponentially_transformed = models.DecimalField(
         "Health Deprivation and Disability Score exponentially transformed",
         help_text="Health Deprivation and Disability Score exponentially transformed",
         null=True,
+        max_digits=6,
+        decimal_places=3,
     )
-    health_deprivation_disability_score = models.IntegerField(
+    health_deprivation_disability_score = models.DecimalField(
         "Health Deprivation and Disability Score (rate)",
         help_text="Health Deprivation and Disability Score (rate)",
         null=True,
+        max_digits=5,
+        decimal_places=3,
     )
     health_deprivation_disability_rank = models.IntegerField(
         "Health Deprivation and Disability Rank",
@@ -197,13 +223,19 @@ class IndexMultipleDeprivation(models.Model):
         "Health Deprivation and Disability Decile",
         help_text="Health Deprivation and Disability Decile (where 1 is most deprived 10% of LSOAs)",
     )
-    crime_score_exponentially_transformed = models.IntegerField(
+    crime_score_exponentially_transformed = models.DecimalField(
         "Crime Score exponentially transformed",
         help_text="Crime Score exponentially transformed",
         null=True,
+        max_digits=6,
+        decimal_places=3,
     )
-    crime_score = models.IntegerField(
-        "Crime Score (rate)", help_text="Crime Score (rate)", null=True
+    crime_score = models.DecimalField(
+        "Crime Score (rate)",
+        help_text="Crime Score (rate)",
+        null=True,
+        max_digits=5,
+        decimal_places=3,
     )
     crime_rank = models.IntegerField(
         "Crime Rank",
@@ -213,15 +245,19 @@ class IndexMultipleDeprivation(models.Model):
         "Crime Decile",
         help_text="Crime Decile (where 1 is most deprived 10% of LSOAs)",
     )
-    barriers_to_housing_services_score_exponentially_transformed = models.IntegerField(
+    barriers_to_housing_services_score_exponentially_transformed = models.DecimalField(
         "Barriers to Housing and Services Score Exponentially transformed",
         help_text="Barriers to Housing and Services Score Exponentially transformed",
         null=True,
+        max_digits=6,
+        decimal_places=3,
     )
-    barriers_to_housing_services_score = models.IntegerField(
+    barriers_to_housing_services_score = models.DecimalField(
         "Barriers to Housing and Services Score (rate)",
         help_text="Barriers to Housing and Services Score (rate)",
         null=True,
+        max_digits=5,
+        decimal_places=3,
     )
     barriers_to_housing_services_rank = models.IntegerField(
         "Barriers to Housing and Services Rank",
@@ -231,10 +267,12 @@ class IndexMultipleDeprivation(models.Model):
         "Barriers to Housing and Services Decile",
         help_text="Barriers to Housing and Services Decile (where 1 is most deprived 10% of LSOAs)",
     )
-    geographical_barriers_sub_domain_score = models.IntegerField(
+    geographical_barriers_sub_domain_score = models.DecimalField(
         "Geographical Barriers Sub-domain Score",
         help_text="Geographical Barriers Sub-domain Score (rate)",
         null=True,
+        max_digits=5,
+        decimal_places=3,
     )
     geographical_barriers_sub_domain_rank = models.IntegerField(
         "Geographical Barriers Sub-domain Rank",
@@ -246,10 +284,12 @@ class IndexMultipleDeprivation(models.Model):
         help_text="Geographical Barriers Sub-domain Decile (where 1 is most deprived 10% of LSOAs)",
         null=True,
     )
-    wider_barriers_sub_domain_score = models.IntegerField(
+    wider_barriers_sub_domain_score = models.DecimalField(
         "Wider Barriers Sub-domain Score (rate)",
         help_text="Wider Barriers Sub-domain Score (rate)",
         null=True,
+        max_digits=5,
+        decimal_places=3,
     )
     wider_barriers_sub_domain_rank = models.IntegerField(
         "Wider Barriers Sub-domain Rank",
@@ -261,15 +301,19 @@ class IndexMultipleDeprivation(models.Model):
         help_text="Wider Barriers Sub-domain Decile (where 1 is most deprived 10% of LSOAs)",
         null=True,
     )
-    living_environment_score = models.IntegerField(
+    living_environment_score = models.DecimalField(
         "Living Environment Score (rate)",
         help_text="Living Environment Score (rate)",
         null=True,
+        max_digits=5,
+        decimal_places=3,
     )
-    living_environment_score_exponentially_transformed = models.IntegerField(
+    living_environment_score_exponentially_transformed = models.DecimalField(
         "Living Environment Score exponentially transformed",
         help_text="Living Environment Score exponentially transformed",
         null=True,
+        max_digits=6,
+        decimal_places=3,
     )
     living_environment_rank = models.IntegerField(
         "Living Environment Rank",
@@ -279,10 +323,12 @@ class IndexMultipleDeprivation(models.Model):
         "Living Environment Decile",
         help_text="Living Environment Decile (where 1 is most deprived 10% of LSOAs)",
     )
-    indoors_sub_domain_score = models.IntegerField(
+    indoors_sub_domain_score = models.DecimalField(
         "Indoors Sub-domain Score (rate)",
         help_text="Indoors Sub-domain Score (rate)",
         null=True,
+        max_digits=5,
+        decimal_places=3,
     )
     indoors_sub_domain_rank = models.IntegerField(
         "Indoors Sub-domain Rank",
@@ -294,10 +340,12 @@ class IndexMultipleDeprivation(models.Model):
         help_text="Indoors Sub-domain Decile (where 1 is most deprived 10% of LSOAs)",
         null=True,
     )
-    outdoors_sub_domain_score = models.IntegerField(
+    outdoors_sub_domain_score = models.DecimalField(
         "Outdoors Sub-domain Score (rate)",
         help_text="Outdoors Sub-domain Score (rate)",
         null=True,
+        max_digits=5,
+        decimal_places=3,
     )
     outdoors_sub_domain_rank = models.IntegerField(
         "Outdoors Sub-domain Rank",
@@ -309,10 +357,12 @@ class IndexMultipleDeprivation(models.Model):
         help_text="Outdoors Sub-domain Decile (where 1 is most deprived 10% of LSOAs)",
         null=True,
     )
-    idaci_score = models.IntegerField(
+    idaci_score = models.DecimalField(
         "Income Deprivation Affecting Children Index Score (rate)",
         help_text="Income Deprivation Affecting Children Index (IDACI) Score (rate)",
         null=True,
+        max_digits=5,
+        decimal_places=3,
     )
     idaci_rank = models.IntegerField(
         "Income Deprivation Affecting Children Index Rank",
@@ -324,10 +374,12 @@ class IndexMultipleDeprivation(models.Model):
         help_text="Income Deprivation Affecting Children Index (IDACI) Decile (where 1 is most deprived 10% of LSOAs)",
         null=True,
     )
-    idaopi_score = models.IntegerField(
+    idaopi_score = models.DecimalField(
         "Income Deprivation Affecting Older People Index Score (rate)",
         help_text="Income Deprivation Affecting Older People Index (IDAOPI) Score (rate)",
         null=True,
+        max_digits=5,
+        decimal_places=3,
     )
     idaopi_rank = models.IntegerField(
         "Income Deprivation Affecting Older People Index Rank",
