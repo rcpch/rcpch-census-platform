@@ -1,4 +1,5 @@
 import csv
+from decimal import Decimal
 from django.core.management.base import BaseCommand
 
 from django.conf import settings
@@ -83,32 +84,30 @@ def add_lsoas_2011_wards_2019_to_LADS_2019():
         lsoa_counter = 0
         data = list(csv.reader(f, delimiter=","))
 
-        for row in data[1:]:  # skip the first row
+    for row in data[1:]:  # skip the first row
 
-            (
-                local_authority_district_2019,
-                created,
-            ) = LocalAuthority.objects.get_or_create(
-                local_authority_district_code=row[5],
-                local_authority_district_name=row[6],
-                year=2019,
-            )
-            if created:
-                lad_counter += 1
+        (
+            local_authority_district_2019,
+            created,
+        ) = LocalAuthority.objects.get_or_create(
+            local_authority_district_code=row[5],
+            local_authority_district_name=row[6],
+            year=2019,
+        )
+        if created:
+            lad_counter += 1
 
-            lsoa_2011, created = LSOA.objects.get_or_create(
-                lsoa_code=row[1],
-                lsoa_name=row[2],
-                year=2011,
-                local_authority_district=local_authority_district_2019,
-            )
-            if created:
-                lsoa_counter += 1
+        lsoa_2011, created = LSOA.objects.get_or_create(
+            lsoa_code=row[1],
+            lsoa_name=row[2],
+            year=2011,
+            local_authority_district=local_authority_district_2019,
+        )
+        if created:
+            lsoa_counter += 1
 
-            print(
-                f"{lad_counter} local authority districts and {lsoa_counter} lsoas added.",
-                end="\r",
-            )
+        # ##progress_bar(current=lsoa_counter, total=lsoa_counter, bar_length=40)
+        ##progress_bar(current=lsoa_counter, total=32844, bar_length=40)
     print(
         f"Complete. Added total {lad_counter} local authority districts and {lsoa_counter} lsoas."
     )
@@ -116,7 +115,7 @@ def add_lsoas_2011_wards_2019_to_LADS_2019():
 
 def add_deprivation_scores_and_domains_to_2011_lsoas():
     # import domains of deprivation data
-    path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_SUBDOMAINS_OF_DEPRIVATION}"
+    path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_DOMAINS_OF_DEPRIVATION}"
     with open(path, "r") as f:
         print(G + "Adding domains of deprivation to LSOAs" + W)
         data = list(csv.reader(f, delimiter=","))
@@ -147,13 +146,15 @@ def add_deprivation_scores_and_domains_to_2011_lsoas():
                 )
                 count += 1
 
-                print(f"Added {count} records of deprivation domains", end="\r")
+            ##progress_bar(current=count, total=32844, bar_length=40)
 
-        print(f"{BOLD}Complete.{END} {count} IMD records with domains added")
+            print(f"Added {count} records of deprivation domains", end="\r")
+
+    print(f"{BOLD}Complete.{END} {count} IMD records with domains added")
 
 
 def update_imd_data_with_subdomains():
-    # import domains of deprivation data
+    # import subdomains of deprivation data
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_SUBDOMAINS_OF_DEPRIVATION}"
     with open(path, "r") as f:
         print(G + "Adding sub-domains of deprivation to LSOAs" + W)
@@ -177,8 +178,12 @@ def update_imd_data_with_subdomains():
                 outdoors_sub_domain_decile=int(float(row[21])),
             )
             count += 1
+
+            ##progress_bar(current=count, total=32844, bar_length=40)
             print(f"Updated {count} LSOAs with subdomains.", end="\r")
-    print(f"{BOLD}Complete.{END} Added {count} subdomains of deprivation 2019 to LSOAs")
+    print(
+        f"{BOLD}Complete.{END} Added {count} subdomains of deprivation 2019 to LSOAs",
+    )
 
 
 def update_imd_data_with_supplementary_indices():
@@ -203,6 +208,7 @@ def update_imd_data_with_supplementary_indices():
             )
             count += 1
             print(f"Updated {count} LSOAs with IDACI and IDAOPI data...", end="\r")
+            ##progress_bar(current=count, total=32844, bar_length=40)
     print(
         f"{BOLD}Complete.{END} Added {count} supplementary indices (IDACI and IDAOPI) of deprivation 2019 to LSOAs"
     )
@@ -219,24 +225,25 @@ def update_imd_data_with_scores():
         for row in data[1:]:
             lsoa = LSOA.objects.get(lsoa_code=row[0])
             IndexMultipleDeprivation.objects.filter(lsoa=lsoa).update(
-                imd_score=int(float(row[4])),
-                income_score=int(float(row[5])),
-                employment_score=int(float(row[6])),
-                education_skills_training_score=int(float(row[7])),
-                health_deprivation_disability_score=int(float(row[8])),
-                crime_score=int(float(row[9])),
-                barriers_to_housing_services_score=int(float(row[10])),
-                living_environment_score=int(float(row[11])),
-                idaci_score=int(float(row[12])),
-                idaopi_score=int(float(row[13])),
-                children_young_people_sub_domain_score=int(float(row[14])),
-                adult_skills_sub_domain_score=int(float(row[15])),
-                geographical_barriers_sub_domain_score=int(float(row[16])),
-                wider_barriers_sub_domain_score=int(float(row[17])),
-                indoors_sub_domain_score=int(float(row[18])),
-                outdoors_sub_domain_score=int(float(row[19])),
+                imd_score=Decimal(row[4]),
+                income_score=Decimal(row[5]),
+                employment_score=Decimal(row[6]),
+                education_skills_training_score=Decimal(row[7]),
+                health_deprivation_disability_score=Decimal(row[8]),
+                crime_score=Decimal(row[9]),
+                barriers_to_housing_services_score=Decimal(row[10]),
+                living_environment_score=Decimal(row[11]),
+                idaci_score=Decimal(row[12]),
+                idaopi_score=Decimal(row[13]),
+                children_young_people_sub_domain_score=Decimal(row[14]),
+                adult_skills_sub_domain_score=Decimal(row[15]),
+                geographical_barriers_sub_domain_score=Decimal(row[16]),
+                wider_barriers_sub_domain_score=Decimal(row[17]),
+                indoors_sub_domain_score=Decimal(row[18]),
+                outdoors_sub_domain_score=Decimal(row[19]),
             )
             count += 1
+            ##progress_bar(current=count, total=32844, bar_length=40)
             print(f"Updated {count} LSOAs with scores of deprivation 2019...", end="\r")
     print(f"{BOLD}Complete.{END} Added {count} scores of deprivation 2019 to LSOAs")
 
@@ -254,21 +261,22 @@ def update_imd_data_with_transformed_scores():
         for row in data[1:]:
             lsoa = LSOA.objects.get(lsoa_code=row[0])
             IndexMultipleDeprivation.objects.filter(lsoa=lsoa).update(
-                income_score_exponentially_transformed=int(float(row[4])),
-                employment_score_exponentially_transformed=int(float(row[5])),
-                education_skills_training_score_exponentially_transformed=int(
-                    float(row[6])
+                income_score_exponentially_transformed=Decimal(row[4]),
+                employment_score_exponentially_transformed=Decimal(row[5]),
+                education_skills_training_score_exponentially_transformed=Decimal(
+                    row[6]
                 ),
-                health_deprivation_disability_score_exponentially_transformed=int(
-                    float(row[7])
+                health_deprivation_disability_score_exponentially_transformed=Decimal(
+                    row[7]
                 ),
-                crime_score_exponentially_transformed=int(float(row[8])),
-                barriers_to_housing_services_score_exponentially_transformed=int(
-                    float(row[9])
+                crime_score_exponentially_transformed=Decimal(row[8]),
+                barriers_to_housing_services_score_exponentially_transformed=Decimal(
+                    row[9]
                 ),
-                living_environment_score_exponentially_transformed=int(float(row[10])),
+                living_environment_score_exponentially_transformed=Decimal(row[10]),
             )
             count += 1
+            ##progress_bar(current=count, total=32844, bar_length=40)
             print(
                 f"Updated {count} LSOAs with transformed scores of deprivation 2019...",
                 end="\r",
@@ -314,8 +322,9 @@ def add_scottish_data_zones_and_local_authorities():
                 f"Added {lad_count} Scottish Local Authorities and {dz_count} data zones...",
                 end="\r",
             )
+            ##progress_bar(current=dz_count, total=6976, bar_length=40)
     print(
-        f"{BOLD}Complete.{END} Added {lad_count} Scottish Local Authorities and {dz_count} data zones..."
+        f"{BOLD}Complete.{END} Added {lad_count} Scottish Local Authorities and {dz_count} data zones...",
     )
 
 
@@ -326,7 +335,7 @@ def add_2015_population_denominators():
         f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_LSOA_2015_POPULATION_DENOMINATORS}"
     )
     with open(path, "r") as f:
-        print(G + "Adding 2019 population denominators to LSOAs" + W)
+        print(G + "Adding 2015 population denominators to LSOAs" + W)
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
@@ -354,52 +363,56 @@ def add_lad_access_to_outdoor_space():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in data[2:]:  # header is on row 3
-            local_authority = LocalAuthority.objects.get(
-                local_authority_district_code=row[4]
+    for row in data[2:]:  # header is on row 3
+        local_authority = LocalAuthority.objects.get(
+            local_authority_district_code=row[4]
+        )
+        if GreenSpace.objects.filter(local_authority=local_authority).exists():
+            print("Greenspace data already available for this Local Authority")
+            pass
+        else:
+            GreenSpace.objects.create(
+                local_authority=local_authority,
+                houses_address_count=int(float(row[6])),
+                houses_addresses_with_private_outdoor_space_count=int(float(row[7])),
+                houses_outdoor_space_total_area=int(float(row[8])),
+                houses_percentage_of_addresses_with_private_outdoor_space=int(
+                    float(row[9])
+                ),
+                houses_average_size_private_outdoor_space=int(float(row[10])),
+                houses_median_size_private_outdoor_space=int(float(row[11])),
+                flats_address_count=int(float(row[12])),
+                flats_addresses_with_private_outdoor_space_count=int(float(row[13])),
+                flats_outdoor_space_total_area=int(float(row[14])),
+                flats_outdoor_space_count=int(float(row[15])),
+                flats_percentage_of_addresses_with_private_outdoor_space=int(
+                    float(row[16])
+                ),
+                flats_average_size_private_outdoor_space=int(float(row[17])),
+                flats_average_number_of_flats_sharing_a_garden=int(float(row[18])),
+                total_addresses_count=int(float(row[19])),
+                total_addresses_with_private_outdoor_space_count=int(float(row[20])),
+                total_percentage_addresses_with_private_outdoor_space=int(
+                    float(row[21])
+                ),
+                total_average_size_private_outdoor_space=int(float(row[22])),
             )
-            if GreenSpace.objects.filter(local_authority=local_authority).exists():
-                print("Greenspace data available for this Local Authority", end="\r")
-                pass
-            else:
-                GreenSpace.objects.create(
-                    local_authority=local_authority,
-                    houses_address_count=int(float(row[6])),
-                    houses_addresses_with_private_outdoor_space_count=int(
-                        float(row[7])
-                    ),
-                    houses_outdoor_space_total_area=int(float(row[8])),
-                    houses_percentage_of_addresses_with_private_outdoor_space=int(
-                        float(row[9])
-                    ),
-                    houses_average_size_private_outdoor_space=int(float(row[10])),
-                    houses_median_size_private_outdoor_space=int(float(row[11])),
-                    flats_address_count=int(float(row[12])),
-                    flats_addresses_with_private_outdoor_space_count=int(
-                        float(row[13])
-                    ),
-                    flats_outdoor_space_total_area=int(float(row[14])),
-                    flats_outdoor_space_count=int(float(row[15])),
-                    flats_percentage_of_addresses_with_private_outdoor_space=int(
-                        float(row[16])
-                    ),
-                    flats_average_size_private_outdoor_space=int(float(row[17])),
-                    flats_average_number_of_flats_sharing_a_garden=int(float(row[18])),
-                    total_addresses_count=int(float(row[19])),
-                    total_addresses_with_private_outdoor_space_count=int(
-                        float(row[20])
-                    ),
-                    total_percentage_addresses_with_private_outdoor_space=int(
-                        float(row[21])
-                    ),
-                    total_average_size_private_outdoor_space=int(float(row[22])),
-                )
 
-                count += 1
-                print(
-                    f"Created {count} Local Authority green space records...", end="\r"
-                )
+            count += 1
+            print(f"Created {count} Local Authority green space records...", end="\r")
+            # ##progress_bar(current=count, total=371, bar_length=40)
     print(f"{BOLD}Complete.{END} Added {count} Local Authority green space records.")
+
+
+def progress_bar(current, total, bar_length=20):
+    fraction = current / total
+
+    arrow = int(fraction * bar_length - 1) * "-" + ">"
+    padding = int(bar_length - len(arrow)) * " "
+
+    ending = "\n" if current == total else "\r"
+
+    print(f"Progress: [{arrow}{padding}] {int(fraction*100)}%", end=ending)
 
 
 def image():
