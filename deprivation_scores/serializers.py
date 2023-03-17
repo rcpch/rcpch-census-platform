@@ -1,5 +1,11 @@
 from rest_framework import serializers
-from .models import LSOA, LocalAuthority, IndexMultipleDeprivation, GreenSpace
+from .models import (
+    LSOA,
+    LocalAuthority,
+    IndexMultipleDeprivation,
+    GreenSpace,
+    WelshIndexMultipleDeprivation,
+)
 
 
 class LSOASerializer(serializers.HyperlinkedModelSerializer):
@@ -27,7 +33,7 @@ class LocalAuthorityDistrictSerializer(serializers.HyperlinkedModelSerializer):
         ]
 
 
-class IndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer):
+class IndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     class Meta:
         model = IndexMultipleDeprivation
         fields = [
@@ -88,6 +94,12 @@ class IndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer)
             "idaopi_decile",
             "lsoa",
         ]
+
+
+class WelshIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WelshIndexMultipleDeprivation
+        fields = "__all__"
 
 
 class GreenSpaceSerializer(serializers.HyperlinkedModelSerializer):
