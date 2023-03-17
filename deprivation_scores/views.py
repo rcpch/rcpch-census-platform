@@ -1,13 +1,23 @@
 from rest_framework import viewsets
 from rest_framework import permissions
 from rest_framework.views import APIView, Response
+from rest_framework import authentication, permissions
 
-from .models import LocalAuthority, LSOA, IndexMultipleDeprivation, GreenSpace
+from requests import Request
+
+from .models import (
+    LocalAuthority,
+    LSOA,
+    IndexMultipleDeprivation,
+    GreenSpace,
+    WelshIndexMultipleDeprivation,
+)
 from .serializers import (
     LocalAuthorityDistrictSerializer,
     LSOASerializer,
     IndexMultipleDeprivationSerializer,
     GreenSpaceSerializer,
+    WelshIndexMultipleDeprivationSerializer,
 )
 from .general_functions import (
     lsoa_for_postcode,
@@ -59,13 +69,19 @@ class IndexMultipleDeprivationViewSet(viewsets.ModelViewSet):
         lsoa_code = self.request.query_params.get("lsoa_code", None)
         post_code = self.request.query_params.get("postcode", None)
         if post_code:
-            lsoa_code = lsoa_for_postcode(postcode=post_code)
-        if lsoa_code:
+            lsoa_object = lsoa_for_postcode(postcode=post_code)
+        if lsoa_object["lsoa"]:
             lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-            print(lsoa.year)
-            query_set = IndexMultipleDeprivation.objects.filter(lsoa=lsoa).all()
+            if lsoa_object["country"] == "England":
+                query_set = IndexMultipleDeprivation.objects.filter(lsoa=lsoa).all()
             return query_set
         return super().get_queryset()
+
+
+class WelshMultipleDeprivationViewSet(viewsets.ModelViewSet):
+    queryset = WelshIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
+    serializer_class = WelshIndexMultipleDeprivationSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
 
 class GreenSpaceViewSet(viewsets.ModelViewSet):
@@ -106,3 +122,33 @@ class PostcodeView(APIView):
         if postcode:
             response = regions_for_postcode(postcode=postcode)
             return Response(response)
+
+
+class EnglishWalesIndexMultipleDeprivationView(APIView):
+    authentication_classes = [authentication.TokenAuthentication]
+    permission_classes = [permissions.IsAdminUser]
+    english_serializer_class = IndexMultipleDeprivationSerializer
+    welsh_serializer_class = WelshIndexMultipleDeprivationSerializer
+
+    def get(self, request):
+        """
+        Returns an IMD against a postcode, from either Wales or Scotland
+        """
+        lsoa_code = self.request.query_params.get("lsoa_code", None)
+        post_code = self.request.query_params.get("postcode", None)
+        if post_code:
+            lsoa_object = lsoa_for_postcode(postcode=post_code)
+        if lsoa_object["lsoa"]:
+            lsoa = LSOA.objects.filter(lsoa_code=lsoa_object["lsoa"]).get()
+            if lsoa_object["country"] == "England":
+                imd = IndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
+                response = self.english_serializer_class(
+                    instance=imd, context={"request": Request(request)}
+                )
+            elif lsoa_object["country"] == "Wales":
+                imd = WelshIndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
+                response = self.welsh_serializer_class(
+                    instance=imd, context={"request": Request(request)}
+                )
+
+            return Response(response.data)

@@ -1,4 +1,5 @@
 import requests
+from pprint import pprint
 
 
 def lsoa_for_postcode(postcode):
@@ -12,8 +13,9 @@ def lsoa_for_postcode(postcode):
         return None
 
     serialised = response.json()
+    country = serialised["result"]["country"]
     lsoa = serialised["result"]["codes"]["lsoa"]
-    return lsoa
+    return {"lsoa": lsoa, "country": country}
 
 
 def regions_for_postcode(postcode):
