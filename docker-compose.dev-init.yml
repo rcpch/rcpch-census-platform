@@ -5,7 +5,7 @@
 version: '3.11'
 
 services:
-  
+
   # web container - runs the django app
   web:
     build: .
@@ -39,13 +39,15 @@ services:
             python manage.py collectstatic --noinput &&
             python manage.py makemigrations &&
             python manage.py migrate &&
-            python manage.py seed --mode=add_census_areas &&
+            python manage.py seed --mode=add_organisational_areas &&
+            python manage.py seed --mode=add_english_imds &&
+            python manage.py seed --mode=add_welsh_imds &&
             python manage.py createsuperuser --noinput &&
             echo 'DEV SETUP SCRIPT: Development superuser username: rcpch-census-dev-user' &&
             echo 'DEV SETUP SCRIPT: Development superuser password: pw' &&
             python manage.py drf_create_token rcpch-census-dev-user &&
             python manage.py runserver 0.0.0.0:8001"
-  
+
   # db container - runs postgres
   db:
     image: postgres:latest

@@ -456,3 +456,71 @@ class GreenSpace(models.Model):
     )
 
     local_authority = models.ForeignKey(LocalAuthority, on_delete=models.CASCADE)
+
+
+class WelshIndexMultipleDeprivation(models.Model):
+    imd_rank = models.IntegerField()
+    imd_quartile = models.SmallIntegerField()
+    imd_quintile = models.SmallIntegerField()
+    imd_decile = models.SmallIntegerField()
+    imd_score = models.DecimalField(
+        max_digits=4, decimal_places=1, blank=True, null=True
+    )
+    income_rank = models.IntegerField()
+    income_quartile = models.SmallIntegerField()
+    income_quintile = models.SmallIntegerField()
+    income_decile = models.SmallIntegerField()
+    income_score = models.DecimalField(
+        max_digits=4, decimal_places=1, blank=True, null=True
+    )
+    employment_rank = models.IntegerField()
+    employment_quartile = models.SmallIntegerField()
+    employment_quintile = models.SmallIntegerField()
+    employment_decile = models.SmallIntegerField()
+    employment_score = models.DecimalField(
+        max_digits=4, decimal_places=1, blank=True, null=True
+    )
+    health_rank = models.IntegerField()
+    health_quartile = models.SmallIntegerField()
+    health_quintile = models.SmallIntegerField()
+    health_decile = models.SmallIntegerField()
+    health_score = models.DecimalField(
+        max_digits=4, decimal_places=1, blank=True, null=True
+    )
+    education_rank = models.IntegerField()
+    education_quartile = models.SmallIntegerField()
+    education_quintile = models.SmallIntegerField()
+    education_decile = models.SmallIntegerField()
+    education_score = models.DecimalField(
+        max_digits=4, decimal_places=1, blank=True, null=True
+    )
+    access_to_services_rank = models.IntegerField()
+    access_to_services_quartile = models.SmallIntegerField()
+    access_to_services_quintile = models.SmallIntegerField()
+    access_to_services_decile = models.SmallIntegerField()
+    access_to_services_score = models.DecimalField(
+        max_digits=4, decimal_places=1, blank=True, null=True
+    )
+    housing_rank = models.IntegerField()
+    housing_quartile = models.SmallIntegerField()
+    housing_quintile = models.SmallIntegerField()
+    housing_decile = models.SmallIntegerField()
+    housing_score = models.DecimalField(
+        max_digits=4, decimal_places=1, blank=True, null=True
+    )
+    community_safety_rank = models.IntegerField()
+    community_safety_quartile = models.SmallIntegerField()
+    community_safety_quintile = models.SmallIntegerField()
+    community_safety_decile = models.SmallIntegerField()
+    community_safety_score = models.DecimalField(
+        max_digits=4, decimal_places=1, blank=True, null=True
+    )
+    physical_environment_rank = models.IntegerField()
+    physical_environment_quartile = models.SmallIntegerField()
+    physical_environment_quintile = models.SmallIntegerField()
+    physical_environment_decile = models.SmallIntegerField()
+    physical_environment_score = models.DecimalField(
+        max_digits=4, decimal_places=1, blank=True, null=True
+    )
+    lsoa = models.ForeignKey(LSOA, on_delete=models.CASCADE)
+    year = models.IntegerField()

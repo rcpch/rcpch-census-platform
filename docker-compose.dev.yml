@@ -1,0 +1,40 @@
+# runs a local version of Epilepsy12 for development on port 8000
+# syncs changes in local code folder to the E12 container
+# migrates the database
+
+version: '3.11'
+
+services:
+
+  # web container - runs the django app
+  web:
+    build: .
+    ports:
+      - 8000:8000
+    depends_on:
+      - db
+    volumes:
+      - .:/home/app/webapp
+    environment:
+      # these env vars are ONLY for development
+
+      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_USER=rcpchCensususer
+      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PASSWORD=password
+      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_NAME=rcpchCensusdb
+      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_HOST=db
+      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PORT=5432
+      - RCPCH_CENSUS_PLATFORM_SECRET_KEY=mysecretkey
+      - DEBUG=True
+      - DJANGO_ALLOWED_HOSTS=0.0.0.0
+    command: >
+      sh -c "python manage.py runserver 0.0.0.0:8001"
+
+  # db container - runs postgres
+  db:
+    image: postgres:latest
+    # volumes:
+    #   - ./data/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=rcpchCensususer
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=rcpchCensusdb
