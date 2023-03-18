@@ -11,17 +11,11 @@ services:
     build: .
     ports:
       - 8001:8001
-    depends_on:
-      - db
     volumes:
       - .:/home/app/webapp
     environment:
       # these env vars are ONLY for development
-      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_USER=rcpchCensususer
-      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PASSWORD=password
-      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_NAME=rcpchCensusdb
-      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_HOST=db
-      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PORT=5432
+      - RCPCH_CENSUS_PLATFORM_DB_NAME=rcpchCensusdb.sqlite3
       - RCPCH_CENSUS_PLATFORM_SECRET_KEY=mysecretkey
       - DEBUG=False
       - DJANGO_ALLOWED_HOSTS=0.0.0.0
@@ -30,30 +24,22 @@ services:
       - DJANGO_SUPERUSER_FIRST_NAME=dev
       - DJANGO_SUPERUSER_SURNAME=dev
       - DJANGO_SUPERUSER_EMAIL=rcpch-census-dev-user@rcpch.tech
-      - DJANGO_SUPERUSER_IS_RCPCH_AUDIT_TEAM_MEMBER=True
       - DJANGO_SUPERUSER_ROLE=1
       - DJANGO_CSRF_TRUSTED_ORIGINS=https://localhost,https://0.0.0.0
     command: >
       sh -c "pip install --upgrade pip &&
             pip install -r requirements/development-requirements.txt &&
-            python manage.py collectstatic --noinput &&
-            python manage.py makemigrations &&
-            python manage.py migrate &&
-            python manage.py seed --mode=add_organisational_areas &&
-            python manage.py seed --mode=add_english_imds &&
-            python manage.py seed --mode=add_welsh_imds &&
+            python -u manage.py collectstatic --noinput &&
+            python -u manage.py makemigrations &&
+            python -u manage.py migrate &&
+            # python -u manage.py seed --mode=add_organisational_areas &&
+            # python -u manage.py seed --mode=add_english_imds &&
+            # python -u manage.py seed --mode=add_welsh_imds &&
+            # python -u manage.py seed --mode=add_scottish_imds &&
+            # python -u manage.py seed --mode=add_northern_ireland_imds &&
             python manage.py createsuperuser --noinput &&
             echo 'DEV SETUP SCRIPT: Development superuser username: rcpch-census-dev-user' &&
             echo 'DEV SETUP SCRIPT: Development superuser password: pw' &&
             python manage.py drf_create_token rcpch-census-dev-user &&
             python manage.py runserver 0.0.0.0:8001"
-
-  # db container - runs postgres
-  db:
-    image: postgres:latest
-    # volumes:
-    #   - ./data/db:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_USER=rcpchCensususer
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=rcpchCensusdb
+    # db container - runs sqlite3

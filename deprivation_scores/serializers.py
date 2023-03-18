@@ -2,9 +2,13 @@ from rest_framework import serializers
 from .models import (
     LSOA,
     LocalAuthority,
-    IndexMultipleDeprivation,
     GreenSpace,
+    DataZone,
+    SOA,
+    EnglishIndexMultipleDeprivation,
     WelshIndexMultipleDeprivation,
+    ScottishIndexMultipleDeprivation,
+    NorthernIrelandIndexMultipleDeprivation,
 )
 
 
@@ -33,9 +37,49 @@ class LocalAuthorityDistrictSerializer(serializers.HyperlinkedModelSerializer):
         ]
 
 
-class IndexMultipleDeprivationSerializer(serializers.ModelSerializer):
+class GreenSpaceSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
-        model = IndexMultipleDeprivation
+        model = GreenSpace
+        depth = 1
+        fields = [
+            "houses_address_count",
+            "houses_addresses_with_private_outdoor_space_count",
+            "houses_outdoor_space_total_area",
+            "houses_outdoor_space_total_area",
+            "houses_percentage_of_addresses_with_private_outdoor_space",
+            "houses_average_size_private_outdoor_space",
+            "houses_median_size_private_outdoor_space",
+            "flats_address_count",
+            "flats_addresses_with_private_outdoor_space_count",
+            "flats_outdoor_space_total_area",
+            "flats_outdoor_space_count",
+            "flats_percentage_of_addresses_with_private_outdoor_space",
+            "flats_average_size_private_outdoor_space",
+            "flats_average_number_of_flats_sharing_a_garden",
+            "total_addresses_count",
+            "total_addresses_with_private_outdoor_space_count",
+            "total_percentage_addresses_with_private_outdoor_space",
+            "total_average_size_private_outdoor_space",
+            "local_authority",
+        ]
+
+
+class DataZoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DataZone
+        fields = "__all__"
+        depth = 1
+
+
+class SOASerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SOA
+        fields = "__all__"
+
+
+class EnglishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EnglishIndexMultipleDeprivation
         fields = [
             "imd_score",
             "imd_rank",
@@ -102,27 +146,15 @@ class WelshIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class GreenSpaceSerializer(serializers.HyperlinkedModelSerializer):
+class ScottishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     class Meta:
-        model = GreenSpace
-        fields = [
-            "houses_address_count",
-            "houses_addresses_with_private_outdoor_space_count",
-            "houses_outdoor_space_total_area",
-            "houses_outdoor_space_total_area",
-            "houses_percentage_of_addresses_with_private_outdoor_space",
-            "houses_average_size_private_outdoor_space",
-            "houses_median_size_private_outdoor_space",
-            "flats_address_count",
-            "flats_addresses_with_private_outdoor_space_count",
-            "flats_outdoor_space_total_area",
-            "flats_outdoor_space_count",
-            "flats_percentage_of_addresses_with_private_outdoor_space",
-            "flats_average_size_private_outdoor_space",
-            "flats_average_number_of_flats_sharing_a_garden",
-            "total_addresses_count",
-            "total_addresses_with_private_outdoor_space_count",
-            "total_percentage_addresses_with_private_outdoor_space",
-            "total_average_size_private_outdoor_space",
-            "local_authority",
-        ]
+        model = ScottishIndexMultipleDeprivation
+        fields = "__all__"
+        depth = 1
+
+
+class NorthernIrelandIndexMultipleDepricationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NorthernIrelandIndexMultipleDeprivation
+        fields = "__all__"
+        depth = 1

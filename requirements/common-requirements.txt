@@ -5,7 +5,6 @@ python-dateutil
 # third party imports
 django
 djangorestframework
-psycopg2-binary
 whitenoise
 
 # RCPCH imports

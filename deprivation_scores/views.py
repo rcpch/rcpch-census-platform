@@ -2,22 +2,30 @@ from rest_framework import viewsets
 from rest_framework import permissions
 from rest_framework.views import APIView, Response
 from rest_framework import authentication, permissions
+from rest_framework.exceptions import NotFound
 
 from requests import Request
 
 from .models import (
     LocalAuthority,
     LSOA,
-    IndexMultipleDeprivation,
     GreenSpace,
+    DataZone,
+    SOA,
+    EnglishIndexMultipleDeprivation,
     WelshIndexMultipleDeprivation,
+    ScottishIndexMultipleDeprivation,
+    NorthernIrelandIndexMultipleDeprivation,
 )
 from .serializers import (
     LocalAuthorityDistrictSerializer,
     LSOASerializer,
-    IndexMultipleDeprivationSerializer,
     GreenSpaceSerializer,
+    DataZoneSerializer,
+    EnglishIndexMultipleDeprivationSerializer,
     WelshIndexMultipleDeprivationSerializer,
+    ScottishIndexMultipleDeprivationSerializer,
+    NorthernIrelandIndexMultipleDepricationSerializer,
 )
 from .general_functions import (
     lsoa_for_postcode,
@@ -60,30 +68,6 @@ class LSOAViewSet(viewsets.ModelViewSet):
         return query_set
 
 
-class IndexMultipleDeprivationViewSet(viewsets.ModelViewSet):
-    queryset = IndexMultipleDeprivation.objects.all().order_by("-imd_rank")
-    serializer_class = IndexMultipleDeprivationSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        lsoa_code = self.request.query_params.get("lsoa_code", None)
-        post_code = self.request.query_params.get("postcode", None)
-        if post_code:
-            lsoa_object = lsoa_for_postcode(postcode=post_code)
-        if lsoa_object["lsoa"]:
-            lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-            if lsoa_object["country"] == "England":
-                query_set = IndexMultipleDeprivation.objects.filter(lsoa=lsoa).all()
-            return query_set
-        return super().get_queryset()
-
-
-class WelshMultipleDeprivationViewSet(viewsets.ModelViewSet):
-    queryset = WelshIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
-    serializer_class = WelshIndexMultipleDeprivationSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-
 class GreenSpaceViewSet(viewsets.ModelViewSet):
     queryset = GreenSpace.objects.all().order_by("-total_addresses_count")
     serializer_class = GreenSpaceSerializer
@@ -112,6 +96,53 @@ class GreenSpaceViewSet(viewsets.ModelViewSet):
         return super().get_queryset()
 
 
+class DataZoneViewSet(viewsets.ModelViewSet):
+    queryset = DataZone
+    serializer_class = DataZoneSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class EnglishIndexMultipleDeprivationViewSet(viewsets.ModelViewSet):
+    queryset = EnglishIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
+    serializer_class = EnglishIndexMultipleDeprivationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        lsoa_code = self.request.query_params.get("lsoa_code", None)
+        post_code = self.request.query_params.get("postcode", None)
+        if post_code:
+            lsoa_object = lsoa_for_postcode(postcode=post_code)
+        if lsoa_object["lsoa"]:
+            lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
+            if lsoa_object["country"] == "England":
+                query_set = EnglishIndexMultipleDeprivation.objects.filter(
+                    lsoa=lsoa
+                ).all()
+            return query_set
+        return super().get_queryset()
+
+
+class WelshMultipleDeprivationViewSet(viewsets.ModelViewSet):
+    queryset = WelshIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
+    serializer_class = WelshIndexMultipleDeprivationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class ScottishMultipleDeprivationViewSet(viewsets.ModelViewSet):
+    queryset = ScottishIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
+    serializer_class = ScottishIndexMultipleDeprivationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class NorthernIrelandMultipleDeprivationViewSet(viewsets.ModelViewSet):
+    queryset = NorthernIrelandIndexMultipleDeprivation.objects.all().order_by(
+        "-imd_rank"
+    )
+    serializer_class = NorthernIrelandIndexMultipleDepricationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+# custom views / endpoints
 class PostcodeView(APIView):
     def get(self, request):
         """
@@ -127,8 +158,12 @@ class PostcodeView(APIView):
 class EnglishWalesIndexMultipleDeprivationView(APIView):
     authentication_classes = [authentication.TokenAuthentication]
     permission_classes = [permissions.IsAdminUser]
-    english_serializer_class = IndexMultipleDeprivationSerializer
+    english_serializer_class = EnglishIndexMultipleDeprivationSerializer
     welsh_serializer_class = WelshIndexMultipleDeprivationSerializer
+    scottish_serializer_class = ScottishIndexMultipleDeprivationSerializer
+    northern_ireland_serializer_class = (
+        NorthernIrelandIndexMultipleDepricationSerializer
+    )
 
     def get(self, request):
         """
@@ -138,10 +173,13 @@ class EnglishWalesIndexMultipleDeprivationView(APIView):
         post_code = self.request.query_params.get("postcode", None)
         if post_code:
             lsoa_object = lsoa_for_postcode(postcode=post_code)
+        else:
+            raise NotFound("No postcode supplied.")
+
         if lsoa_object["lsoa"]:
             lsoa = LSOA.objects.filter(lsoa_code=lsoa_object["lsoa"]).get()
             if lsoa_object["country"] == "England":
-                imd = IndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
+                imd = EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
                 response = self.english_serializer_class(
                     instance=imd, context={"request": Request(request)}
                 )
@@ -150,5 +188,23 @@ class EnglishWalesIndexMultipleDeprivationView(APIView):
                 response = self.welsh_serializer_class(
                     instance=imd, context={"request": Request(request)}
                 )
+            elif lsoa_object["country"] == "Scotland":
+                imd = ScottishIndexMultipleDeprivation.objects.filter(
+                    data_zone=lsoa
+                ).get()
+                response = self.scottish_serializer_class(
+                    instance=imd, context={"request": Request(request)}
+                )
+            elif lsoa_object["country"] == "Northern Ireland":
+                imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
+                    soa=lsoa
+                ).get()
+                response = self.northern_ireland_serializer_class(
+                    instance=imd, context={"request": Request(request)}
+                )
+            else:
+                raise NotFound(f"LSOA {lsoa} not found,.")
+        else:
+            raise NotFound("No valid LSOA found.")
 
             return Response(response.data)

@@ -121,3 +121,4 @@ staticfiles/
 .vscode/*
 
 db.sqlite3
+rcpchCensusdb.sqlite3
