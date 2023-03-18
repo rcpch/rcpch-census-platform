@@ -790,16 +790,12 @@ def add_scottish_deprivation_ranks_and_domains_to_2011_datazones():
 def progress_bar(current, total, bar_length=20):
     fraction = current / total
 
-    arrow = int(fraction * bar_length - 1) * "◼︎"
+    arrow = int(fraction * bar_length - 1) * "◼︎" + ">"
     padding = int(bar_length - len(arrow)) * " "
 
     ending = "\n" if current == total else "\r"
 
-    print(
-        W + f"Progress: [{arrow}{padding}] {int(fraction*100)}%" + W,
-        end="\r",
-        flush=True,
-    )
+    print(f"Progress: [{arrow}{padding}] {int(fraction*100)}%", end=ending, flush=True)
 
 
 def image():
