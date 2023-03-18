@@ -89,12 +89,8 @@ WSGI_APPLICATION = "rcpch_census_platform.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("- RCPCH_CENSUS_PLATFORM_POSTGRES_DB_NAME"),
-        "USER": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_USER"),
-        "PASSWORD": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PASSWORD"),
-        "HOST": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_HOST"),
-        "PORT": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PORT"),
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": os.environ.get("RCPCH_CENSUS_PLATFORM_DB_NAME"),
     }
 }
 
@@ -121,7 +117,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.1/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "en-GB"
 
 TIME_ZONE = "UTC"
 

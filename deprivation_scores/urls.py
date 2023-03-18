@@ -1,25 +1,36 @@
 from django.urls import include, path
 from rest_framework import routers
 from .views import (
-    IndexMultipleDeprivationViewSet,
-    WelshMultipleDeprivationViewSet,
     LocalAuthorityDistrictViewSet,
     LSOAViewSet,
-    PostcodeView,
     GreenSpaceViewSet,
+    EnglishIndexMultipleDeprivationViewSet,
+    WelshMultipleDeprivationViewSet,
+    ScottishMultipleDeprivationViewSet,
+    NorthernIrelandMultipleDeprivationViewSet,
+    PostcodeView,
     EnglishWalesIndexMultipleDeprivationView,
 )
 
 router = routers.DefaultRouter()
 router.register(r"local_authority_districts", viewset=LocalAuthorityDistrictViewSet)
 router.register(r"lower_layer_super_output_areas", viewset=LSOAViewSet)
+router.register(r"green_space", viewset=GreenSpaceViewSet)
 router.register(
-    r"english_indices_of_multiple_deprivation", viewset=IndexMultipleDeprivationViewSet
+    r"english_indices_of_multiple_deprivation",
+    viewset=EnglishIndexMultipleDeprivationViewSet,
 )
 router.register(
     r"welsh_indices_of_multiple_deprivation", viewset=WelshMultipleDeprivationViewSet
 )
-router.register(r"green_space", viewset=GreenSpaceViewSet)
+router.register(
+    r"scottish_indices_of_multiple_deprivation",
+    viewset=ScottishMultipleDeprivationViewSet,
+)
+router.register(
+    r"northern_ireland_indices_of_multiple_deprivation",
+    viewset=NorthernIrelandMultipleDeprivationViewSet,
+)
 
 drf_routes = [
     # rest framework paths

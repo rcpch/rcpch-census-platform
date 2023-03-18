@@ -1,7 +1,7 @@
 from typing import Literal
-from csv import DictReader
+from math import floor
+import sys
 import csv
-from pathlib import Path
 from decimal import Decimal
 from django.core.management.base import BaseCommand
 
@@ -11,10 +11,13 @@ from ...models import (
     MSOA,
     LocalAuthority,
     Ward,
-    IndexMultipleDeprivation,
     GreenSpace,
     DataZone,
+    SOA,
+    EnglishIndexMultipleDeprivation,
     WelshIndexMultipleDeprivation,
+    ScottishIndexMultipleDeprivation,
+    NorthernIrelandIndexMultipleDeprivation,
 )
 
 
@@ -37,6 +40,8 @@ IMD_WALES_DEPRIVATION_DOMAINS_RANKS = (
 )
 
 IMD_WALES_DEPRIVATION_SCORES = "wimd-2019-index-and-domain-scores-by-small-area.csv"
+IMD_SCOTLAND_RANKS = "SIMD+2020v2.csv"
+NORTHERN_IRELAND_SOAS_AND_IMD_RANKS = "NIMDM17_SOAresults.csv"
 
 W = "\033[0m"  # white (normal)
 R = "\033[31m"  # red
@@ -55,100 +60,87 @@ class Command(BaseCommand):
         parser.add_argument("--mode", type=str, help="Mode")
 
     def handle(self, *args, **options):
-        if options["mode"] == "add_census_areas":
-            self.stdout.write(B + "Adding census areas..." + W)
-            add_census_areas()
         if options["mode"] == "add_organisational_areas":
             self.stdout.write(B + "Adding organisational areas..." + W)
             add_lsoas_2011_wards_2019_to_LADS_2019()
             add_scottish_data_zones_and_local_authorities()
-            add_2015_population_denominators()
+            # add_2015_population_denominators()
             add_lad_access_to_outdoor_space()
         elif options["mode"] == "add_welsh_imds":
-            self.stdout.write(B + "Adding Welsh IMDs to existing LSOAs")
+            self.stdout.write(B + "Adding Welsh IMDs to existing LSOAs" + W)
             add_welsh_2019_domains_and_ranks_to_existing_2019_lsoas()
             add_welsh_2019_scores_to_existing_2019_lsoas()
         elif options["mode"] == "add_english_imds":
-            self.stdout.write(B + "Adding English IMDs to existing LSOAs")
+            self.stdout.write(B + "Adding English IMDs to existing LSOAs" + W)
             add_english_deprivation_scores_and_domains_to_2011_lsoas()
             update_english_imd_data_with_subdomains()
             update_english_imd_data_with_supplementary_indices()
             update_english_imd_data_with_scores()
             update_english_imd_data_with_transformed_scores()
+        elif options["mode"] == "add_scottish_imds":
+            self.stdout.write(B + "Adding Scottish IMDs to existing Datazones" + W)
+            add_scottish_deprivation_ranks_and_domains_to_2011_datazones()
+        elif options["mode"] == "add_northern_ireland_imds":
+            self.stdout.write(B + "Adding Northern Ireland SOAs and IMDs" + W)
+            add_northern_ireland_soas_and_deprivation_domains_with_ranks()
         else:
             self.stdout.write("No options supplied...")
         self.stdout.write(image())
         self.stdout.write("done.")
 
 
-def add_census_areas():
-
-    if LocalAuthority.objects.count() == 339:
-        print("Local Authority Districts already loaded. Passing...")
-    else:
-        print(
-            B
-            + "Adding LSOAs and Local Authority Districts\n2011 population denominators\nScottish data zones and local authorities\nLocal Authority outdoor space data..."
-            + W
-        )
-        add_lsoas_2011_wards_2019_to_LADS_2019()
-        add_scottish_data_zones_and_local_authorities()
-        add_2015_population_denominators()
-        add_lad_access_to_outdoor_space()
-
-    if IndexMultipleDeprivation.objects.count() == 32844:
-        print("English IMD Domains already added. Passing....")
-    else:
-        print(B + "Adding English IMDs to existing LSOAs")
-        add_english_deprivation_scores_and_domains_to_2011_lsoas()
-        update_english_imd_data_with_subdomains()
-        update_english_imd_data_with_supplementary_indices()
-        update_english_imd_data_with_scores()
-        update_english_imd_data_with_transformed_scores()
-
-    if WelshIndexMultipleDeprivation.objects.count() == 1909:
-        print("Welsh IMD Domains already added. Passing....")
-    else:
-        print(B + "Adding Welsh IMDs to existing LSOAs")
-        add_welsh_2019_domains_and_ranks_to_existing_2019_lsoas()
-        add_welsh_2019_scores_to_existing_2019_lsoas()
-
-
 def add_lsoas_2011_wards_2019_to_LADS_2019():
     # import LSOA 2011/Ward & LAD 2019 boundaries
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{LSOA_2011_WARD_LAD_2019}"
 
-    print(G + "- Adding 2019 LADs and 2011 LSOAs..." + W)
-    lad_counter = 0
-    lsoa_counter = 0
+    if LocalAuthority.objects.exists() and LocalAuthority.objects.all().count() == 371:
+        print(R + "Local Authorities already added. Skipping..." + W)
+        pass
+    else:
+        lad_counter = 0
+        lsoa_counter = 0
 
-    for row in DictReader(open(path)):
-        local_authority_district_2019, created = LocalAuthority.objects.get_or_create(
-            local_authority_district_code=row["LAD19CD"],
-            local_authority_district_name=row["LAD19NM"],
-            year=2019,
-        )
-        if created:
-            lad_counter += 1
+        with open(path, "r") as f:
+            print(
+                G
+                + "- Adding English & Welsh 2019 Local Authority Districts and 2011 LSOAs..."
+                + W,
+                end="\n",
+                flush=True,
+            )
+            data = list(csv.reader(f, delimiter=","))
+            for row in data[1:]:
+                (
+                    local_authority_district_2019,
+                    created,
+                ) = LocalAuthority.objects.get_or_create(
+                    local_authority_district_code=row[5],
+                    local_authority_district_name=row[6],
+                    year=2019,
+                )
+                if created:
+                    lad_counter += 1
 
-        LSOA.objects.create(
-            lsoa_code=row["LSOA11CD"],
-            lsoa_name=row["LSOA11NM"],
-            year=2011,
-            local_authority_district=local_authority_district_2019,
+                LSOA.objects.create(
+                    lsoa_code=row[1],
+                    lsoa_name=row[2],
+                    year=2011,
+                    local_authority_district=local_authority_district_2019,
+                )
+                lsoa_counter += 1
+                progress_bar(current=lsoa_counter, total=34753, bar_length=20)
+        print(
+            f"Complete. Added total {lad_counter} local authority districts and {lsoa_counter} lsoas.\n",
+            flush=True,  # should be a total of 34753 LSOAs and 339 LADs
         )
-        lsoa_counter += 1
-    print(
-        f"Complete. Added total {lad_counter} local authority districts and {lsoa_counter} lsoas."  # should be a total of 34753 LSOAs and 339 LADs
-    )
 
 
 def add_english_deprivation_scores_and_domains_to_2011_lsoas():
     # import domains of deprivation data
 
     if (
-        IndexMultipleDeprivation.objects.exists()
-        and IndexMultipleDeprivation.objects.count() == 32844
+        EnglishIndexMultipleDeprivation.objects.exists()
+        and EnglishIndexMultipleDeprivation.objects.count() == 32844
     ):
         print(R + "English indices already exist! Skipping..." + W)
         return
@@ -167,7 +159,7 @@ def add_english_deprivation_scores_and_domains_to_2011_lsoas():
             if LSOA.objects.filter(lsoa_code=row[0], year=2011).exists():
                 lsoa = LSOA.objects.filter(lsoa_code=row[0], year=2011).get()
 
-                IndexMultipleDeprivation.objects.create(
+                EnglishIndexMultipleDeprivation.objects.create(
                     imd_rank=int(float(row[4])),
                     imd_decile=int(float(row[5])),
                     income_rank=int(float(row[6])),
@@ -195,7 +187,7 @@ def add_english_deprivation_scores_and_domains_to_2011_lsoas():
             # )  # 32844
 
     print(
-        f"{BOLD}Complete.{END} {count} IMD records with domains added (ranks and deciles)"
+        f"{BOLD}Complete.{END} {count} IMD records with domains added (ranks and deciles)\n"
     )
 
 
@@ -209,7 +201,7 @@ def update_english_imd_data_with_subdomains():
 
         for row in data[1:]:
             lsoa = LSOA.objects.get(lsoa_code=row[0])
-            IndexMultipleDeprivation.objects.filter(lsoa=lsoa).update(
+            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa).update(
                 children_young_people_sub_domain_rank=int(float(row[6])),
                 children_young_people_sub_domain_decile=int(float(row[7])),
                 adult_skills_sub_domain_rank=int(float(row[8])),
@@ -228,7 +220,7 @@ def update_english_imd_data_with_subdomains():
             progress_bar(current=count, total=32844, bar_length=20)
             # print(f"Updated {count} LSOAs with subdomains.", end="\r")
     print(
-        f"{BOLD}Complete.{END} Added {count} subdomains of deprivation 2019 to LSOAs",
+        f"{BOLD}Complete.{END} Added {count} subdomains of deprivation 2019 to LSOAs\n",
     )
 
 
@@ -246,7 +238,7 @@ def update_english_imd_data_with_supplementary_indices():
 
         for row in data[1:]:
             lsoa = LSOA.objects.get(lsoa_code=row[0])
-            IndexMultipleDeprivation.objects.filter(lsoa=lsoa).update(
+            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa).update(
                 idaci_rank=int(float(row[6])),
                 idaci_decile=int(float(row[7])),
                 idaopi_rank=int(float(row[8])),
@@ -256,7 +248,7 @@ def update_english_imd_data_with_supplementary_indices():
             progress_bar(current=count, total=32844, bar_length=20)
             # print(f"Updated {count} LSOAs with IDACI and IDAOPI data...", end="\r")
     print(
-        f"{BOLD}Complete.{END} Added {count} supplementary indices (IDACI and IDAOPI) of deprivation 2019 to LSOAs"
+        f"{BOLD}Complete.{END} Added {count} supplementary indices (IDACI and IDAOPI) of deprivation 2019 to LSOAs\n"
     )
 
 
@@ -270,7 +262,7 @@ def update_english_imd_data_with_scores():
 
         for row in data[1:]:
             lsoa = LSOA.objects.get(lsoa_code=row[0])
-            IndexMultipleDeprivation.objects.filter(lsoa=lsoa).update(
+            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa).update(
                 imd_score=Decimal(row[4]),
                 income_score=Decimal(row[5]),
                 employment_score=Decimal(row[6]),
@@ -293,7 +285,7 @@ def update_english_imd_data_with_scores():
             # print(
             #     f"Updated {count} indices of deprivation 2019 with scores...", end="\r"
             # )
-    print(f"{BOLD}Complete.{END} Added {count} English scores of deprivation 2019")
+    print(f"{BOLD}Complete.{END} Added {count} English scores of deprivation 2019\n")
 
 
 def update_english_imd_data_with_transformed_scores():
@@ -308,7 +300,7 @@ def update_english_imd_data_with_transformed_scores():
 
         for row in data[1:]:
             lsoa = LSOA.objects.get(lsoa_code=row[0])
-            IndexMultipleDeprivation.objects.filter(lsoa=lsoa).update(
+            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa).update(
                 income_score_exponentially_transformed=Decimal(row[4]),
                 employment_score_exponentially_transformed=Decimal(row[5]),
                 education_skills_training_score_exponentially_transformed=Decimal(
@@ -330,7 +322,7 @@ def update_english_imd_data_with_transformed_scores():
             #     end="\r",
             # )
     print(
-        f"{BOLD}Complete.{END} Added {count} English transformed scores of deprivation 2019"
+        f"{BOLD}Complete.{END} Added {count} English transformed scores of deprivation 2019\n"
     )
 
 
@@ -370,9 +362,9 @@ def add_scottish_data_zones_and_local_authorities():
                 f"Added {lad_count} Scottish Local Authorities and {dz_count} data zones...",
                 end="\r",
             )
-            ##progress_bar(current=dz_count, total=6976, bar_length=40)
+            # progress_bar(current=dz_count, total=6976, bar_length=40)
     print(
-        f"{BOLD}Complete.{END} Added {lad_count} Scottish Local Authorities and {dz_count} data zones...",
+        f"{BOLD}Complete.{END} Added {lad_count} Scottish Local Authorities and {dz_count} data zones...\n",
     )
 
 
@@ -400,7 +392,7 @@ def add_2015_population_denominators():
             print(
                 f"Updated {count} LSOAs with 2015 Population Denominators...", end="\r"
             )
-    print(f"{BOLD}Complete.{END} Added {count} 2015 population denominators to LSOAs")
+    print(f"{BOLD}Complete.{END} Added {count} 2015 population denominators to LSOAs\n")
 
 
 def add_lad_access_to_outdoor_space():
@@ -449,7 +441,7 @@ def add_lad_access_to_outdoor_space():
             count += 1
             progress_bar(current=count, total=371, bar_length=40)
             # print(f"Created {count} Local Authority green space records...", end="\r")
-    print(f"{BOLD}Complete.{END} Added {count} Local Authority green space records.")
+    print(f"{BOLD}Complete.{END} Added {count} Local Authority green space records.\n")
 
 
 def add_welsh_2019_domains_and_ranks_to_existing_2019_lsoas():
@@ -571,7 +563,7 @@ def add_welsh_2019_domains_and_ranks_to_existing_2019_lsoas():
             progress_bar(current=count, total=1909, bar_length=20)
             count += 1
     print(
-        f"{BOLD}Complete.{END} Added {count} Welsh IMD ranks/quantiles."
+        f"{BOLD}Complete.{END} Added {count} Welsh IMD ranks/quantiles.\n"
     )  # should be 1909
 
 
@@ -602,18 +594,76 @@ def add_welsh_2019_scores_to_existing_2019_lsoas():
             )
             progress_bar(current=count, total=1909, bar_length=20)
             count += 1
-    print(f"{BOLD}Complete.{END} Added {count} Welsh IMD scores.")  # should be 1909
+    print(f"{BOLD}Complete.{END} Added {count} Welsh IMD scores.\n")  # should be 1909
 
 
-def progress_bar(current, total, bar_length=20):
-    fraction = current / total
+def add_northern_ireland_soas_and_deprivation_domains_with_ranks():
+    path = f"{settings.IMD_DATA_FILES_FOLDER}/{NORTHERN_IRELAND_SOAS_AND_IMD_RANKS}"
 
-    arrow = int(fraction * bar_length - 1) * "-" + ">"
-    padding = int(bar_length - len(arrow)) * " "
+    if SOA.objects.exists() and SOA.objects.all().count() == 891:
+        print(R + "Northern Ireland SOAs already added. Skipping..." + W)
+        pass
+    else:
+        imd_counter = 0
 
-    ending = "\n" if current == total else "\r"
+        with open(path, "r") as f:
+            print(
+                G
+                + "- Adding Northern Ireland 2001 SOAs and 2017 deprivation domains and ranks...\n"
+                + W
+            )
+            data = list(csv.reader(f, delimiter=","))
+            for row in data[1:891]:
+                soa = SOA.objects.create(soa_code=row[2], soa_name=row[3], year=2001)
 
-    print(f"Progress: [{arrow}{padding}] {int(fraction*100)}%", end=ending)
+                NorthernIrelandIndexMultipleDeprivation.objects.create(
+                    year=2017,
+                    imd_rank=row[4],
+                    income_rank=row[5],
+                    employment_rank=row[6],
+                    health_deprivation_and_disability_rank=row[7],
+                    education_skills_and_training_rank=row[8],
+                    access_to_services_rank=row[9],
+                    living_environment_rank=row[10],
+                    crime_and_disorder_rank=row[11],
+                    soa=soa,
+                )
+
+                progress_bar(current=imd_counter, total=891, bar_length=20)
+                imd_counter += 1
+    print(
+        f"{BOLD}Complete.{END} {imd_counter} Northern Ireland SOAs and IMD domains and ranks added."
+        + W
+    )
+
+
+def calculated_quantile_for_rank(rank, total_records, quantile_type):
+    """
+    Return a quantile against a rank and a total
+    Params:
+    rank: integer - represents rank in a list of records
+    total_records: integer - represents the total number of records
+    quantile_type: integer - the number of equally sized groups the records are divided into
+    """
+    quantile_names = [
+        "median",
+        "tertile",
+        "quartile",
+        "quintile",
+        "sextile",
+        "septile",
+        "octile",
+        "decile",
+        "duodecile",
+        "hexadecile",
+        "vigintile",
+    ]
+
+    tile_size = floor(total_records / quantile_type)
+    if tile_size <= rank:
+        return 1
+    else:
+        return floor(rank / tile_size)
 
 
 def quantile_for_rank(rank, quantile=Literal["quartile", "quintile", "decile"]):
@@ -683,6 +733,73 @@ def quantile_for_rank(rank, quantile=Literal["quartile", "quintile", "decile"]):
         return 10
     else:
         raise ValueError(f"Incorrect rank {rank} passed for {quantile}")
+
+
+def add_scottish_deprivation_ranks_and_domains_to_2011_datazones():
+    # import domains of deprivation data
+
+    if (
+        ScottishIndexMultipleDeprivation.objects.exists()
+        and ScottishIndexMultipleDeprivation.objects.count() == 6976
+    ):
+        print(R + "Scottish indices already exist! Skipping..." + W)
+        return
+
+    path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_SCOTLAND_RANKS}"
+    with open(path, "r") as f:
+        print(
+            G
+            + "- Adding Scottish domains of deprivation to data zones with ranks\n"
+            + W
+        )
+        data = list(csv.reader(f, delimiter=","))
+        count = 0
+
+        for row in data[1:]:  # skip the first row
+            if DataZone.objects.filter(data_zone_code=row[0], year=2011).exists():
+                data_zone = DataZone.objects.filter(
+                    data_zone_code=row[0], year=2011
+                ).get()
+
+                ScottishIndexMultipleDeprivation.objects.create(
+                    imd_rank=row[2],
+                    version=2,
+                    income_rank=round(float(row[6])),
+                    employment_rank=round(float(row[7])),
+                    education_rank=round(float(row[8])),
+                    health_rank=round(float(row[9])),
+                    access_rank=round(float(row[10])),
+                    crime_rank=round(float(row[11])),
+                    housing_rank=round(float(row[12])),
+                    data_zone=data_zone,
+                    year=2020,
+                )
+                count += 1
+
+            progress_bar(current=count, total=6976, bar_length=20)
+            # print(
+            #     f"Added {count} records of English deprivation domains (ranks and deciles)",
+            #     end="\r",
+            # )  # 32844
+
+    print(
+        f"{BOLD}Complete.{END} {count} Scottish IMD records with domains added (ranks).\n"
+    )
+
+
+def progress_bar(current, total, bar_length=20):
+    fraction = current / total
+
+    arrow = int(fraction * bar_length - 1) * "◼︎"
+    padding = int(bar_length - len(arrow)) * " "
+
+    ending = "\n" if current == total else "\r"
+
+    print(
+        W + f"Progress: [{arrow}{padding}] {int(fraction*100)}%" + W,
+        end="\r",
+        flush=True,
+    )
 
 
 def image():

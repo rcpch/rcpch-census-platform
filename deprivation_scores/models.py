@@ -85,7 +85,7 @@ class Ward(models.Model):
     msoa = models.ForeignKey(MSOA, on_delete=models.CASCADE)
 
 
-class IndexMultipleDeprivation(models.Model):
+class EnglishIndexMultipleDeprivation(models.Model):
     imd_score = models.DecimalField(
         "Index of Multiple Deprivation (IMD) Score",
         help_text="Index of Multiple Deprivation (IMD) Score",
@@ -524,3 +524,36 @@ class WelshIndexMultipleDeprivation(models.Model):
     )
     lsoa = models.ForeignKey(LSOA, on_delete=models.CASCADE)
     year = models.IntegerField()
+
+
+class ScottishIndexMultipleDeprivation(models.Model):
+    year = models.IntegerField()
+    version = models.SmallIntegerField()
+    imd_rank = models.IntegerField()
+    income_rank = models.IntegerField()
+    employment_rank = models.IntegerField()
+    education_rank = models.IntegerField()
+    health_rank = models.IntegerField()
+    access_rank = models.IntegerField()
+    crime_rank = models.IntegerField()
+    housing_rank = models.IntegerField()
+    data_zone = models.ForeignKey(to=DataZone, on_delete=models.PROTECT)
+
+
+class SOA(models.Model):
+    year = models.IntegerField()
+    soa_code = models.CharField(max_length=50, unique=True)
+    soa_name = models.CharField(max_length=50)
+
+
+class NorthernIrelandIndexMultipleDeprivation(models.Model):
+    imd_rank = models.IntegerField()
+    year = models.IntegerField()
+    income_rank = models.IntegerField()
+    employment_rank = models.IntegerField()
+    health_deprivation_and_disability_rank = models.IntegerField()
+    education_skills_and_training_rank = models.IntegerField()
+    access_to_services_rank = models.IntegerField()
+    living_environment_rank = models.IntegerField()
+    crime_and_disorder_rank = models.IntegerField()
+    soa = models.ForeignKey(to=SOA, on_delete=models.PROTECT)
