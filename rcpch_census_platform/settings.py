@@ -90,11 +90,11 @@ WSGI_APPLICATION = "rcpch_census_platform.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_NAME"),
-        "USER": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_USER"),
-        "PASSWORD": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PASSWORD"),
-        "HOST": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_HOST"),
-        "PORT": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PORT"),
+        "NAME": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME"),
+        "USER": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER"),
+        "PASSWORD": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD"),
+        "HOST": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST"),
+        "PORT": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT"),
     }
 }
 
