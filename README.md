@@ -10,7 +10,7 @@ This project is a python 3.11 / Django Rest Framework project providing UK censu
 
 ## Why is it needed?
 
-The [Office of National Statistics](https://www.ons.gov.uk) publishes all the Census data exhaustively - this API is not intended to replace it. There is a need though for RCPCH to be able to describe the lived environment and experience of children and young people in a meaningful way, to inform research and clinical practice. This API therefore curates environmental data where they have impact on children's health or paediatrics. It is a work in progress but the initial project addresses deprivation, in particular reporting indices of multiple deprivation from across the UK as an API. It is consumed by software that RCPCH and others provide.
+The [Office of National Statistics](https://www.ons.gov.uk) publishes all the Census data exhaustively - this project is not intended to replace it. There is a need though for RCPCH to be able to describe the lived environment and experience of children and young people in a meaningful way, to inform research, audit and clinical practice. The project will curate social and environmental data where they have impact on children's health or on paediatrics, available to clinicians and researchers. It is a work in progress. The first application within this project is an API to address deprivation, by reporting indices of multiple deprivation from across the UK against a postcode. It is consumed by software that RCPCH provide.
 
 ### UK Areas
 
@@ -25,7 +25,7 @@ Each fits within the one below it like a Russian doll.
 
 There are other ways of describing areas across the UK:
 
-1. Ward (electoral)
+1. Wards (electoral)
 2. Parishes
 3. Local Enterprise Partnerships
 4. Parliamentary Constituencies
@@ -36,11 +36,11 @@ There is a better explainer [here](https://ocsi.uk/2019/03/18/lsoas-leps-and-loo
 
 Within healthcare, there are several other important organisational boundaries.
 
-Integrated Care Boards were introduced in June 2022, taking over from Sustainability and Transformation Partnerships (STPs) and 106 Clinical Commissioning Groups (CCGs) as the top-level organisational units for planning and commissioning health and social care. Commissioning now is controlled by the 42 ICBs (and ICPs or integrated care partnerships). Other hierarchies include providers (such as NHS Trusts, Mental Health Trusts, GP surgeries, pharmacies, ambulance services etc) and Primary Care Networks (PCNs).
+Integrated Care Boards were introduced on 1st July 2022, taking over from Sustainability and Transformation Partnerships (STPs) and 106 Clinical Commissioning Groups (CCGs) as the top-level organisational units for planning and commissioning health and social care. Commissioning now is controlled by the 42 ICBs (and ICPs or integrated care partnerships). Other hierarchies include providers (such as NHS Trusts, Mental Health Trusts, GP surgeries, pharmacies, ambulance services etc) and Primary Care Networks (PCNs).
 
 ### Indices of Multiple Deprivation (IMD)
 
-Indices of Multiple Deprivation (IMDs) are not standardised across the devolved nations. There are specific to each country and are derived from census data. The methodology for the calculation though is essentially the same. It involves breaking the country up into units comparable by population size - in England and Wales, this is LSOAs, in Scotland it is Data Zones and in Northern Ireland it is SOAs. Each unit then is allocated a score to summarise certain deprivation domains. These vary across the 4 countries: 
+Indices of Multiple Deprivation (IMDs) are not standardised across the devolved nations. They are specific to each country and are derived from census data. The methodology for the calculation though is essentially the same. It involves breaking the country up into units comparable by population size - in England and Wales, this is LSOAs, in Scotland it is Data Zones and in Northern Ireland it is SOAs. Each unit then is allocated a score to summarise certain deprivation domains. These vary across the 4 countries: 
 
 | England                          | Wales                 | Scotland          | Northern Ireland                  |
 |:---------------------------------|:----------------------|:------------------|:----------------------------------|
@@ -90,95 +90,24 @@ The final step is to run the server:
 2. ```cd rcpch_census_platform```
 3. ```s/docker-init```
 4. grab the token from the console within the docker > ![alt drf_token](static/images/census_db_token.png)
-5. Add the token to your header when making an api call (```-H 'Authorization: *******'``` in curl statement for example). If you are using Postman, use the OAUTH2 Authorization header, and the ket 'Token'.
+5. Add the token to your header when making an api call (```-H 'Authorization: *******'``` in curl statement for example). If you are using Postman, use the OAUTH2 Authorization header, and the key 'Token'.
 
-If you navigate to ```http://localhost:8001//rcpch-census-platform/api/v1/``` and login, it should be possible then to view the data.
+If you navigate to the base url```http://localhost:8001/rcpch-census-platform/api/v1/``` and login, it should be possible then to view the data. Alternatively, add the token to Postman.
 
 There are 3 routes that accept GET requests:
 
 1. ```/local_authority_districts/```: params include ```local_authority_district_code``` or if none is passed, a list of all local authorities in the UK is returned
-2. ```/lower_layer_super_output_areas/```: params include ```lsoa_code```. If none is passed, a list of all LSOAs is returned.
-3. ```/indices_of_multiple_deprivation/``` params include: ```postcode``` and ```lsoa_code```. If none is passed, all IMDs are returned.
-4. ```/boundaries?postcode=``` params include ```postcode``` and are mandatory.
-5. ```/greenspace/``` params include ```postcode``` and ```local_authority_district_code```. If none is passed, all IMDs are returned.
+2. ```/england_wales_lower_layer_super_output_areas/```: params include ```lsoa_code```. If none is passed, a list of all LSOAs is returned.
+3. ```/indices_of_multiple_deprivation/``` params: ```postcode``` [mandatory].
+4. ```/greenspace/``` params include ```postcode``` and ```local_authority_district_code```. If none is passed, all IMDs are returned.
+5. ```/english_indices_of_multiple_deprivation/``` returns a list of all English indices of deprivation
+6. ```/welsh_indices_of_multiple_deprivation/``` returns a list of all Welsh indices of deprivation
+7. ```/scottish_indices_of_multiple_deprivation/``` returns a list of all Scottish indices of deprivation
+8. ```/northern_ireland_indices_of_multiple_deprivation/``` returns a list of all Scottish indices of deprivation
+9. ```/indices_of_multiple_deprivation/```: takes a UK postcode (mandatory) and returns deprivation score and quantiles for that LSOA
 
-The IMD route returns IMD data for a given lsoa_code eg:
-```http://localhost:8000/rcpch-census-platform/api/v1/indices_of_multiple_deprivation/?lsoa_code=E01003474``` will return:
-
-```json
-HTTP 200 OK
-Allow: GET, POST, HEAD, OPTIONS
-Content-Type: application/json
-Vary: Accept
-
-{
-    "count": 1,
-    "next": null,
-    "previous": null,
-    "results": [
-        {
-            "imd_score": 4,
-            "imd_rank": 32844,
-            "imd_decile": 10,
-            "income_score": 0,
-            "income_score_exponentially_transformed": 0,
-            "income_rank": 32822,
-            "income_decile": 10,
-            "employment_score": 0,
-            "employment_score_exponentially_transformed": 0,
-            "employment_rank": 32831,
-            "employment_decile": 10,
-            "education_skills_training_score_exponentially_transformed": 0,
-            "education_skills_training_score": 0,
-            "education_skills_training_rank": 22206,
-            "education_skills_training_decile": 7,
-            "children_young_people_sub_domain_score": -2,
-            "children_young_people_sub_domain_rank": 32822,
-            "children_young_people_sub_domain_decile": 10,
-            "adult_skills_sub_domain_score": 0,
-            "adult_skills_sub_domain_rank": 32831,
-            "adult_skills_sub_domain_decile": 10,
-            "health_deprivation_disability_score_exponentially_transformed": 0,
-            "health_deprivation_disability_score": -1,
-            "health_deprivation_disability_rank": 20783,
-            "health_deprivation_disability_decile": 7,
-            "crime_score_exponentially_transformed": 12,
-            "crime_score": 0,
-            "crime_rank": 12993,
-            "crime_decile": 4,
-            "barriers_to_housing_services_score_exponentially_transformed": 8,
-            "barriers_to_housing_services_score": 15,
-            "barriers_to_housing_services_rank": 10504,
-            "barriers_to_housing_services_decile": 4,
-            "geographical_barriers_sub_domain_score": 0,
-            "geographical_barriers_sub_domain_rank": 20783,
-            "geographical_barriers_sub_domain_decile": 7,
-            "wider_barriers_sub_domain_score": 0,
-            "wider_barriers_sub_domain_rank": 12993,
-            "wider_barriers_sub_domain_decile": 4,
-            "living_environment_score": 27,
-            "living_environment_score_exponentially_transformed": 25,
-            "living_environment_rank": 13739,
-            "living_environment_decile": 5,
-            "indoors_sub_domain_score": 0,
-            "indoors_sub_domain_rank": 13739,
-            "indoors_sub_domain_decile": 5,
-            "outdoors_sub_domain_score": 0,
-            "outdoors_sub_domain_rank": 4948,
-            "outdoors_sub_domain_decile": 2,
-            "idaci_score": 0,
-            "idaci_rank": 32569,
-            "idaci_decile": 10,
-            "idaopi_score": 0,
-            "idaopi_rank": 30751,
-            "idaopi_decile": 10,
-            "lsoa": "http://localhost:8000/rcpch-census-platform/api/v1/lower_layer_super_output_areas/31392/"
-        }
-    ]
-}
-```
-
-Or against a given postcode eg SW1A 1AA (Buckingham Palace):
+example:
+SW1A 1AA (Buckingham Palace):
 ```http://localhost:8000/rcpch-census-platform/api/v1/indices_of_multiple_deprivation/?postcode=SW11AA```
 
 ```json
