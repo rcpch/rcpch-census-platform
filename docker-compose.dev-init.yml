@@ -23,11 +23,11 @@ services:
       - RCPCH_CENSUS_PLATFORM_SECRET_KEY=mysecretkey
       - DEBUG=True
       - DJANGO_ALLOWED_HOSTS=0.0.0.0
-      - DJANGO_SUPERUSER_USERNAME=rcpch-census-platform-dev-user
+      - DJANGO_SUPERUSER_USERNAME=rcpch-census-dev-user
       - DJANGO_SUPERUSER_PASSWORD=pw
       - DJANGO_SUPERUSER_FIRST_NAME=dev
       - DJANGO_SUPERUSER_SURNAME=dev
-      - DJANGO_SUPERUSER_EMAIL=rcpch-census-platform-dev-user@rcpch.tech
+      - DJANGO_SUPERUSER_EMAIL=rcpch-census-dev-user@rcpch.tech
       - DJANGO_SUPERUSER_ROLE=1
       - DJANGO_CSRF_TRUSTED_ORIGINS=https://localhost,https://0.0.0.0
     command: >
