@@ -10,7 +10,7 @@ This project is a python 3.11 / Django Rest Framework project providing UK censu
 
 ## Why is it needed?
 
-The [Office of National Statistics](https://www.ons.gov.uk) publishes all the Census data exhaustively - this API is not intended to replace it. There is a need though for RCPCH to be able to describe the lived environment and experience of children and young people in a meaningful way, to inform research and clinical practice. This API therefore reports Indices of Deprivation across the devolved nations and in future might produce data/maps at local and regional level for to be consumed by software that RCPCH and others provide.
+The [Office of National Statistics](https://www.ons.gov.uk) publishes all the Census data exhaustively - this API is not intended to replace it. There is a need though for RCPCH to be able to describe the lived environment and experience of children and young people in a meaningful way, to inform research and clinical practice. This API therefore curates environmental data where they have impact on children's health or paediatrics. It is a work in progress but the initial project addresses deprivation, in particular reporting indices of multiple deprivation from across the UK as an API. It is consumed by software that RCPCH and others provide.
 
 ### UK Areas
 
@@ -34,26 +34,31 @@ These do not always fit within the output areas, and boundaries can change.
 
 There is a better explainer [here](https://ocsi.uk/2019/03/18/lsoas-leps-and-lookups-a-beginners-guide-to-statistical-geographies/)
 
-Within healthcare, there are several other important organisational boundaries. These include:
+Within healthcare, there are several other important organisational boundaries.
 
-1. Clinical Commissioning Groups (CCGs)
-2. Sustainability and Transformation Partnerships (STPs)
+Integrated Care Boards were introduced in June 2022, taking over from Sustainability and Transformation Partnerships (STPs) and 106 Clinical Commissioning Groups (CCGs) as the top-level organisational units for planning and commissioning health and social care. Commissioning now is controlled by the 42 ICBs (and ICPs or integrated care partnerships). Other hierarchies include providers (such as NHS Trusts, Mental Health Trusts, GP surgeries, pharmacies, ambulance services etc) and Primary Care Networks (PCNs).
 
 ### Indices of Multiple Deprivation (IMD)
 
-Indices of Multiple Deprivation (IMDs) are not standardised across the devolved nations. In England and Wales, IMDs are a composite of several domains:
+Indices of Multiple Deprivation (IMDs) are not standardised across the devolved nations. There are specific to each country and are derived from census data. The methodology for the calculation though is essentially the same. It involves breaking the country up into units comparable by population size - in England and Wales, this is LSOAs, in Scotland it is Data Zones and in Northern Ireland it is SOAs. Each unit then is allocated a score to summarise certain deprivation domains. These vary across the 4 countries: 
 
-1. income
-2. employment
-3. education
-4. health
-5. crime
-6. barriers to housing and services
-7. living environment
+| England                          | Wales                 | Scotland          | Northern Ireland                  |
+|:---------------------------------|:----------------------|:------------------|:----------------------------------|
+| income                           | income                | income            | income                            |
+| employment                       | employment            | employment        | employment                        |
+| education                        | health                | education         | health deprivation and disability |
+| health                           | education             | health            | education skills and training     |
+| crime                            | access to services    | access            | access to services                |
+| barriers to housing and services | housing               | crime             | living environment                |
+| living environment               | community safety      | housing           | crime and disorder                |
+|                                  | physical environment  |                   |                                   |
+| *32844 LSOAs*                    | *1909 LSOAs*          | *6976 Data Zones* | *890 SOAs*                        |
+| *2019 data*                      | *2019 data*           | *2020 data*       | *2017 data*                       |
 
-The are subdomains for education (children and young people and adult skills), barriers to housing and services (geographical barriers and wider barriers) and living environment (indoors and outdoors). These domains are then weighted and contribute to the final IMD. Based on the score in each LSOA, LSOAs are then ranked in order, and then split into deciles (with the lower deciles the most deprived). It is important to say that the rankings do not compare between countries - that is a given decile in one country is not the same as the same decile in another. An attempt to do this has been made by [MySociety](https://github.com/mysociety/composite_uk_imd) who have published a Composite UK IMD which brings together all the datasets across the devolved nations. In the process, however, a lot of the detail is lost so whilst this allows the user to compare deprivation scores across countries, [it is not possible to compare the subdomains](https://github.com/mysociety/composite_uk_imd/issues/2). For our purposes, therefore, we will use the individual countries scores, but report these with an appropriate warning.
+In England, there are also subdomains for education (children and young people and adult skills), barriers to housing and services (geographical barriers and wider barriers) and living environment (indoors and outdoors).
 
-The process in Scotland is similar, but Data Zones, rather than LSOAs are used, which comprise fewer people. In Northern Ireland, SOAs are used.
+These domains are then weighted and contribute to the final index of multiple deprivation score. Based on the score in each LSOA, LSOAs are then ranked by deprivation score, and then split into quantiles (with the lower quantiles the most deprived). It is important to say that the rankings do not compare between countries - that is a given decile in one country is not the same as the same decile in another, and this is because the scores are not standardised across the UK, only across each nation. An attempt to do this has been made by [MySociety](https://github.com/mysociety/composite_uk_imd) who have published a Composite UK IMD which brings together all the datasets across the devolved nations. In the process, however, a lot of the detail is lost so whilst this allows the user to compare deprivation scores across countries, [it is not possible to compare the subdomains](https://github.com/mysociety/composite_uk_imd/issues/2). For our purposes, therefore, we will use the individual countries scores, but report these with an appropriate warning.
+
 
 ## Getting Started
 
@@ -62,26 +67,30 @@ Written in python 3.11 and django-rest-framework, these will need to be installe
 ### Option One
 
 1. clone the repo
-2. ```cd rcpch_census_platform```console
-3. ```pip install -r requirements/common-requirements.txt```console
-4. ```python manage.py createsuperuser --username username --email username@email.com```console
-5. ```python manage.py makemigrations```console
-6. ```python manage.py migrate```console
-7. ```python manage.py seed --mode='add_census_areas'```console
+2. ```cd rcpch_census_platform```
+3. ```pip install -r requirements/common-requirements.txt```
+4. ```python manage.py createsuperuser --username username --email username@email.com```
+5. ```python manage.py makemigrations```
+6. ```python manage.py migrate```
+7. ```python manage.py seed --mode='add_organisational_areas'```
+8. ```python manage.py seed --mode='add_english_imds'```
+9. ```python manage.py seed --mode='add_welsh_imds'```
+10. ```python manage.py seed --mode='add_scottish_imds'```
+11. ```python manage.py seed --mode='add_northern_ireland_imds'```
 
 This latter step will take several minutes as it populates the database with all the census and deprivation data. If successful, it should yield the following message:
 > ![alt rcpch-census-db](static/images/census_db_screenshot.png?raw=true)
 
 The final step is to run the server:
-```python manage.py runserver```console
+```python manage.py runserver```
 
 ### Option Two
 
 1. clone the repo
-2. ```cd rcpch_census_platform```console
-3. ```s/docker-init```console
-4. grab the token from the console > ![alt drf_token](static/images/census_db_token.png)
-5. Add the token to your header when making an api call (```-H 'Authorization: *******'``` in curl statement for example)
+2. ```cd rcpch_census_platform```
+3. ```s/docker-init```
+4. grab the token from the console within the docker > ![alt drf_token](static/images/census_db_token.png)
+5. Add the token to your header when making an api call (```-H 'Authorization: *******'``` in curl statement for example). If you are using Postman, use the OAUTH2 Authorization header, and the ket 'Token'.
 
 If you navigate to ```http://localhost:8001//rcpch-census-platform/api/v1/``` and login, it should be possible then to view the data.
 
@@ -170,7 +179,7 @@ Vary: Accept
 ```
 
 Or against a given postcode eg SW1A 1AA (Buckingham Palace):
-```http://localhost:8000/rcpch-census-platform/api/v1/indices_of_multiple_deprivation/?postcode=W11AA```
+```http://localhost:8000/rcpch-census-platform/api/v1/indices_of_multiple_deprivation/?postcode=SW11AA```
 
 ```json
 HTTP 200 OK
@@ -242,6 +251,111 @@ Vary: Accept
             "lsoa": "http://localhost:8000/rcpch-census-platform/api/v1/lower_layer_super_output_areas/32961/"
         }
     ]
+}
+```
+
+Note that this endpoint accepts any postcode from across the UK, and returns a slightly different response object depending on the country. Examples of England are above.
+
+Wales is as follows (```rcpch-census-engine.azurewebsites.net/api/v1/indices_of_multiple_deprivation?postcode=CF14 3LX```):
+
+```json
+{
+    "id": 1712,
+    "imd_rank": 1362,
+    "imd_quartile": 3,
+    "imd_quintile": 4,
+    "imd_decile": 8,
+    "imd_score": "11.5",
+    "income_rank": 1576,
+    "income_quartile": 4,
+    "income_quintile": 5,
+    "income_decile": 9,
+    "income_score": "4.4",
+    "employment_rank": 1865,
+    "employment_quartile": 4,
+    "employment_quintile": 5,
+    "employment_decile": 10,
+    "employment_score": "0.5",
+    "health_rank": 1476,
+    "health_quartile": 4,
+    "health_quintile": 4,
+    "health_decile": 8,
+    "health_score": "5.8",
+    "education_rank": 1559,
+    "education_quartile": 4,
+    "education_quintile": 5,
+    "education_decile": 9,
+    "education_score": "4.6",
+    "access_to_services_rank": 1675,
+    "access_to_services_quartile": 4,
+    "access_to_services_quintile": 5,
+    "access_to_services_decile": 9,
+    "access_to_services_score": "3.0",
+    "housing_rank": 72,
+    "housing_quartile": 1,
+    "housing_quintile": 1,
+    "housing_decile": 1,
+    "housing_score": "69.1",
+    "community_safety_rank": 1314,
+    "community_safety_quartile": 3,
+    "community_safety_quintile": 4,
+    "community_safety_decile": 7,
+    "community_safety_score": "8.5",
+    "physical_environment_rank": 78,
+    "physical_environment_quartile": 1,
+    "physical_environment_quintile": 1,
+    "physical_environment_decile": 1,
+    "physical_environment_score": "67.7",
+    "year": 2019,
+    "lsoa": 33860
+}
+```
+
+Scotland (```rcpch-census-engine.azurewebsites.net/api/v1/indices_of_multiple_deprivation?postcode=ML1 1AA```):
+
+```json
+{
+    "id": 4968,
+    "year": 2020,
+    "version": 2,
+    "imd_rank": 192,
+    "income_rank": 440,
+    "employment_rank": 121,
+    "education_rank": 354,
+    "health_rank": 138,
+    "access_rank": 5390,
+    "crime_rank": 32,
+    "housing_rank": 3076,
+    "data_zone": {
+        "id": 4968,
+        "data_zone_code": "S01011473",
+        "data_zone_name": "Motherwell South - 03",
+        "year": 2011,
+        "local_authority": 361
+    }
+}
+```
+
+and Northern Ireland (```rcpch-census-engine.azurewebsites.net/api/v1/indices_of_multiple_deprivation?postcode=BT2 7DX```):
+
+```json
+{
+    "id": 272,
+    "imd_rank": 163,
+    "year": 2017,
+    "income_rank": 464,
+    "employment_rank": 128,
+    "health_deprivation_and_disability_rank": 70,
+    "education_skills_and_training_rank": 104,
+    "access_to_services_rank": 739,
+    "living_environment_rank": 187,
+    "crime_and_disorder_rank": 123,
+    "soa": {
+        "id": 272,
+        "year": 2001,
+        "soa_code": "95GG39S1",
+        "soa_name": "Shaftesbury_1"
+    }
 }
 ```
 

@@ -788,7 +788,7 @@ SCOTTISH_ADDRESSES = [
     },
 ]
 
-SCOTTISH_TEST_DATA = [
+SCOTTISH_IMD_TEST_DATA = [
     {
         "data_zone_code:": "S01006506",
         "Data zone name": "Culter - 01",
