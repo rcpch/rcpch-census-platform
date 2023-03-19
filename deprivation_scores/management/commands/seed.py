@@ -83,9 +83,6 @@ class Command(BaseCommand):
         elif options["mode"] == "add_northern_ireland_imds":
             self.stdout.write(B + "Adding Northern Ireland SOAs and IMDs" + W)
             add_northern_ireland_soas_and_deprivation_domains_with_ranks()
-        elif options["mode"] == "update_datazone_names":
-            self.stdout.write(B + "Updating Scottish Data Zone names" + W)
-            update_data_zone_names()
         else:
             self.stdout.write("No options supplied...")
         self.stdout.write(image())
@@ -341,26 +338,6 @@ def update_english_imd_data_with_transformed_scores():
             # )
     print(
         f"{BOLD}Complete.{END} Added {count} English transformed scores of deprivation 2019\n"
-    )
-
-
-def update_data_zone_names():
-    path = (
-        f"{settings.IMD_DATA_FILES_FOLDER}/{SCOTTISH_DATA_ZONES_AND_LOCAL_AUTHORITIES}"
-    )
-    with open(path, "r", encoding="windows-1252") as f:
-        print(G + "- Updating 2011 Scottish Data Zones" + W)
-        data = list(csv.reader(f, delimiter=","))
-        dz_count = 0
-
-        for row in data[1:]:
-            DataZone.objects.filter(data_zone_code=row[0]).update(data_zone_name=row[1])
-            dz_count += 1
-            progress_bar(
-                iteration=dz_count, total=6976, prefix="Progress", suffix="Complete"
-            )
-    print(
-        f"{BOLD}Complete.{END} Updated names of {dz_count} data zones...\n",
     )
 
 
