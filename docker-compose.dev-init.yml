@@ -17,8 +17,8 @@ services:
       # these env vars are ONLY for development
       - RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER=rcpchCensususer
       - RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD=password
-      - RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME=rcpch_census_engine_db
-      - RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST=rcpch_census_engine_db
+      - RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME=rcpchCensusdb
+      - RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST=db
       - RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT=5432
       - RCPCH_CENSUS_ENGINE_SECRET_KEY=mysecretkey
       - DEBUG=True
@@ -52,6 +52,6 @@ services:
     # volumes:
     #   - ./data/db:/var/lib/postgresql/data
     environment:
-      - POSTGRES_USER=rcpch_census_engine_user
+      - POSTGRES_USER=rcpchCensususer
       - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=rcpch_census_engine_db
+      - POSTGRES_DB=rcpchCensusdb

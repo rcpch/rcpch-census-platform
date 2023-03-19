@@ -128,7 +128,12 @@ def add_lsoas_2011_wards_2019_to_LADS_2019():
                     local_authority_district=local_authority_district_2019,
                 )
                 lsoa_counter += 1
-                progress_bar(current=lsoa_counter, total=34753, bar_length=20)
+                progress_bar(
+                    iteration=lsoa_counter,
+                    total=34753,
+                    prefix="Progress",
+                    suffix="Complete",
+                )
         print(
             f"Complete. Added total {lad_counter} local authority districts and {lsoa_counter} lsoas.\n",
             flush=True,  # should be a total of 34753 LSOAs and 339 LADs
@@ -180,7 +185,9 @@ def add_english_deprivation_scores_and_domains_to_2011_lsoas():
                 )
                 count += 1
 
-            progress_bar(current=count, total=32844, bar_length=20)
+            progress_bar(
+                iteration=count, total=32844, prefix="Progress", suffix="Complete"
+            )
             # print(
             #     f"Added {count} records of English deprivation domains (ranks and deciles)",
             #     end="\r",
@@ -217,7 +224,9 @@ def update_english_imd_data_with_subdomains():
             )
             count += 1
 
-            progress_bar(current=count, total=32844, bar_length=20)
+            progress_bar(
+                iteration=count, total=32844, prefix="Progress", suffix="Complete"
+            )
             # print(f"Updated {count} LSOAs with subdomains.", end="\r")
     print(
         f"{BOLD}Complete.{END} Added {count} subdomains of deprivation 2019 to LSOAs\n",
@@ -245,7 +254,9 @@ def update_english_imd_data_with_supplementary_indices():
                 idaopi_decile=int(float(row[9])),
             )
             count += 1
-            progress_bar(current=count, total=32844, bar_length=20)
+            progress_bar(
+                iteration=count, total=32844, prefix="Progress", suffix="Complete"
+            )
             # print(f"Updated {count} LSOAs with IDACI and IDAOPI data...", end="\r")
     print(
         f"{BOLD}Complete.{END} Added {count} supplementary indices (IDACI and IDAOPI) of deprivation 2019 to LSOAs\n"
@@ -281,7 +292,9 @@ def update_english_imd_data_with_scores():
                 outdoors_sub_domain_score=Decimal(row[19]),
             )
             count += 1
-            progress_bar(current=count, total=32844, bar_length=20)
+            progress_bar(
+                iteration=count, total=32844, prefix="Progress", suffix="Complete"
+            )
             # print(
             #     f"Updated {count} indices of deprivation 2019 with scores...", end="\r"
             # )
@@ -316,7 +329,9 @@ def update_english_imd_data_with_transformed_scores():
                 living_environment_score_exponentially_transformed=Decimal(row[10]),
             )
             count += 1
-            progress_bar(current=count, total=32844, bar_length=20)
+            progress_bar(
+                iteration=count, total=32844, prefix="Progress", suffix="Complete"
+            )
             # print(
             #     f"Updated {count} records with transformed scores of deprivation 2019...",
             #     end="\r",
@@ -439,7 +454,9 @@ def add_lad_access_to_outdoor_space():
             )
 
             count += 1
-            progress_bar(current=count, total=371, bar_length=40)
+            progress_bar(
+                iteration=count, total=371, prefix="Progress", suffix="Complete"
+            )
             # print(f"Created {count} Local Authority green space records...", end="\r")
     print(f"{BOLD}Complete.{END} Added {count} Local Authority green space records.\n")
 
@@ -560,7 +577,9 @@ def add_welsh_2019_domains_and_ranks_to_existing_2019_lsoas():
                 lsoa=lsoa,
                 year=2019,
             )
-            progress_bar(current=count, total=1909, bar_length=20)
+            progress_bar(
+                iteration=count, total=1909, prefix="Progress", suffix="Complete"
+            )
             count += 1
     print(
         f"{BOLD}Complete.{END} Added {count} Welsh IMD ranks/quantiles.\n"
@@ -592,7 +611,9 @@ def add_welsh_2019_scores_to_existing_2019_lsoas():
                 lsoa=lsoa,
                 year=2019,
             )
-            progress_bar(current=count, total=1909, bar_length=20)
+            progress_bar(
+                iteration=count, total=1909, prefix="Progress", suffix="Complete"
+            )
             count += 1
     print(f"{BOLD}Complete.{END} Added {count} Welsh IMD scores.\n")  # should be 1909
 
@@ -629,7 +650,12 @@ def add_northern_ireland_soas_and_deprivation_domains_with_ranks():
                     soa=soa,
                 )
 
-                progress_bar(current=imd_counter, total=891, bar_length=20)
+                progress_bar(
+                    iteration=imd_counter,
+                    total=891,
+                    prefix="Progress",
+                    suffix="Complete",
+                )
                 imd_counter += 1
     print(
         f"{BOLD}Complete.{END} {imd_counter} Northern Ireland SOAs and IMD domains and ranks added."
@@ -776,7 +802,9 @@ def add_scottish_deprivation_ranks_and_domains_to_2011_datazones():
                 )
                 count += 1
 
-            progress_bar(current=count, total=6976, bar_length=20)
+            progress_bar(
+                iteration=count, total=6976, prefix="Progress", suffix="Complete"
+            )
             # print(
             #     f"Added {count} records of English deprivation domains (ranks and deciles)",
             #     end="\r",
@@ -787,15 +815,44 @@ def add_scottish_deprivation_ranks_and_domains_to_2011_datazones():
     )
 
 
-def progress_bar(current, total, bar_length=20):
-    fraction = current / total
+# def progress_bar(current, total, bar_length=20):
+#     fraction = current / total
 
-    arrow = int(fraction * bar_length - 1) * "◼︎" + ">"
-    padding = int(bar_length - len(arrow)) * " "
+#     arrow = int(fraction * bar_length - 1) * "◼︎"
+#     padding = int(bar_length - len(arrow)) * " "
 
-    ending = "\n" if current == total else "\r"
+#     ending = "\n" if current == total else "\r"
 
-    print(f"Progress: [{arrow}{padding}] {int(fraction*100)}%", end=ending, flush=True)
+#     print(f"Progress: [{arrow}{padding}] {int(fraction*100)}%", end=ending)
+def progress_bar(
+    iteration,
+    total,
+    prefix="",
+    suffix="",
+    decimals=1,
+    length=100,
+    fill="█",
+    printEnd="\r",
+):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + "-" * (length - filledLength)
+    print(f"\r{prefix} |{bar}| {percent}% {suffix}", end=printEnd)
+    # Print New Line on Complete
+    if iteration == total:
+        print()
 
 
 def image():
