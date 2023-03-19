@@ -94,12 +94,12 @@ The final step is to run the server:
 
 If you navigate to the base url```http://localhost:8001/rcpch-census-platform/api/v1/``` and login, it should be possible then to view the data. Alternatively, add the token to Postman.
 
-There are 3 routes that accept GET requests:
+There are 10 routes that accept GET requests:
 
 1. ```/local_authority_districts/```: params include ```local_authority_district_code```, ```local_authority_district_name```, ```year``` or if none is passed, a list of all local authorities in the UK is returned
 2. ```/england_wales_lower_layer_super_output_areas/```: params include ```lsoa_code```, ```lsoa_name```, ```year```. If none is passed, a list of all LSOAs is returned.
 3. ```/northern_ireland_small_output_areas/```: params include ```soa_code```, ```soa_name```, ```year```. If none is passed, a list of all SOAs is returned.
-4. ```/scotland_datazones/```: params include ``data_zone_code```,```data_zone_name```,```year```. If none is passed, a list of all Data Zones is returned.
+4. ```/scotland_datazones/```: params include ```data_zone_code```,```data_zone_name```,```year```. If none is passed, a list of all Data Zones is returned.
 5. ```/greenspace/```: returns data on green space access by local authority in England, Scotland and Wales
 6. ```/english_indices_of_multiple_deprivation/```: params include ```lsoa_code``` returns a list of all English indices of deprivation
 7. ```/welsh_indices_of_multiple_deprivation/```: params include ```lsoa_code``` returns a list of all Welsh indices of deprivation
