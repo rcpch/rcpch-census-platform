@@ -67,14 +67,15 @@ class GreenSpaceSerializer(serializers.HyperlinkedModelSerializer):
 class DataZoneSerializer(serializers.ModelSerializer):
     class Meta:
         model = DataZone
-        fields = "__all__"
+        fields = ["data_zone_code", "data_zone_name", "year", "local_authority"]
         depth = 1
 
 
 class SOASerializer(serializers.ModelSerializer):
     class Meta:
         model = SOA
-        fields = "__all__"
+        fields = ["year", "soa_code", "soa_name"]
+        depth = 1
 
 
 class EnglishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
@@ -143,18 +144,89 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
 class WelshIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     class Meta:
         model = WelshIndexMultipleDeprivation
-        fields = "__all__"
+        fields = [
+            "imd_rank",
+            "imd_quartile",
+            "imd_quintile",
+            "imd_decile",
+            "imd_score",
+            "income_rank",
+            "income_quartile",
+            "income_quintile",
+            "income_decile",
+            "income_score",
+            "employment_rank",
+            "employment_quartile",
+            "employment_quintile",
+            "employment_decile",
+            "employment_score",
+            "health_rank",
+            "health_quartile",
+            "health_quintile",
+            "health_decile",
+            "health_score",
+            "education_rank",
+            "education_quartile",
+            "education_quintile",
+            "education_decile",
+            "education_score",
+            "access_to_services_rank",
+            "access_to_services_quartile",
+            "access_to_services_quintile",
+            "access_to_services_decile",
+            "access_to_services_score",
+            "housing_rank",
+            "housing_quartile",
+            "housing_quintile",
+            "housing_decile",
+            "housing_score",
+            "community_safety_rank",
+            "community_safety_quartile",
+            "community_safety_quintile",
+            "community_safety_decile",
+            "community_safety_score",
+            "physical_environment_rank",
+            "physical_environment_quartile",
+            "physical_environment_quintile",
+            "physical_environment_decile",
+            "physical_environment_score",
+            "lsoa",
+            "year",
+        ]
 
 
 class ScottishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     class Meta:
         model = ScottishIndexMultipleDeprivation
-        fields = "__all__"
+        fields = [
+            "year",
+            "version",
+            "imd_rank",
+            "income_rank",
+            "employment_rank",
+            "education_rank",
+            "health_rank",
+            "access_rank",
+            "crime_rank",
+            "housing_rank",
+            "data_zone",
+        ]
         depth = 1
 
 
 class NorthernIrelandIndexMultipleDepricationSerializer(serializers.ModelSerializer):
     class Meta:
         model = NorthernIrelandIndexMultipleDeprivation
-        fields = "__all__"
+        fields = [
+            "imd_rank",
+            "year",
+            "income_rank",
+            "employment_rank",
+            "health_deprivation_and_disability_rank",
+            "education_skills_and_training_rank",
+            "access_to_services_rank",
+            "living_environment_rank",
+            "crime_and_disorder_rank",
+            "soa",
+        ]
         depth = 1

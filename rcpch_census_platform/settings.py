@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "whitenoise.runserver_nostatic",
     "rest_framework",
     "rest_framework.authtoken",
+    "django_filters",
     "deprivation_scores",
 ]
 
@@ -157,6 +158,7 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
         "rest_framework.permissions.DjangoModelPermissions",
     ],
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
 }
 
 CSRF_TRUSTED_ORIGINS = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
