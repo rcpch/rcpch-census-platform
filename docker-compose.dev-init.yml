@@ -2,7 +2,7 @@
 # syncs changes in local code folder to the RCPCHCensusPlatform container
 # migrates the database
 
-version: '3.11'
+version: '3.10'
 
 services:
 
@@ -15,15 +15,19 @@ services:
       - .:/home/app/webapp
     environment:
       # these env vars are ONLY for development
-      - RCPCH_CENSUS_PLATFORM_DB_NAME=rcpchCensusdb.sqlite3
+      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_USER=rcpch_census_platform_user
+      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PASSWORD=password
+      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_NAME=rcpch_census_platform_db
+      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_HOST=db
+      - RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PORT=5432
       - RCPCH_CENSUS_PLATFORM_SECRET_KEY=mysecretkey
-      - DEBUG=False
+      - DEBUG=True
       - DJANGO_ALLOWED_HOSTS=0.0.0.0
-      - DJANGO_SUPERUSER_USERNAME=rcpch-census-dev-user
+      - DJANGO_SUPERUSER_USERNAME=rcpch-census-platform-dev-user
       - DJANGO_SUPERUSER_PASSWORD=pw
       - DJANGO_SUPERUSER_FIRST_NAME=dev
       - DJANGO_SUPERUSER_SURNAME=dev
-      - DJANGO_SUPERUSER_EMAIL=rcpch-census-dev-user@rcpch.tech
+      - DJANGO_SUPERUSER_EMAIL=rcpch-census-platform-dev-user@rcpch.tech
       - DJANGO_SUPERUSER_ROLE=1
       - DJANGO_CSRF_TRUSTED_ORIGINS=https://localhost,https://0.0.0.0
     command: >
@@ -42,4 +46,12 @@ services:
             echo 'DEV SETUP SCRIPT: Development superuser password: pw' &&
             python manage.py drf_create_token rcpch-census-dev-user &&
             python manage.py runserver 0.0.0.0:8001"
-    # db container - runs sqlite3
+    # db container - runs postgres
+  db:
+    image: postgres:latest
+    # volumes:
+    #   - ./data/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=rcpch_census_platform_user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=rcpch_census_platform_db
