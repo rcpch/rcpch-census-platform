@@ -11,7 +11,7 @@ from .views import (
     ScottishMultipleDeprivationViewSet,
     NorthernIrelandMultipleDeprivationViewSet,
     PostcodeView,
-    EnglishWalesIndexMultipleDeprivationView,
+    UKIndexMultipleDeprivationView,
 )
 
 router = routers.DefaultRouter()
@@ -42,7 +42,7 @@ drf_routes = [
     path("api/v1/boundaries", view=PostcodeView.as_view()),
     path(
         "api/v1/indices_of_multiple_deprivation",
-        view=EnglishWalesIndexMultipleDeprivationView.as_view(),
+        view=UKIndexMultipleDeprivationView.as_view(),
     ),
     path("api-auth/", include("rest_framework.urls", namespace="rest_framework")),
 ]
