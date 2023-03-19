@@ -46,3 +46,17 @@ def local_authority_district_code_for_postcode(postcode):
     serialised = response.json()
     lad = serialised["result"]["codes"]["admin_district"]
     return lad
+
+
+def is_valid_postcode(postcode):
+
+    url = f"https://api.postcodes.io/postcodes/{postcode}/validate"
+    response = requests.get(url=url)
+    if response.status_code == 404:
+        print("Postcode validation failure. Could not validate postcode.")
+        return False
+    else:
+        if response.json()["result"] == "True":
+            return True
+        else:
+            return False
