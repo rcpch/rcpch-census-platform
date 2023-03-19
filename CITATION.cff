@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: "Chapman"
+    given-names: "Simon"
+    orcid: "https://orcid.org/0000-0001-9897-2040"
+title: "rcpch-census-platform"
+version: 1.0.0
+doi: 10.5281/zenodo.7750692
+date-released: 2023-03-19
+url: "https://github.com/rcpch/rcpch-census-platform"

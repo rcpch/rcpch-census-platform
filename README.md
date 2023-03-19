@@ -341,3 +341,5 @@ Vary: Accept
 ```
 
 This information comes directly from the remarkable [postcodes.io](https://postcodes.io) which offers this as a free service. This is a dependency of the RCPCH Census Platform API, since it is used to get LSOAs from a postcode. This process is complicated as boundaries frequently change.
+
+[![DOI](https://zenodo.org/badge/568991339.svg)](https://zenodo.org/badge/latestdoi/568991339)
