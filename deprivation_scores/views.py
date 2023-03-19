@@ -6,6 +6,8 @@ from rest_framework.exceptions import NotFound
 
 from requests import Request
 
+from pprint import pprint
+
 from .models import (
     LocalAuthority,
     LSOA,
@@ -22,6 +24,7 @@ from .serializers import (
     LSOASerializer,
     GreenSpaceSerializer,
     DataZoneSerializer,
+    SOASerializer,
     EnglishIndexMultipleDeprivationSerializer,
     WelshIndexMultipleDeprivationSerializer,
     ScottishIndexMultipleDeprivationSerializer,
@@ -68,6 +71,12 @@ class LSOAViewSet(viewsets.ModelViewSet):
         return query_set
 
 
+class SOAViewSet(viewsets.ModelViewSet):
+    queryset = SOA.objects.all().order_by("-soa_code")
+    serializer_class = SOASerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
 class GreenSpaceViewSet(viewsets.ModelViewSet):
     queryset = GreenSpace.objects.all().order_by("-total_addresses_count")
     serializer_class = GreenSpaceSerializer
@@ -97,7 +106,7 @@ class GreenSpaceViewSet(viewsets.ModelViewSet):
 
 
 class DataZoneViewSet(viewsets.ModelViewSet):
-    queryset = DataZone
+    queryset = DataZone.objects.all().order_by("data_zone_code")
     serializer_class = DataZoneSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -177,18 +186,20 @@ class EnglishWalesIndexMultipleDeprivationView(APIView):
             raise NotFound("No postcode supplied.")
 
         if lsoa_object["lsoa"]:
-            lsoa = LSOA.objects.filter(lsoa_code=lsoa_object["lsoa"]).get()
             if lsoa_object["country"] == "England":
+                lsoa = LSOA.objects.filter(lsoa_code=lsoa_object["lsoa"]).get()
                 imd = EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
                 response = self.english_serializer_class(
                     instance=imd, context={"request": Request(request)}
                 )
             elif lsoa_object["country"] == "Wales":
+                lsoa = LSOA.objects.filter(lsoa_code=lsoa_object["lsoa"]).get()
                 imd = WelshIndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
                 response = self.welsh_serializer_class(
                     instance=imd, context={"request": Request(request)}
                 )
             elif lsoa_object["country"] == "Scotland":
+                lsoa = DataZone.objects.filter(data_zone_code=lsoa_object["lsoa"]).get()
                 imd = ScottishIndexMultipleDeprivation.objects.filter(
                     data_zone=lsoa
                 ).get()
@@ -196,6 +207,7 @@ class EnglishWalesIndexMultipleDeprivationView(APIView):
                     instance=imd, context={"request": Request(request)}
                 )
             elif lsoa_object["country"] == "Northern Ireland":
+                lsoa = SOA.objects.filter(soa_code=lsoa_object["lsoa"]).get()
                 imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
                     soa=lsoa
                 ).get()
@@ -207,4 +219,4 @@ class EnglishWalesIndexMultipleDeprivationView(APIView):
         else:
             raise NotFound("No valid LSOA found.")
 
-            return Response(response.data)
+        return Response(response.data)
