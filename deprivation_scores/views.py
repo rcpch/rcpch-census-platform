@@ -1,5 +1,5 @@
-from rest_framework import viewsets
-from rest_framework import permissions
+from rest_framework import viewsets, permissions
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView, Response
 from rest_framework import authentication, permissions
 from rest_framework.exceptions import ParseError
@@ -167,6 +167,9 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ModelViewSet):
 
 
 # custom views / endpoints
+
+
+@permission_classes((permissions.AllowAny,))
 class PostcodeView(APIView):
     def get(self, request):
         """
