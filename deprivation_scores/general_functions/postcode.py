@@ -56,7 +56,4 @@ def is_valid_postcode(postcode):
         print("Postcode validation failure. Could not validate postcode.")
         return False
     else:
-        if response.json()["result"] == "True":
-            return True
-        else:
-            return False
+        return response.json()["result"]
