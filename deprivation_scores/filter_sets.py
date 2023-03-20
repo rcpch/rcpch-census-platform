@@ -1,87 +1,52 @@
-from rest_framework import serializers
+from django_filters.filterset import FilterSet, CharFilter, NumberFilter
 from .models import (
-    LSOA,
-    LocalAuthority,
-    GreenSpace,
     DataZone,
-    SOA,
     EnglishIndexMultipleDeprivation,
     WelshIndexMultipleDeprivation,
     ScottishIndexMultipleDeprivation,
-    NorthernIrelandIndexMultipleDeprivation,
 )
 
 
-class LSOASerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = LSOA
-        fields = [
-            "lsoa_code",
-            "lsoa_name",
-            "year",
-            "total_population_mid_2015",
-            "dependent_children_mid_2015",
-            "population_16_59_mid_2015",
-            "older_population_over_16_mid_2015",
-            "working_age_population_over_18_mid_2015",
-        ]
+class DataZoneFilter(FilterSet):
+    local_authority_code = CharFilter(
+        field_name="local_authority__local_authority_district_code",
+        lookup_expr="icontains",
+    )
+    local_authority_name = CharFilter(
+        field_name="local_authority__local_authority_name",
+        lookup_expr="icontains",
+    )
 
-
-class LocalAuthorityDistrictSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = LocalAuthority
-        fields = [
-            "local_authority_district_code",
-            "local_authority_district_name",
-            "year",
-        ]
-
-
-class GreenSpaceSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = GreenSpace
-        depth = 1
-        fields = [
-            "houses_address_count",
-            "houses_addresses_with_private_outdoor_space_count",
-            "houses_outdoor_space_total_area",
-            "houses_outdoor_space_total_area",
-            "houses_percentage_of_addresses_with_private_outdoor_space",
-            "houses_average_size_private_outdoor_space",
-            "houses_median_size_private_outdoor_space",
-            "flats_address_count",
-            "flats_addresses_with_private_outdoor_space_count",
-            "flats_outdoor_space_total_area",
-            "flats_outdoor_space_count",
-            "flats_percentage_of_addresses_with_private_outdoor_space",
-            "flats_average_size_private_outdoor_space",
-            "flats_average_number_of_flats_sharing_a_garden",
-            "total_addresses_count",
-            "total_addresses_with_private_outdoor_space_count",
-            "total_percentage_addresses_with_private_outdoor_space",
-            "total_average_size_private_outdoor_space",
-            "local_authority",
-        ]
-
-
-class DataZoneSerializer(serializers.ModelSerializer):
     class Meta:
         model = DataZone
-        fields = ["data_zone_code", "data_zone_name", "year", "local_authority"]
-        depth = 1
+        fields = (
+            "data_zone_code",
+            "data_zone_name",
+            "year",
+        )
 
 
-class SOASerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SOA
-        fields = ["year", "soa_code", "soa_name"]
-        depth = 1
+class EnglishIndexMultipleDeprivationFilter(FilterSet):
+    lsoa_code = CharFilter(
+        field_name="lsoa__lsoa_code",
+        lookup_expr="icontains",
+    )
+    lsoa_name = CharFilter(
+        field_name="lsoa__lsoa_name",
+        lookup_expr="icontains",
+    )
+    local_authority_code = CharFilter(
+        field_name="lsoa__local_authority__local_authority_district_code",
+        lookup_expr="icontains",
+    )
+    local_authority_name = CharFilter(
+        field_name="lsoa__local_authority__local_authority_district_name",
+        lookup_expr="icontains",
+    )
 
-
-class EnglishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     class Meta:
         model = EnglishIndexMultipleDeprivation
-        fields = [
+        fields = (
             "imd_score",
             "imd_rank",
             "imd_decile",
@@ -126,7 +91,6 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
             "living_environment_rank",
             "living_environment_decile",
             "indoors_sub_domain_score",
-            "indoors_sub_domain_rank",
             "indoors_sub_domain_decile",
             "outdoors_sub_domain_score",
             "outdoors_sub_domain_rank",
@@ -137,12 +101,27 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
             "idaopi_score",
             "idaopi_rank",
             "idaopi_decile",
-            "lsoa",
-        ]
-        depth = 1
+        )
 
 
-class WelshIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
+class WelshIndexMultipleDeprivationFilter(FilterSet):
+    lsoa_code = CharFilter(
+        field_name="lsoa__lsoa_code",
+        lookup_expr="icontains",
+    )
+    lsoa_name = CharFilter(
+        field_name="lsoa__lsoa_name",
+        lookup_expr="icontains",
+    )
+    local_authority_code = CharFilter(
+        field_name="lsoa__local_authority__local_authority_district_code",
+        lookup_expr="icontains",
+    )
+    local_authority_name = CharFilter(
+        field_name="lsoa__local_authority__local_authority_district_name",
+        lookup_expr="icontains",
+    )
+
     class Meta:
         model = WelshIndexMultipleDeprivation
         fields = [
@@ -194,10 +173,23 @@ class WelshIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
             "lsoa",
             "year",
         ]
-        depth = 1
+        exclude = "id"
 
 
-class ScottishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
+class ScottishIndexMultipleDeprivationFilter(FilterSet):
+    data_zone_code = CharFilter(
+        field_name="data_zone__data_zone_code",
+        lookup_expr="icontains",
+    )
+    data_zone_name = CharFilter(
+        field_name="data_zone__data_zone_name",
+        lookup_expr="icontains",
+    )
+    local_authority_code = CharFilter(
+        field_name="data_zone__local_authority",
+        lookup_expr="icontains",
+    )
+
     class Meta:
         model = ScottishIndexMultipleDeprivation
         fields = [
@@ -213,22 +205,4 @@ class ScottishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
             "housing_rank",
             "data_zone",
         ]
-        depth = 1
-
-
-class NorthernIrelandIndexMultipleDepricationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = NorthernIrelandIndexMultipleDeprivation
-        fields = [
-            "imd_rank",
-            "year",
-            "income_rank",
-            "employment_rank",
-            "health_deprivation_and_disability_rank",
-            "education_skills_and_training_rank",
-            "access_to_services_rank",
-            "living_environment_rank",
-            "crime_and_disorder_rank",
-            "soa",
-        ]
-        depth = 1
+        exclude = "id"
