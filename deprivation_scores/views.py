@@ -4,10 +4,14 @@ from rest_framework.views import APIView, Response
 from rest_framework import authentication, permissions
 from rest_framework.exceptions import ParseError
 from django_filters.rest_framework import DjangoFilterBackend
-
 from requests import Request
 
-from pprint import pprint
+from .filter_sets import (
+    DataZoneFilter,
+    EnglishIndexMultipleDeprivationFilter,
+    WelshIndexMultipleDeprivationFilter,
+    ScottishIndexMultipleDeprivationFilter,
+)
 
 from .models import (
     LocalAuthority,
@@ -104,7 +108,7 @@ class DataZoneViewSet(viewsets.ModelViewSet):
     queryset = DataZone.objects.all().order_by("data_zone_code")
     serializer_class = DataZoneSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filterset_fields = ["data_zone_code", "data_zone_name", "year"]
+    filter_class = DataZoneFilter
     filter_backends = [DjangoFilterBackend]
 
 
@@ -118,7 +122,7 @@ class EnglishIndexMultipleDeprivationViewSet(viewsets.ModelViewSet):
     queryset = EnglishIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
     serializer_class = EnglishIndexMultipleDeprivationSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filterset_fields = ["lsoa__lsoa_code"]
+    filter_class = EnglishIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
 
 
@@ -132,7 +136,7 @@ class WelshMultipleDeprivationViewSet(viewsets.ModelViewSet):
     queryset = WelshIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
     serializer_class = WelshIndexMultipleDeprivationSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filterset_fields = ["lsoa__lsoa_code"]
+    filter_class = WelshIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
 
 
@@ -146,7 +150,7 @@ class ScottishMultipleDeprivationViewSet(viewsets.ModelViewSet):
     queryset = ScottishIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
     serializer_class = ScottishIndexMultipleDeprivationSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filterset_fields = ["data_zone__data_zone_code"]
+    filter_class = ScottishIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
 
 
@@ -162,7 +166,7 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ModelViewSet):
     )
     serializer_class = NorthernIrelandIndexMultipleDepricationSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filterset_fields = ["soa__soa_code"]
+    filterset_fields = ["soa__soa_code", "soa__soa_name"]
     filter_backends = [DjangoFilterBackend]
 
 
