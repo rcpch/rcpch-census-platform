@@ -4,6 +4,7 @@ from .models import (
     EnglishIndexMultipleDeprivation,
     WelshIndexMultipleDeprivation,
     ScottishIndexMultipleDeprivation,
+    NorthernIrelandIndexMultipleDeprivation,
 )
 
 
@@ -114,11 +115,7 @@ class WelshIndexMultipleDeprivationFilter(FilterSet):
         lookup_expr="icontains",
     )
     local_authority_code = CharFilter(
-        field_name="lsoa__local_authority__local_authority_district_code",
-        lookup_expr="icontains",
-    )
-    local_authority_name = CharFilter(
-        field_name="lsoa__local_authority__local_authority_district_name",
+        field_name="lsoa__local_authority__local_authority_district",
         lookup_expr="icontains",
     )
 
@@ -205,4 +202,34 @@ class ScottishIndexMultipleDeprivationFilter(FilterSet):
             "housing_rank",
             "data_zone",
         ]
+        exclude = "id"
+
+
+class NorthernIrelandIndexMultipleDeprivationFilter(FilterSet):
+    soa_zone_code = CharFilter(
+        field_name="soa__soa_code",
+        lookup_expr="icontains",
+    )
+    soa_zone_name = CharFilter(
+        field_name="soa__soa_name",
+        lookup_expr="icontains",
+    )
+    local_authority_code = CharFilter(
+        field_name="soa__local_authority",
+        lookup_expr="icontains",
+    )
+
+    class Meta:
+        model = NorthernIrelandIndexMultipleDeprivation
+        fields = (
+            "imd_rank",
+            "year",
+            "income_rank",
+            "employment_rank",
+            "health_deprivation_and_disability_rank",
+            "education_skills_and_training_rank",
+            "access_to_services_rank",
+            "living_environment_rank",
+            "crime_and_disorder_rank",
+        )
         exclude = "id"
