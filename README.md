@@ -89,22 +89,27 @@ The final step is to run the server:
 1. clone the repo
 2. ```cd rcpch_census_platform```
 3. ```s/docker-init```
-4. grab the token from the console within the docker > ![alt drf_token](static/images/census_db_token.png)
-5. Add the token to your header when making an api call (```-H 'Authorization: *******'``` in curl statement for example). If you are using Postman, use the OAUTH2 Authorization header, and the key 'Token'.
+4. ```python manage.py seed --mode='add_organisational_areas'```
+5. ```python manage.py seed --mode='add_english_imds'```
+6. ```python manage.py seed --mode='add_welsh_imds'```
+7. ```python manage.py seed --mode='add_scottish_imds'```
+8. ```python manage.py seed --mode='add_northern_ireland_imds'```
+9. grab the token from the console within the docker > ![alt drf_token](static/images/census_db_token.png)
+10. Add the token to your header when making an api call (```-H 'Authorization: *******'``` in curl statement for example). If you are using Postman, use the OAUTH2 Authorization header, and the key 'Token'.
 
 If you navigate to the base url```http://localhost:8001/rcpch-census-platform/api/v1/``` and login, it should be possible then to view the data. Alternatively, add the token to Postman.
 
-There are 10 routes that accept GET requests:
+There are 10 routes that accept GET requests, all of which return lists that can be filtered, with the exception of ```/indices_of_multiple_deprivation/``` which accepts only a postcode.
 
 1. ```/local_authority_districts/```: params include ```local_authority_district_code```, ```local_authority_district_name```, ```year``` or if none is passed, a list of all local authorities in the UK is returned
 2. ```/england_wales_lower_layer_super_output_areas/```: params include ```lsoa_code```, ```lsoa_name```, ```year```. If none is passed, a list of all LSOAs is returned.
 3. ```/northern_ireland_small_output_areas/```: params include ```soa_code```, ```soa_name```, ```year```. If none is passed, a list of all SOAs is returned.
-4. ```/scotland_datazones/```: params include ```data_zone_code```,```data_zone_name```,```year```. If none is passed, a list of all Data Zones is returned.
+4. ```/scotland_datazones/```: params include ```data_zone_code```,```data_zone_name```,```year```,```local_authority_code```. If none is passed, a list of all Data Zones is returned.
 5. ```/greenspace/```: returns data on green space access by local authority in England, Scotland and Wales
-6. ```/english_indices_of_multiple_deprivation/```: params include ```lsoa_code``` returns a list of all English indices of deprivation
-7. ```/welsh_indices_of_multiple_deprivation/```: params include ```lsoa_code``` returns a list of all Welsh indices of deprivation
-8. ```/scottish_indices_of_multiple_deprivation/```: params include ```data_zone_code``` returns a list of all Scottish indices of deprivation
-9. ```/northern_ireland_indices_of_multiple_deprivation/```: params include ```soa_code``` returns a list of all Scottish indices of deprivation
+6. ```/english_indices_of_multiple_deprivation/```: params include ```lsoa_code_name``` or ```lsoa_code```, ```local_authority_code``` as well any of the return object fields. It returns a list of all English indices of deprivation
+7. ```/welsh_indices_of_multiple_deprivation/```: params include ```lsoa_code```, ```local_authority_code``` as well any of the return object fields. It returns a list of all Welsh indices of deprivation
+8. ```/scottish_indices_of_multiple_deprivation/```: params include ```data_zone_code``` and ```data_zone_name```, ```local_authority_code``` as well as any of the return object fields. It returns a list of all Scottish indices of deprivation.
+9. ```/northern_ireland_indices_of_multiple_deprivation/```: params include ```soa_code``` and ```soa_code_name``` as well as any of the return object fields. It returns a list of all Scottish indices of deprivation
 10. ```/indices_of_multiple_deprivation/```: takes a UK postcode (mandatory) and returns deprivation score and quantiles for that LSOA
 
 example:
