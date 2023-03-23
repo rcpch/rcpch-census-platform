@@ -1,7 +1,7 @@
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView, Response
-from rest_framework import authentication, permissions
+from rest_framework import authentication, permissions, generics
 from rest_framework.exceptions import ParseError
 from django_filters.rest_framework import DjangoFilterBackend
 from requests import Request
