@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "django_filters",
     "deprivation_scores",
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -159,6 +160,17 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.DjangoModelPermissions",
     ],
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
+    
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+# drf-spectacular schema settings
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Deprivation Scores API',
+    'DESCRIPTION': '*************ADD DESCRIPTION HERE******************',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # OTHER SETTINGS
 }
 
 CSRF_TRUSTED_ORIGINS = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
