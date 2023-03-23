@@ -6,6 +6,8 @@ from rest_framework.exceptions import ParseError
 from django_filters.rest_framework import DjangoFilterBackend
 from requests import Request
 
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+
 from .filter_sets import (
     DataZoneFilter,
     EnglishIndexMultipleDeprivationFilter,
@@ -171,10 +173,13 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ModelViewSet):
 
 
 # custom views / endpoints
-
-
 @permission_classes((permissions.AllowAny,))
 class PostcodeView(APIView):
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name='postcode', description='Postcode for postcodes.io', required=True, type=str),
+        ]
+    )
     def get(self, request):
         """
         This is a proxy for postcodes.io, an api that looks up a given postcode
