@@ -201,6 +201,11 @@ class UKIndexMultipleDeprivationView(APIView):
         NorthernIrelandIndexMultipleDepricationSerializer
     )
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name='postcode', description='Postcode for postcodes.io', required=True, type=str),
+        ]
+    )
     def get(self, request):
         """
         Returns an index of multiple deprivations against a postcode, from either England, Wales, Scotland or Northern Ireland
