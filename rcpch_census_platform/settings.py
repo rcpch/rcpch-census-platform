@@ -167,7 +167,7 @@ REST_FRAMEWORK = {
 # drf-spectacular schema settings
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Deprivation Scores API',
-    'DESCRIPTION': '*************ADD DESCRIPTION HERE******************',
+    'DESCRIPTION': 'This project is a Python 3.11 / Django Rest Framework project providing UK census data, especially Index of Multiple Deprivation as a service.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     # OTHER SETTINGS
