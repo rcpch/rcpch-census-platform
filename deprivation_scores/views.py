@@ -7,6 +7,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from requests import Request
 
 from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 
 from .filter_sets import (
     DataZoneFilter,
@@ -61,7 +62,10 @@ class LocalAuthorityDistrictViewSet(viewsets.ModelViewSet):
     ]
     filter_backends = [DjangoFilterBackend]
 
-
+@extend_schema(
+    request=LSOASerializer,
+    
+)
 class LSOAViewSet(viewsets.ModelViewSet):
     """
     Returns a list of LSOAs in England and Wales
@@ -177,7 +181,12 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ModelViewSet):
 class PostcodeView(APIView):
     @extend_schema(
         parameters=[
-            OpenApiParameter(name='postcode', description='Postcode for postcodes.io', required=True, type=str),
+            OpenApiParameter(
+                name='postcode', 
+                description='Postcode for postcodes.io', 
+                required=True, 
+                type=OpenApiTypes.STR,
+                ),
         ]
     )
     def get(self, request):
