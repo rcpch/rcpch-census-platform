@@ -14,6 +14,8 @@ from .views import (
     UKIndexMultipleDeprivationView,
 )
 
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+
 router = routers.DefaultRouter()
 router.register(r"local_authority_districts", viewset=LocalAuthorityDistrictViewSet)
 router.register(r"england_wales_lower_layer_super_output_areas", viewset=LSOAViewSet)
@@ -45,6 +47,13 @@ drf_routes = [
         view=UKIndexMultipleDeprivationView.as_view(),
     ),
     path("api-auth/", include("rest_framework.urls", namespace="rest_framework")),
+    
+    #SWAGGERUI PATHS
+    #path to download schema
+    path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
+    # path to ui
+    path('api/v1/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+
 ]
 
 urlpatterns = []

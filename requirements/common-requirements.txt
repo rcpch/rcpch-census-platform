@@ -5,6 +5,7 @@ python-dateutil
 # third party imports
 django
 djangorestframework
+drf-spectacular
 django-filter
 psycopg2-binary
 whitenoise
