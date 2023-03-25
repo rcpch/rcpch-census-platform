@@ -1,10 +1,13 @@
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView, Response
-from rest_framework import authentication, permissions
+from rest_framework import authentication, permissions, generics
 from rest_framework.exceptions import ParseError
 from django_filters.rest_framework import DjangoFilterBackend
 from requests import Request
+
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 
 from .filter_sets import (
     DataZoneFilter,
@@ -43,7 +46,7 @@ from .general_functions import (
 )
 
 
-class LocalAuthorityDistrictViewSet(viewsets.ModelViewSet):
+class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Returns a list of Local Authority Districts (2019) across England, Scotland and Wales
     Filter params include: "year","local_authority_district_code","local_authority_district_name"
@@ -61,7 +64,10 @@ class LocalAuthorityDistrictViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
-class LSOAViewSet(viewsets.ModelViewSet):
+@extend_schema(
+    request=LSOASerializer,
+)
+class LSOAViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Returns a list of LSOAs in England and Wales
     Filter params include: "year","lsoa_code","lsoa_name"
@@ -75,7 +81,10 @@ class LSOAViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
-class SOAViewSet(viewsets.ModelViewSet):
+@extend_schema(
+    request=SOASerializer,
+)
+class SOAViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Returns a list of SOAs in Northern Ireland
     Filter params include: "year","soa_code","soa_name"
@@ -89,7 +98,10 @@ class SOAViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
-class GreenSpaceViewSet(viewsets.ModelViewSet):
+@extend_schema(
+    request=GreenSpaceSerializer,
+)
+class GreenSpaceViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Returns a list of local authorities in the UK with data relating to green space and access to green space,
     """
@@ -99,7 +111,10 @@ class GreenSpaceViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 
-class DataZoneViewSet(viewsets.ModelViewSet):
+@extend_schema(
+    request=DataZoneSerializer,
+)
+class DataZoneViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Returns a list of all Scottish data zones (2011) and their associated local authority district
     Filter params include: "year","data_zone_code","data_zone_name"
@@ -113,7 +128,10 @@ class DataZoneViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
-class EnglishIndexMultipleDeprivationViewSet(viewsets.ModelViewSet):
+@extend_schema(
+    request=EnglishIndexMultipleDeprivationSerializer,
+)
+class EnglishIndexMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Returns a list of all English LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).
     Filter params include: "lsoa_code"
@@ -127,7 +145,10 @@ class EnglishIndexMultipleDeprivationViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
-class WelshMultipleDeprivationViewSet(viewsets.ModelViewSet):
+@extend_schema(
+    request=WelshIndexMultipleDeprivationSerializer,
+)
+class WelshMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Returns a list of Welsh LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).
     Filter params include: "lsoa_code"
@@ -141,7 +162,10 @@ class WelshMultipleDeprivationViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
-class ScottishMultipleDeprivationViewSet(viewsets.ModelViewSet):
+@extend_schema(
+    request=ScottishIndexMultipleDeprivationSerializer,
+)
+class ScottishMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Returns a list of Scottish data zones with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2017).
     Filter params include: "data_zone_code"
@@ -155,7 +179,10 @@ class ScottishMultipleDeprivationViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
-class NorthernIrelandMultipleDeprivationViewSet(viewsets.ModelViewSet):
+@extend_schema(
+    request=NorthernIrelandIndexMultipleDepricationSerializer,
+)
+class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Returns a list of all Northern Ireland SOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2020).
     Filter params include: "soa_code"
@@ -172,10 +199,18 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ModelViewSet):
 
 
 # custom views / endpoints
-
-
 @permission_classes((permissions.AllowAny,))
 class PostcodeView(APIView):
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="postcode",
+                description="Postcode for postcodes.io",
+                required=True,
+                type=OpenApiTypes.STR,
+            ),
+        ]
+    )
     def get(self, request):
         """
         This is a proxy for postcodes.io, an api that looks up a given postcode
@@ -197,6 +232,16 @@ class UKIndexMultipleDeprivationView(APIView):
         NorthernIrelandIndexMultipleDepricationSerializer
     )
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="postcode",
+                description="Postcode",
+                required=True,
+                type=str,
+            ),
+        ]
+    )
     def get(self, request):
         """
         Returns an index of multiple deprivations against a postcode, from either England, Wales, Scotland or Northern Ireland
