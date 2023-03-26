@@ -50,8 +50,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "django_filters",
+    "drf_spectacular",
     "deprivation_scores",
-    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -159,17 +159,16 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
         "rest_framework.permissions.DjangoModelPermissions",
     ],
-    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
-    
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 # drf-spectacular schema settings
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Deprivation Scores API',
-    'DESCRIPTION': 'This project is a Python 3.11 / Django Rest Framework project providing UK census data, especially Index of Multiple Deprivation as a service.',
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
+    "TITLE": "Deprivation Scores API",
+    "DESCRIPTION": "This project is a Python 3.11 / Django Rest Framework project providing UK census data, especially Index of Multiple Deprivation as a service.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
     # OTHER SETTINGS
 }
 

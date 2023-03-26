@@ -216,7 +216,7 @@ class ScottishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
         depth = 1
 
 
-class NorthernIrelandIndexMultipleDepricationSerializer(serializers.ModelSerializer):
+class NorthernIrelandIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     class Meta:
         model = NorthernIrelandIndexMultipleDeprivation
         fields = [

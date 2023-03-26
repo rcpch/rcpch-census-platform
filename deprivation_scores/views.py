@@ -1,13 +1,12 @@
-from typing import Literal
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView, Response
-from rest_framework import authentication, permissions, generics
+from rest_framework import authentication, permissions
 from rest_framework.exceptions import ParseError
 from django_filters.rest_framework import DjangoFilterBackend
 from requests import Request
 
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 
 from .general_functions import quantile_for_rank
@@ -40,7 +39,7 @@ from .serializers import (
     EnglishIndexMultipleDeprivationSerializer,
     WelshIndexMultipleDeprivationSerializer,
     ScottishIndexMultipleDeprivationSerializer,
-    NorthernIrelandIndexMultipleDepricationSerializer,
+    NorthernIrelandIndexMultipleDeprivationSerializer,
 )
 from .general_functions import (
     lsoa_for_postcode,
@@ -49,6 +48,9 @@ from .general_functions import (
 )
 
 
+@extend_schema(
+    request=LocalAuthorityDistrictSerializer,
+)
 class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Returns a list of Local Authority Districts (2019) across England, Scotland and Wales
@@ -183,7 +185,7 @@ class ScottishMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 @extend_schema(
-    request=NorthernIrelandIndexMultipleDepricationSerializer,
+    request=NorthernIrelandIndexMultipleDeprivationSerializer,
 )
 class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -195,9 +197,9 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = NorthernIrelandIndexMultipleDeprivation.objects.all().order_by(
         "-imd_rank"
     )
-    serializer_class = NorthernIrelandIndexMultipleDepricationSerializer
+    serializer_class = NorthernIrelandIndexMultipleDeprivationSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filterset_fields = NorthernIrelandIndexMultipleDeprivationFilter
+    filterset_class = NorthernIrelandIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
 
 
@@ -232,7 +234,7 @@ class UKIndexMultipleDeprivationView(APIView):
     welsh_serializer_class = WelshIndexMultipleDeprivationSerializer
     scottish_serializer_class = ScottishIndexMultipleDeprivationSerializer
     northern_ireland_serializer_class = (
-        NorthernIrelandIndexMultipleDepricationSerializer
+        NorthernIrelandIndexMultipleDeprivationSerializer
     )
 
     @extend_schema(
@@ -241,7 +243,7 @@ class UKIndexMultipleDeprivationView(APIView):
                 name="postcode",
                 description="Postcode",
                 required=True,
-                type=str,
+                type=OpenApiTypes.STR,
             ),
         ]
     )
@@ -253,7 +255,6 @@ class UKIndexMultipleDeprivationView(APIView):
         postcode: string [Mandatory]
         """
         post_code = self.request.query_params.get("postcode", None)
-        quantile = self.request.query_params.get("quantile", None)
         if post_code:
             if is_valid_postcode(postcode=post_code):
                 lsoa_object = lsoa_for_postcode(postcode=post_code)
@@ -305,12 +306,6 @@ class UKIndexMultipleDeprivationView(APIView):
 class UKIndexMultipleDeprivationQuantileView(APIView):
     authentication_classes = [authentication.TokenAuthentication]
     permission_classes = [permissions.IsAdminUser]
-    english_serializer_class = EnglishIndexMultipleDeprivationSerializer
-    welsh_serializer_class = WelshIndexMultipleDeprivationSerializer
-    scottish_serializer_class = ScottishIndexMultipleDeprivationSerializer
-    northern_ireland_serializer_class = (
-        NorthernIrelandIndexMultipleDepricationSerializer
-    )
 
     @extend_schema(
         parameters=[
@@ -318,13 +313,13 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                 name="postcode",
                 description="Postcode",
                 required=True,
-                type=str,
+                type=OpenApiTypes.STR,
             ),
             OpenApiParameter(
                 name="quantile",
                 description="Quantile",
                 required=True,
-                type=int,  # Literal[2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20],
+                type=OpenApiTypes.INT,  # Literal[2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20],
             ),
         ]
     )
