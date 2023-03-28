@@ -28,7 +28,7 @@ IMD_DATA_FILES_FOLDER = os.path.join(PROJECT_ROOT, "deprivation_scores/imd_data"
 SECRET_KEY = "django-insecure-taj5j+tk=ehlabn6m84jw$5431d#1$xt)u#hej7xlbj@(@v9ra"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") + [
     "127.0.0.1",
