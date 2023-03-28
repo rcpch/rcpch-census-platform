@@ -4,3 +4,4 @@ from .postcode import (
     local_authority_district_code_for_postcode,
     is_valid_postcode,
 )
+from .quantile import quantile_for_rank

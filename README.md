@@ -111,6 +111,7 @@ There are 10 routes that accept GET requests, all of which return lists that can
 8. ```/scottish_indices_of_multiple_deprivation/```: params include ```data_zone_code``` and ```data_zone_name```, ```local_authority_code``` as well as any of the return object fields. It returns a list of all Scottish indices of deprivation.
 9. ```/northern_ireland_indices_of_multiple_deprivation/```: params include ```soa_code``` and ```soa_code_name``` as well as any of the return object fields. It returns a list of all Scottish indices of deprivation
 10. ```/indices_of_multiple_deprivation/```: takes a UK postcode (mandatory) and returns deprivation score and quantiles for that LSOA
+11. ```/index_of_multiple_deprivation_quantile/```: takes a UK postcode (mandatory) and a requested quantile (mandatory) and returns a deprivation quantile.
 
 example:
 SW1A 1AA (Buckingham Palace):
@@ -290,6 +291,27 @@ and Northern Ireland (```rcpch-census-engine.azurewebsites.net/api/v1/indices_of
         "year": 2001,
         "soa_code": "95GG39S1",
         "soa_name": "Shaftesbury_1"
+    }
+}
+```
+
+The endpoint for deprivation quantile: It accepts a postcode and a quantile_type, one of [2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20]
+
+```
+{{base_url}}/index_of_multiple_deprivation_quantile?quantile=5&postcode=SY10 0AA
+```
+
+returns:
+
+```json
+{
+    "result": {
+        "rank": 1038,
+        "requested_quantile": 5,
+        "requested_quantile_name": "quintile",
+        "data_quantile": 3,
+        "country": "wales",
+        "error": null
     }
 }
 ```
