@@ -12,7 +12,10 @@ from .views import (
     NorthernIrelandMultipleDeprivationViewSet,
     PostcodeView,
     UKIndexMultipleDeprivationView,
+    UKIndexMultipleDeprivationQuantileView,
 )
+
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 router = routers.DefaultRouter()
 router.register(r"local_authority_districts", viewset=LocalAuthorityDistrictViewSet)
@@ -44,7 +47,20 @@ drf_routes = [
         "api/v1/indices_of_multiple_deprivation",
         view=UKIndexMultipleDeprivationView.as_view(),
     ),
+    path(
+        "api/v1/index_of_multiple_deprivation_quantile",
+        view=UKIndexMultipleDeprivationQuantileView.as_view(),
+    ),
     path("api-auth/", include("rest_framework.urls", namespace="rest_framework")),
+    # SWAGGERUI PATHS
+    # path to download schema
+    path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
+    # path to ui
+    path(
+        "api/v1/schema/swagger-ui/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
 ]
 
 urlpatterns = []

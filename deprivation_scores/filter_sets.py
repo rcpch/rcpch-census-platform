@@ -121,7 +121,7 @@ class WelshIndexMultipleDeprivationFilter(FilterSet):
 
     class Meta:
         model = WelshIndexMultipleDeprivation
-        fields = [
+        fields = (
             "imd_rank",
             "imd_quartile",
             "imd_quintile",
@@ -169,7 +169,7 @@ class WelshIndexMultipleDeprivationFilter(FilterSet):
             "physical_environment_score",
             "lsoa",
             "year",
-        ]
+        )
         exclude = "id"
 
 
@@ -189,7 +189,7 @@ class ScottishIndexMultipleDeprivationFilter(FilterSet):
 
     class Meta:
         model = ScottishIndexMultipleDeprivation
-        fields = [
+        fields = (
             "year",
             "version",
             "imd_rank",
@@ -201,7 +201,7 @@ class ScottishIndexMultipleDeprivationFilter(FilterSet):
             "crime_rank",
             "housing_rank",
             "data_zone",
-        ]
+        )
         exclude = "id"
 
 
