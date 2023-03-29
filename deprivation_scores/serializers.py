@@ -40,7 +40,7 @@ class LocalAuthorityDistrictSerializer(serializers.HyperlinkedModelSerializer):
 class GreenSpaceSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = GreenSpace
-        depth = 1
+        # depth = 1
         fields = [
             "houses_address_count",
             "houses_addresses_with_private_outdoor_space_count",
@@ -64,21 +64,19 @@ class GreenSpaceSerializer(serializers.HyperlinkedModelSerializer):
         ]
 
 
-class DataZoneSerializer(serializers.ModelSerializer):
+class DataZoneSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = DataZone
         fields = ["data_zone_code", "data_zone_name", "year", "local_authority"]
-        depth = 1
 
 
-class SOASerializer(serializers.ModelSerializer):
+class SOASerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = SOA
         fields = ["year", "soa_code", "soa_name"]
-        depth = 1
 
 
-class EnglishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
+class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = EnglishIndexMultipleDeprivation
         fields = [
@@ -139,10 +137,9 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
             "idaopi_decile",
             "lsoa",
         ]
-        depth = 1
 
 
-class WelshIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
+class WelshIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = WelshIndexMultipleDeprivation
         fields = [
@@ -194,10 +191,11 @@ class WelshIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
             "lsoa",
             "year",
         ]
-        depth = 1
 
 
-class ScottishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
+class ScottishIndexMultipleDeprivationSerializer(
+    serializers.HyperlinkedModelSerializer
+):
     class Meta:
         model = ScottishIndexMultipleDeprivation
         fields = [
@@ -213,10 +211,11 @@ class ScottishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
             "housing_rank",
             "data_zone",
         ]
-        depth = 1
 
 
-class NorthernIrelandIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
+class NorthernIrelandIndexMultipleDeprivationSerializer(
+    serializers.HyperlinkedModelSerializer
+):
     class Meta:
         model = NorthernIrelandIndexMultipleDeprivation
         fields = [
@@ -231,4 +230,3 @@ class NorthernIrelandIndexMultipleDeprivationSerializer(serializers.ModelSeriali
             "crime_and_disorder_rank",
             "soa",
         ]
-        depth = 1
