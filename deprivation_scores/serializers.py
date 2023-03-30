@@ -1,4 +1,7 @@
 from rest_framework import serializers
+
+from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
+
 from .models import (
     LSOA,
     LocalAuthority,
@@ -12,6 +15,24 @@ from .models import (
 )
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "Swansea",
+            value={
+                "lsoa_code": "W01001958",
+                "lsoa_name": "Swansea 025H",
+                "year": 2011,
+                "total_population_mid_2015": None,
+                "dependent_children_mid_2015": None,
+                "population_16_59_mid_2015": None,
+                "older_population_over_16_mid_2015": None,
+                "working_age_population_over_18_mid_2015": None,
+            },
+            response_only=True,
+        )
+    ]
+)
 class LSOASerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = LSOA

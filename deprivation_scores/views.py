@@ -1,8 +1,8 @@
 from rest_framework import (
     viewsets,
     permissions,
-    serializers,
-)  # serializers here required for drf-spectacular @extend_schema
+    serializers,  # serializers here required for drf-spectacular @extend_schema
+)
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView, Response
 from rest_framework.exceptions import ParseError
@@ -13,8 +13,7 @@ from drf_spectacular.utils import (
     extend_schema,
     OpenApiParameter,
     OpenApiExample,
-    OpenApiResponse,
-    inline_serializer,
+    OpenApiResponse
 )
 from drf_spectacular.types import OpenApiTypes
 
@@ -136,10 +135,6 @@ class DataZoneViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = DataZoneFilter
     filter_backends = [DjangoFilterBackend]
 
-
-@extend_schema(
-    request=EnglishIndexMultipleDeprivationSerializer,
-)
 class EnglishIndexMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Returns a list of all English LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).
