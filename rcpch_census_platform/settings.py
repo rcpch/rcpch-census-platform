@@ -10,8 +10,13 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 
+# standard imports
 from pathlib import Path
 import os
+
+# third party imports
+from django.core.management.utils import get_random_secret_key
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,9 +28,7 @@ IMD_DATA_FILES_FOLDER = os.path.join(PROJECT_ROOT, "deprivation_scores/imd_data"
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-# NOTE THIS IS NOT ACTIVELY USED AND IS JUST AN EXAMPLE
-SECRET_KEY = "django-insecure-taj5j+tk=ehlabn6m84jw$5431d#1$xt)u#hej7xlbj@(@v9ra"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "False") == "True"
@@ -150,23 +153,19 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 10,
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
-    ),
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
-        "rest_framework.permissions.DjangoModelPermissions",
-    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_PERMISSION_CLASSES": [],
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    'DEFAULT_RENDERER_CLASSES': [
+            'rest_framework.renderers.JSONRenderer',
+        ],
 }
 
 # drf-spectacular schema settings
 SPECTACULAR_SETTINGS = {
     "TITLE": "Deprivation Scores API",
-    "DESCRIPTION": "This project is a Python 3.11 / Django Rest Framework project providing UK census data, especially Index of Multiple Deprivation as a service.",
+    "DESCRIPTION": "UK census data, especially Index of Multiple Deprivation, as a service.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     # OTHER SETTINGS

@@ -62,7 +62,7 @@ These domains are then weighted and contribute to the final index of multiple de
 
 ## Getting Started
 
-Written in python 3.11 and django-rest-framework, these will need to be installed.
+Written in python 3.11 and django-rest-framework. We recommend using `pyenv` or similar python version manager and virtual environment manager.
 
 ### Option One
 
@@ -84,7 +84,7 @@ This latter step will take several minutes as it populates the database with all
 The final step is to run the server:
 ```python manage.py runserver```
 
-### Option Two
+### Docker Compose development install
 
 1. clone the repo
 2. ```cd rcpch_census_platform```
