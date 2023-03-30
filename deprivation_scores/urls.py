@@ -41,7 +41,7 @@ router.register(
 
 drf_routes = [
     # rest framework paths
-    path("/", include(router.urls)),
+    path("", include(router.urls)),
     path("boundaries", view=PostcodeView.as_view()),
     path(
         "indices_of_multiple_deprivation",
@@ -52,7 +52,7 @@ drf_routes = [
     ),
 
     # JSON Schema
-    path("", SpectacularJSONAPIView.as_view(), name="json"),
+    path("schema/", SpectacularJSONAPIView.as_view(), name="schema"),
 
     # Swagger UI
     path("swagger-ui/",
