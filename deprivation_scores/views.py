@@ -1,11 +1,21 @@
-from rest_framework import viewsets, permissions
+from rest_framework import (
+    viewsets,
+    permissions,
+    serializers,
+)  # serializers here required for drf-spectacular @extend_schema
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView, Response
 from rest_framework.exceptions import ParseError
 from django_filters.rest_framework import DjangoFilterBackend
 from requests import Request
 
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import (
+    extend_schema,
+    OpenApiParameter,
+    OpenApiExample,
+    OpenApiResponse,
+    inline_serializer,
+)
 from drf_spectacular.types import OpenApiTypes
 
 from .general_functions import quantile_for_rank
@@ -203,13 +213,23 @@ class PostcodeView(APIView):
                 description="Postcode for postcodes.io",
                 required=True,
                 type=OpenApiTypes.STR,
+                examples=[
+                    OpenApiExample(
+                        name="Buckinham Palace",
+                        value="SW1A 1AA",
+                    ),
+                    OpenApiExample(
+                        name="Great Ormond Street Hospital",
+                        value="WC1N 3JH",
+                    ),
+                ],
             ),
-        ]
+        ],
     )
     def get(self, request):
         """
         This is a proxy for postcodes.io, an api that looks up a given postcode
-        and returns lsoa code, ccg code and other important codes information
+        and returns LSOA code, CCG code and other important codes information
         """
         postcode = request.query_params.get("postcode")
         if postcode:
