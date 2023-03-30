@@ -42,7 +42,7 @@ services:
   db:
     image: postgres:latest
     volumes:
-      - ./.data/db:/var/lib/postgresql/data
+      - "datadb:/var/lib/postgresql/data"
     environment:
       - POSTGRES_USER=rcpchCensususer
       - POSTGRES_PASSWORD=password
@@ -50,3 +50,6 @@ services:
     # ensures that docker compose always displays log output
     tty: true
     stdin_open: true
+
+volumes:
+  datadb:
