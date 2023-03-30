@@ -120,5 +120,6 @@ staticfiles/
 .vscode/
 .vscode/*
 
-db.sqlite3
-rcpchCensusdb.sqlite3
+# Docker and docker compose
+.pip_cache
+.data
