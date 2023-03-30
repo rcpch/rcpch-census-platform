@@ -97,6 +97,72 @@ class SOASerializer(serializers.HyperlinkedModelSerializer):
         fields = ["year", "soa_code", "soa_name"]
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "LSOA 15014",
+            value={
+                "imd_score": "10.908",
+                "imd_rank": 23438,
+                "imd_decile": 8,
+                "income_score": "0.061",
+                "income_score_exponentially_transformed": "7.683",
+                "income_rank": 23396,
+                "income_decile": 8,
+                "employment_score": "0.053",
+                "employment_score_exponentially_transformed": "7.492",
+                "employment_rank": 23595,
+                "employment_decile": 8,
+                "education_skills_training_score_exponentially_transformed": "33.459",
+                "education_skills_training_score": "33.331",
+                "education_skills_training_rank": 7339,
+                "education_skills_training_decile": 3,
+                "children_young_people_sub_domain_score": "0.528",
+                "children_young_people_sub_domain_rank": 8508,
+                "children_young_people_sub_domain_decile": 3,
+                "adult_skills_sub_domain_score": "0.406",
+                "adult_skills_sub_domain_rank": 6398,
+                "adult_skills_sub_domain_decile": 2,
+                "health_deprivation_disability_score_exponentially_transformed": "5.537",
+                "health_deprivation_disability_score": "-0.681",
+                "health_deprivation_disability_rank": 25726,
+                "health_deprivation_disability_decile": 8,
+                "crime_score_exponentially_transformed": "2.248",
+                "crime_score": "-1.090",
+                "crime_rank": 29747,
+                "crime_decile": 10,
+                "barriers_to_housing_services_score_exponentially_transformed": "21.124",
+                "barriers_to_housing_services_score": "23.332",
+                "barriers_to_housing_services_rank": 12852,
+                "barriers_to_housing_services_decile": 4,
+                "geographical_barriers_sub_domain_score": "0.654",
+                "geographical_barriers_sub_domain_rank": 6287,
+                "geographical_barriers_sub_domain_decile": 2,
+                "wider_barriers_sub_domain_score": "-1.095",
+                "wider_barriers_sub_domain_rank": 21245,
+                "wider_barriers_sub_domain_decile": 7,
+                "living_environment_score": "2.029",
+                "living_environment_score_exponentially_transformed": "0.602",
+                "living_environment_rank": 31986,
+                "living_environment_decile": 10,
+                "indoors_sub_domain_score": "-1.089",
+                "indoors_sub_domain_rank": 29674,
+                "indoors_sub_domain_decile": 10,
+                "outdoors_sub_domain_score": "-1.180",
+                "outdoors_sub_domain_rank": 30773,
+                "outdoors_sub_domain_decile": 10,
+                "idaci_score": "0.071",
+                "idaci_rank": 23801,
+                "idaci_decile": 8,
+                "idaopi_score": "0.081",
+                "idaopi_rank": 23219,
+                "idaopi_decile": 8,
+                "lsoa": "http://localhost:8001/england_wales_lower_layer_super_output_areas/15014/",
+            },
+            response_only=True,
+        )
+    ]
+)
 class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = EnglishIndexMultipleDeprivation
