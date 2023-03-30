@@ -15,7 +15,7 @@ from .views import (
     UKIndexMultipleDeprivationQuantileView,
 )
 
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from drf_spectacular.views import SpectacularJSONAPIView, SpectacularSwaggerView
 
 router = routers.DefaultRouter()
 router.register(r"local_authority_districts", viewset=LocalAuthorityDistrictViewSet)
@@ -50,10 +50,9 @@ drf_routes = [
     path("index_of_multiple_deprivation_quantile",
         view=UKIndexMultipleDeprivationQuantileView.as_view(),
     ),
-    path("api-auth/", include("rest_framework.urls", namespace="rest_framework")),
 
-    # YAML Schema
-    path("schema/", SpectacularAPIView.as_view(), name="schema"),
+    # JSON Schema
+    path("", SpectacularJSONAPIView.as_view(), name="json"),
 
     # Swagger UI
     path("swagger-ui/",
