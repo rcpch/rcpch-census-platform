@@ -86,6 +86,7 @@ The final step is to run the server:
 
 ### Docker Compose development install
 
+<!-- the below needs a rewrite to include 'docker compose exec web' in front of all the commands -->
 1. clone the repo
 2. ```cd rcpch_census_platform```
 3. ```s/docker-init```
@@ -98,6 +99,26 @@ The final step is to run the server:
 10. Add the token to your header when making an api call (```-H 'Authorization: *******'``` in curl statement for example). If you are using Postman, use the OAUTH2 Authorization header, and the key 'Token'.
 
 If you navigate to the base url```http://localhost:8001/rcpch-census-platform/api/v1/``` and login, it should be possible then to view the data. Alternatively, add the token to Postman.
+
+
+<!-- TODO: #14 #13 remove all references to auth, logins, or tokens in the census engine readme -->
+
+## Creating openapi.yml and openapi.json files
+
+rf-spectacular can create the openapi3 spec files for you using the following command.
+
+We only really use the JSON version, but it's easy to create a YAML equivalent if needed also.
+
+JSON
+```shell
+docker compose -f docker-compose.dev-init.yml exec web python manage.py spectacular --file openapi.json
+```
+YAML
+```shell
+docker compose -f docker-compose.dev-init.yml exec web python manage.py spectacular --file openapi.json
+```
+
+<!-- The detailed description of the routes should be added to the schema documentation and removed from here -->
 
 There are 10 routes that accept GET requests, all of which return lists that can be filtered, with the exception of ```/indices_of_multiple_deprivation/``` which accepts only a postcode.
 
