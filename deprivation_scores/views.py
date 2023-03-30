@@ -1,7 +1,6 @@
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView, Response
-from rest_framework import authentication, permissions
 from rest_framework.exceptions import ParseError
 from django_filters.rest_framework import DjangoFilterBackend
 from requests import Request
@@ -60,7 +59,6 @@ class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = LocalAuthority.objects.all().order_by("-local_authority_district_code")
     serializer_class = LocalAuthorityDistrictSerializer
-    permission_classes = [permissions.IsAuthenticated]
     filterset_fields = [
         "local_authority_district_code",
         "local_authority_district_name",
@@ -81,7 +79,6 @@ class LSOAViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = LSOA.objects.all().order_by("-lsoa_code")
     serializer_class = LSOASerializer
-    permission_classes = [permissions.IsAuthenticated]
     filterset_fields = ["lsoa_code", "lsoa_name", "year"]
     filter_backends = [DjangoFilterBackend]
 
@@ -98,7 +95,6 @@ class SOAViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = SOA.objects.all().order_by("-soa_code")
     serializer_class = SOASerializer
-    permission_classes = [permissions.IsAuthenticated]
     filterset_fields = ["year", "soa_code", "soa_name"]
     filter_backends = [DjangoFilterBackend]
 
@@ -113,7 +109,6 @@ class GreenSpaceViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = GreenSpace.objects.all().order_by("-total_addresses_count")
     serializer_class = GreenSpaceSerializer
-    permission_classes = [permissions.IsAuthenticated]
 
 
 @extend_schema(
@@ -128,7 +123,6 @@ class DataZoneViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = DataZone.objects.all().order_by("data_zone_code")
     serializer_class = DataZoneSerializer
-    permission_classes = [permissions.IsAuthenticated]
     filterset_class = DataZoneFilter
     filter_backends = [DjangoFilterBackend]
 
@@ -145,7 +139,6 @@ class EnglishIndexMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = EnglishIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
     serializer_class = EnglishIndexMultipleDeprivationSerializer
-    permission_classes = [permissions.IsAuthenticated]
     filterset_class = EnglishIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
 
@@ -162,7 +155,6 @@ class WelshMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = WelshIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
     serializer_class = WelshIndexMultipleDeprivationSerializer
-    permission_classes = [permissions.IsAuthenticated]
     filterset_class = WelshIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
 
@@ -179,7 +171,6 @@ class ScottishMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = ScottishIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
     serializer_class = ScottishIndexMultipleDeprivationSerializer
-    permission_classes = [permissions.IsAuthenticated]
     filterset_class = ScottishIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
 
@@ -198,7 +189,6 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
         "-imd_rank"
     )
     serializer_class = NorthernIrelandIndexMultipleDeprivationSerializer
-    permission_classes = [permissions.IsAuthenticated]
     filterset_class = NorthernIrelandIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
 
@@ -230,7 +220,6 @@ class PostcodeView(APIView):
 
 
 class UKIndexMultipleDeprivationView(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
     permission_classes = [permissions.IsAdminUser]
     english_serializer_class = EnglishIndexMultipleDeprivationSerializer
     welsh_serializer_class = WelshIndexMultipleDeprivationSerializer
@@ -306,7 +295,6 @@ class UKIndexMultipleDeprivationView(APIView):
 
 
 class UKIndexMultipleDeprivationQuantileView(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
     permission_classes = [permissions.IsAdminUser]
 
     @extend_schema(
