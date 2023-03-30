@@ -225,6 +225,8 @@ class PostcodeView(APIView):
         if postcode:
             response = regions_for_postcode(postcode=postcode)
             return Response(response)
+        else:
+            raise ParseError(detail="Postcode cannot be blank")
 
 
 class UKIndexMultipleDeprivationView(APIView):
@@ -360,17 +362,11 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                             country="wales",
                         )
                         response = Response({"result": data})
-                        # response = self.welsh_serializer_class(
-                        #     instance=imd, context={"request": Request(request)}
-                        # )
                     elif lsoa_object["country"] == "Scotland":
                         lsoa = DataZone.objects.filter(data_zone_code=lsoa_code).get()
                         imd = ScottishIndexMultipleDeprivation.objects.filter(
                             data_zone=lsoa
                         ).get()
-                        # response = self.scottish_serializer_class(
-                        #     instance=imd, context={"request": Request(request)}
-                        # )
                         data = quantile_for_rank(
                             rank=imd.imd_rank,
                             requested_quantile=requested_quantile,
@@ -382,9 +378,6 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                         imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
                             soa=lsoa
                         ).get()
-                        # response = self.northern_ireland_serializer_class(
-                        #     instance=imd, context={"request": Request(request)}
-                        # )
                         data = quantile_for_rank(
                             rank=imd.imd_rank,
                             requested_quantile=requested_quantile,
