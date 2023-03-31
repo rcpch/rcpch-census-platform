@@ -1,9 +1,8 @@
 from rest_framework import (
     viewsets,
-    permissions,
     serializers,  # serializers here required for drf-spectacular @extend_schema
 )
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view
 from rest_framework.views import APIView, Response
 from rest_framework.exceptions import ParseError
 from django_filters.rest_framework import DjangoFilterBackend
@@ -198,7 +197,6 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # custom views / endpoints
-@permission_classes((permissions.AllowAny,))
 class PostcodeView(APIView):
     @extend_schema(
         parameters=[
@@ -234,7 +232,6 @@ class PostcodeView(APIView):
 
 
 class UKIndexMultipleDeprivationView(APIView):
-    # permission_classes = [permissions.IsAdminUser]
     english_serializer_class = EnglishIndexMultipleDeprivationSerializer
     welsh_serializer_class = WelshIndexMultipleDeprivationSerializer
     scottish_serializer_class = ScottishIndexMultipleDeprivationSerializer
