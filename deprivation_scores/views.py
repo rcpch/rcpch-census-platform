@@ -11,7 +11,8 @@ from drf_spectacular.utils import (
     extend_schema,
     OpenApiParameter,
     OpenApiExample,
-    OpenApiResponse
+    OpenApiResponse,
+    PolymorphicProxySerializer,
 )
 from drf_spectacular.types import OpenApiTypes
 
@@ -56,12 +57,39 @@ from .general_functions import (
 
 @extend_schema(
     request=LocalAuthorityDistrictSerializer,
+    responses={
+        200: OpenApiResponse(
+            response=OpenApiTypes.OBJECT,
+            description="Valid Response",
+            examples=[
+                OpenApiExample(
+                    "/local_authority_districts/1/",
+                    external_value="external value",
+                    value={
+                        "local_authority_district_code": "E06000002",
+                        "local_authority_district_name": "Middlesbrough",
+                        "year": 2019,
+                    },
+                    response_only=True,
+                ),
+            ],
+        ),
+    },
 )
 class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Returns a list of Local Authority Districts (2019) across England, Scotland and Wales
-    Filter params include: "year","local_authority_district_code","local_authority_district_name"
-    If none are passed, a list is returned
+    This endpoint returns a list of Local Authority Districts (2019) across England, Scotland and Wales.
+
+    Filter Parameters:
+
+    `year`
+
+    `local_authority_district_code`
+
+    `local_authority_district_name`
+
+    If none are passed, a list is returned.
+
     """
 
     queryset = LocalAuthority.objects.all().order_by("-local_authority_district_code")
@@ -74,14 +102,21 @@ class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
-@extend_schema(
-    request=LSOASerializer,
-)
+@extend_schema(request=LSOASerializer)
 class LSOAViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Returns a list of LSOAs in England and Wales
-    Filter params include: "year","lsoa_code","lsoa_name"
-    If none are passed, a list is returned
+    This endpoint returns a list of LSOAs in England and Wales.
+
+    Filter Parameters:
+
+    `year`
+
+    `lsoa_code`
+
+    `lsoa_name`
+
+    If none are passed, a list is returned.
+
     """
 
     queryset = LSOA.objects.all().order_by("-lsoa_code")
@@ -95,9 +130,17 @@ class LSOAViewSet(viewsets.ReadOnlyModelViewSet):
 )
 class SOAViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Returns a list of SOAs in Northern Ireland
-    Filter params include: "year","soa_code","soa_name"
-    If none are passed, a list is returned
+    This endpoint returns a list of SOAs in Northern Ireland.
+    
+    Filter Parameters:
+
+    `year`
+    
+    `soa_code`
+    
+    `soa_name`
+
+    If none are passed, a list is returned.
     """
 
     queryset = SOA.objects.all().order_by("-soa_code")
@@ -111,7 +154,9 @@ class SOAViewSet(viewsets.ReadOnlyModelViewSet):
 )
 class GreenSpaceViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Returns a list of local authorities in the UK with data relating to green space and access to green space,
+
+    This endpoint returns a list of local authorities in the UK with data relating to green space and access to green space.
+
     """
 
     queryset = GreenSpace.objects.all().order_by("-total_addresses_count")
@@ -123,9 +168,17 @@ class GreenSpaceViewSet(viewsets.ReadOnlyModelViewSet):
 )
 class DataZoneViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Returns a list of all Scottish data zones (2011) and their associated local authority district
-    Filter params include: "year","data_zone_code","data_zone_name"
-    If none are passed, a list is returned
+    This endpoint returns a list of all Scottish data zones (2011) and their associated local authority district.
+    
+    Filter Parameters:
+
+    `year`
+    
+    `data_zone_code`
+    
+    `data_zone_name`
+
+    If none are passed, a list is returned.
     """
 
     queryset = DataZone.objects.all().order_by("data_zone_code")
@@ -133,10 +186,15 @@ class DataZoneViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = DataZoneFilter
     filter_backends = [DjangoFilterBackend]
 
+
 class EnglishIndexMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Returns a list of all English LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).
-    Filter params include: "lsoa_code"
+    This endpoint returns a list of all English LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).
+
+    Filter Parameters:
+
+    `lsoa_code`
+
     If none are passed, a list is returned
     """
 
@@ -151,9 +209,13 @@ class EnglishIndexMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 )
 class WelshMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Returns a list of Welsh LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).
-    Filter params include: "lsoa_code"
-    If none are passed, a list is returned
+    This endpoint returns a list of Welsh LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).
+    
+    Filter Parameters:
+
+    `lsoa_code`
+
+    If none are passed, a list is returned.
     """
 
     queryset = WelshIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
@@ -167,9 +229,13 @@ class WelshMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 )
 class ScottishMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Returns a list of Scottish data zones with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2017).
-    Filter params include: "data_zone_code"
-    If none are passed, a list is returned
+    This endpoint returns a list of Scottish data zones with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2017).
+    
+    Filter Parameters:
+
+    `data_zone_code`
+
+    If none are passed, a list is returned.
     """
 
     queryset = ScottishIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
@@ -183,9 +249,13 @@ class ScottishMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 )
 class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Returns a list of all Northern Ireland SOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2020).
-    Filter params include: "soa_code"
-    If none are passed, a list is returned
+    This endpoint returns a list of all Northern Ireland SOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2020).
+
+    Filter Parameters:
+
+    `soa_code`
+
+    If none are passed, a list is returned.
     """
 
     queryset = NorthernIrelandIndexMultipleDeprivation.objects.all().order_by(
@@ -207,7 +277,7 @@ class PostcodeView(APIView):
                 type=OpenApiTypes.STR,
                 examples=[
                     OpenApiExample(
-                        name="Buckinham Palace",
+                        name="Buckingham Palace",
                         value="SW1A 1AA",
                     ),
                     OpenApiExample(
@@ -246,19 +316,43 @@ class UKIndexMultipleDeprivationView(APIView):
                 description="Postcode",
                 required=True,
                 type=OpenApiTypes.STR,
+                examples=[
+                    OpenApiExample(
+                        name="Low Deprivation",
+                        description="Example low deprivation postcode",
+                        value="SW1A 1AA",
+                    ),
+                    OpenApiExample(
+                        name="High Deprivation",
+                        description="Example high deprivation postcode",
+                        value="CO15 2DQ",
+                    ),
+                ],
             ),
-        ]
+        ],
+        responses=PolymorphicProxySerializer(
+            component_name="UKIndexofMultipleDeprivation",
+            # on 200 one of the UK Serializers is returned
+            serializers=[
+                EnglishIndexMultipleDeprivationSerializer,
+                WelshIndexMultipleDeprivationSerializer,
+                ScottishIndexMultipleDeprivationSerializer,
+                NorthernIrelandIndexMultipleDeprivationSerializer,
+            ],
+            resource_type_field_name="type",
+        ),
     )
     def get(self, request):
         """
-        Returns an index of multiple deprivations against a postcode, from either England, Wales, Scotland or Northern Ireland
-        It accepts a UK postcode
+        This endpoint returns an index of multiple deprivations against a postcode, from either England, Wales, Scotland or Northern Ireland.
+
         Parameters:
-        postcode: string [Mandatory]
+
+        `postcode`: string **[Mandatory]**
+
         """
         post_code = self.request.query_params.get("postcode", None)
         if post_code:
-
             if is_valid_postcode(postcode=post_code):
                 lsoa_object = lsoa_for_postcode(postcode=post_code)
 
@@ -272,7 +366,6 @@ class UKIndexMultipleDeprivationView(APIView):
                         response = self.english_serializer_class(
                             instance=imd, context={"request": request}
                         )
-                        print(f"ENGLISH SERIALISER HYPERLINED REPR: {response.__repr__}")
                     elif lsoa_object["country"] == "Wales":
                         lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
                         imd = WelshIndexMultipleDeprivation.objects.filter(
@@ -309,7 +402,6 @@ class UKIndexMultipleDeprivationView(APIView):
 
 
 class UKIndexMultipleDeprivationQuantileView(APIView):
-
     @extend_schema(
         parameters=[
             OpenApiParameter(
@@ -323,16 +415,55 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                 description="Quantile",
                 required=True,
                 type=OpenApiTypes.INT,  # Literal[2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20],
+                enum=[2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20],
             ),
-        ]
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=OpenApiTypes.OBJECT,
+                description="Valid Response",
+                examples=[
+                    OpenApiExample(
+                        "/index_of_multiple_deprivation_quantile?postcode=SW1A1AA&quantile=10",
+                        external_value="external value",
+                        value={
+                            "rank": 24862,
+                            "requested_quantile": 10,
+                            "requested_quantile_name": "decile",
+                            "data_quantile": 8,
+                            "country": "england",
+                            "error": None,
+                        },
+                        response_only=True,
+                    ),
+                    OpenApiExample(
+                        "/index_of_multiple_deprivation_quantile?postcode=B346DX&quantile=2",
+                        external_value="external value",
+                        value={
+                            "result": {
+                                "rank": 9304,
+                                "requested_quantile": 2,
+                                "requested_quantile_name": "median",
+                                "data_quantile": 1,
+                                "country": "england",
+                                "error": None,
+                            }
+                        },
+                        response_only=True,
+                    ),
+                ],
+            ),
+        },
     )
     def get(self, request):
         """
-        Returns an index of multiple deprivations against a postcode, from either England, Wales, Scotland or Northern Ireland
-        It accepts a UK postcode
+        This endpoint returns an Index of Multiple Deprivations against a postcode, from either England, Wales, Scotland or Northern Ireland.
+
         Parameters:
-        postcode: string [Mandatory]
-        quantile: must be an integer, one of [2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20]
+
+        `postcode`: string **[Mandatory]**
+
+        `quantile`: integer **[Mandatory]**, one of [2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20]
         """
         post_code = self.request.query_params.get("postcode", None)
         requested_quantile = self.request.query_params.get("quantile", None)
