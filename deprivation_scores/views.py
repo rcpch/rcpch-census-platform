@@ -7,7 +7,6 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView, Response
 from rest_framework.exceptions import ParseError
 from django_filters.rest_framework import DjangoFilterBackend
-from requests import Request
 
 from drf_spectacular.utils import (
     extend_schema,
@@ -235,7 +234,7 @@ class PostcodeView(APIView):
 
 
 class UKIndexMultipleDeprivationView(APIView):
-    permission_classes = [permissions.IsAdminUser]
+    # permission_classes = [permissions.IsAdminUser]
     english_serializer_class = EnglishIndexMultipleDeprivationSerializer
     welsh_serializer_class = WelshIndexMultipleDeprivationSerializer
     scottish_serializer_class = ScottishIndexMultipleDeprivationSerializer
@@ -262,8 +261,10 @@ class UKIndexMultipleDeprivationView(APIView):
         """
         post_code = self.request.query_params.get("postcode", None)
         if post_code:
+
             if is_valid_postcode(postcode=post_code):
                 lsoa_object = lsoa_for_postcode(postcode=post_code)
+
                 if lsoa_object["lsoa"]:
                     lsoa_code = lsoa_object["lsoa"]
                     if lsoa_object["country"] == "England":
@@ -272,15 +273,16 @@ class UKIndexMultipleDeprivationView(APIView):
                             lsoa=lsoa
                         ).get()
                         response = self.english_serializer_class(
-                            instance=imd, context={"request": Request(request)}
+                            instance=imd, context={"request": request}
                         )
+                        print(f"ENGLISH SERIALISER HYPERLINED REPR: {response.__repr__}")
                     elif lsoa_object["country"] == "Wales":
                         lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
                         imd = WelshIndexMultipleDeprivation.objects.filter(
                             lsoa=lsoa
                         ).get()
                         response = self.welsh_serializer_class(
-                            instance=imd, context={"request": Request(request)}
+                            instance=imd, context={"request": request}
                         )
                     elif lsoa_object["country"] == "Scotland":
                         lsoa = DataZone.objects.filter(data_zone_code=lsoa_code).get()
@@ -288,7 +290,7 @@ class UKIndexMultipleDeprivationView(APIView):
                             data_zone=lsoa
                         ).get()
                         response = self.scottish_serializer_class(
-                            instance=imd, context={"request": Request(request)}
+                            instance=imd, context={"request": request}
                         )
                     elif lsoa_object["country"] == "Northern Ireland":
                         lsoa = SOA.objects.filter(soa_code=lsoa_code).get()
@@ -296,7 +298,7 @@ class UKIndexMultipleDeprivationView(APIView):
                             soa=lsoa
                         ).get()
                         response = self.northern_ireland_serializer_class(
-                            instance=imd, context={"request": Request(request)}
+                            instance=imd, context={"request": request}
                         )
                     else:
                         raise ParseError("No valid country supplied.", code=400)
@@ -310,7 +312,6 @@ class UKIndexMultipleDeprivationView(APIView):
 
 
 class UKIndexMultipleDeprivationQuantileView(APIView):
-    permission_classes = [permissions.IsAdminUser]
 
     @extend_schema(
         parameters=[
