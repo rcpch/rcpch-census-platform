@@ -35,6 +35,11 @@ jobs:
       - name: Install yq 
         run: sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
       
+      - name: Debugging CSRF issue
+        run: |
+          pwd
+          ls
+      
       - name: Create openAPI.yml
         run: python manage.py spectacular --file schema.yml        
 
