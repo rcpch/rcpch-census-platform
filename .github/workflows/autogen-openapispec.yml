@@ -8,11 +8,12 @@ on:
   push:
     branches:
       - development
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://localhost,https://0.0.0.0
 
     steps:
       - uses: actions/checkout@v3
@@ -29,26 +30,18 @@ jobs:
       
       - name: Install dependencies
         run: pip install -r requirements.txt
-
-      # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
       
       - name: Install yq 
         run: sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
       
-      - name: Debugging CSRF issue
-        run: |
-          pwd
-          ls
-          printenv
-      
       - name: Create openAPI.yml
-        run: python manage.py spectacular --file schema.yml        
+        run: python manage.py spectacular --file openapi.yml        
 
       - name: Convert yaml to json
-        run: yq -o=json '.' schema.yml > schema.json
+        run: yq -o=json '.' openapi.yml > openapi.json
         
       # Commit all changed files back to the repository
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          file_pattern: 'schema.json'
+          file_pattern: 'openapi.json'
       
