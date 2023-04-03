@@ -7,7 +7,7 @@ name: Autogenerate OpenAPI3 spec in YAML and JSON form and save to repo
 on:
   push:
     branches:
-      - **
+      - '**'
 
 jobs:
   build:
