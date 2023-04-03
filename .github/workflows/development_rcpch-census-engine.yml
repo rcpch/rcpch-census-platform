@@ -39,6 +39,7 @@ jobs:
         run: |
           pwd
           ls
+          printenv
       
       - name: Create openAPI.yml
         run: python manage.py spectacular --file schema.yml        
