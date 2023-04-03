@@ -32,14 +32,14 @@ jobs:
 
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
       
+      - name: Install yq 
+        run: wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && chmod +x /usr/bin/yq
+      
+      - name: Create openAPI.yml
+        run: python manage.py spectacular --file schema.yml        
+
       - name: Convert yaml to json
-        run: |
-          python manage.py spectacular --file schema.yml        
-          # installs yq
-          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq &&\
-          chmod +x /usr/bin/yq
-          # convert yaml to json
-          yq -o=json '.' schema.yml > schema.json
+        run: yq -o=json '.' schema.yml > schema.json
         
       # Commit all changed files back to the repository
       - uses: stefanzweifel/git-auto-commit-action@v4
