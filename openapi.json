@@ -1,0 +1,3665 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Deprivation Scores API",
+    "version": "1.0.0",
+    "description": "UK census data, especially Index of Multiple Deprivation, as a service."
+  },
+  "paths": {
+    "/boundaries": {
+      "get": {
+        "operationId": "boundaries_retrieve",
+        "description": "This is a proxy for postcodes.io, an api that looks up a given postcode\nand returns LSOA code, CCG code and other important codes information",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "postcode",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Postcode for postcodes.io",
+            "required": true,
+            "examples": {
+              "BuckinghamPalace": {
+                "value": "SW1A 1AA",
+                "summary": "Buckingham Palace"
+              },
+              "GreatOrmondStreetHospital": {
+                "value": "WC1N 3JH",
+                "summary": "Great Ormond Street Hospital"
+              }
+            }
+          }
+        ],
+        "tags": [
+          "boundaries"
+        ],
+        "responses": {
+          "200": {
+            "description": "No response body"
+          }
+        }
+      }
+    },
+    "/england_wales_lower_layer_super_output_areas/": {
+      "get": {
+        "operationId": "england_wales_lower_layer_super_output_areas_list",
+        "description": "This endpoint returns a list of LSOAs in England and Wales.\n\nFilter Parameters:\n\n`year`\n\n`lsoa_code`\n\n`lsoa_name`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "lsoa_code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lsoa_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "england_wales_lower_layer_super_output_areas"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedLSOAList"
+                },
+                "examples": {
+                  "/englandWalesLowerLayerSuperOutputAreas/1/": {
+                    "value": {
+                      "count": 123,
+                      "next": "http://api.example.org/accounts/?page=4",
+                      "previous": "http://api.example.org/accounts/?page=2",
+                      "results": [
+                        {
+                          "lsoa_code": "E01012057",
+                          "lsoa_name": "Middlesbrough 009E",
+                          "year": 2011,
+                          "total_population_mid_2015": "null",
+                          "dependent_children_mid_2015": "null",
+                          "population_16_59_mid_2015": "null",
+                          "older_population_over_16_mid_2015": "null",
+                          "working_age_population_over_18_mid_2015": "null"
+                        }
+                      ]
+                    },
+                    "summary": "/england_wales_lower_layer_super_output_areas/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/england_wales_lower_layer_super_output_areas/{id}/": {
+      "get": {
+        "operationId": "england_wales_lower_layer_super_output_areas_retrieve",
+        "description": "This endpoint returns a list of LSOAs in England and Wales.\n\nFilter Parameters:\n\n`year`\n\n`lsoa_code`\n\n`lsoa_name`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this ('LSOA',).",
+            "required": true
+          }
+        ],
+        "tags": [
+          "england_wales_lower_layer_super_output_areas"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LSOA"
+                },
+                "examples": {
+                  "/englandWalesLowerLayerSuperOutputAreas/1/": {
+                    "value": {
+                      "lsoa_code": "E01012057",
+                      "lsoa_name": "Middlesbrough 009E",
+                      "year": 2011,
+                      "total_population_mid_2015": "null",
+                      "dependent_children_mid_2015": "null",
+                      "population_16_59_mid_2015": "null",
+                      "older_population_over_16_mid_2015": "null",
+                      "working_age_population_over_18_mid_2015": "null"
+                    },
+                    "summary": "/england_wales_lower_layer_super_output_areas/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/english_indices_of_multiple_deprivation/": {
+      "get": {
+        "operationId": "english_indices_of_multiple_deprivation_list",
+        "description": "This endpoint returns a list of all English LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).\n\nFilter Parameters:\n\n`lsoa_code`\n\nIf none are passed, a list is returned",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "adult_skills_sub_domain_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "adult_skills_sub_domain_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "adult_skills_sub_domain_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "barriers_to_housing_services_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "barriers_to_housing_services_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "barriers_to_housing_services_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "barriers_to_housing_services_score_exponentially_transformed",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "children_young_people_sub_domain_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "children_young_people_sub_domain_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "children_young_people_sub_domain_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "crime_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "crime_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "crime_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "crime_score_exponentially_transformed",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "education_skills_training_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "education_skills_training_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "education_skills_training_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "education_skills_training_score_exponentially_transformed",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "employment_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "employment_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "employment_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "employment_score_exponentially_transformed",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "geographical_barriers_sub_domain_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "geographical_barriers_sub_domain_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "geographical_barriers_sub_domain_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "health_deprivation_disability_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "health_deprivation_disability_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "health_deprivation_disability_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "health_deprivation_disability_score_exponentially_transformed",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "idaci_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "idaci_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "idaci_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "idaopi_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "idaopi_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "idaopi_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "imd_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "imd_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "imd_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "income_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "income_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "income_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "income_score_exponentially_transformed",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "indoors_sub_domain_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "indoors_sub_domain_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "living_environment_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "living_environment_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "living_environment_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "living_environment_score_exponentially_transformed",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "local_authority_code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "local_authority_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lsoa_code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lsoa_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "outdoors_sub_domain_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "outdoors_sub_domain_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "outdoors_sub_domain_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "wider_barriers_sub_domain_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "wider_barriers_sub_domain_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "wider_barriers_sub_domain_score",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "tags": [
+          "english_indices_of_multiple_deprivation"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedEnglishIndexMultipleDeprivationList"
+                },
+                "examples": {
+                  "/englishIndicesOfMultipleDeprivation/1/": {
+                    "value": {
+                      "count": 123,
+                      "next": "http://api.example.org/accounts/?page=4",
+                      "previous": "http://api.example.org/accounts/?page=2",
+                      "results": [
+                        {
+                          "imd_score": "6.208",
+                          "imd_rank": 29199,
+                          "imd_decile": 9,
+                          "income_score": "0.007",
+                          "income_score_exponentially_transformed": "0.010",
+                          "income_rank": 32831,
+                          "income_decile": 10,
+                          "employment_score": "0.010",
+                          "employment_score_exponentially_transformed": "0.071",
+                          "employment_rank": 32742,
+                          "employment_decile": 10,
+                          "education_skills_training_score_exponentially_transformed": "0.002",
+                          "education_skills_training_score": "0.024",
+                          "education_skills_training_rank": 32842,
+                          "education_skills_training_decile": 10,
+                          "children_young_people_sub_domain_score": "-2.107",
+                          "children_young_people_sub_domain_rank": 32777,
+                          "children_young_people_sub_domain_decile": 10,
+                          "adult_skills_sub_domain_score": "0.032",
+                          "adult_skills_sub_domain_rank": 32843,
+                          "adult_skills_sub_domain_decile": 10,
+                          "health_deprivation_disability_score_exponentially_transformed": "0.512",
+                          "health_deprivation_disability_score": "-1.654",
+                          "health_deprivation_disability_rank": 32113,
+                          "health_deprivation_disability_decile": 10,
+                          "crime_score_exponentially_transformed": "0.127",
+                          "crime_score": "-2.012",
+                          "crime_rank": 32662,
+                          "crime_decile": 10,
+                          "barriers_to_housing_services_score_exponentially_transformed": "33.518",
+                          "barriers_to_housing_services_score": "29.472",
+                          "barriers_to_housing_services_rank": 7319,
+                          "barriers_to_housing_services_decile": 3,
+                          "geographical_barriers_sub_domain_score": "-0.430",
+                          "geographical_barriers_sub_domain_rank": 22985,
+                          "geographical_barriers_sub_domain_decile": 7,
+                          "wider_barriers_sub_domain_score": "3.587",
+                          "wider_barriers_sub_domain_rank": 3216,
+                          "wider_barriers_sub_domain_decile": 1,
+                          "living_environment_score": "31.873",
+                          "living_environment_score_exponentially_transformed": "32.163",
+                          "living_environment_rank": 7789,
+                          "living_environment_decile": 3,
+                          "indoors_sub_domain_score": "0.006",
+                          "indoors_sub_domain_rank": 16364,
+                          "indoors_sub_domain_decile": 5,
+                          "outdoors_sub_domain_score": "1.503",
+                          "outdoors_sub_domain_rank": 1615,
+                          "outdoors_sub_domain_decile": 1,
+                          "idaci_score": "0.006",
+                          "idaci_rank": 32806,
+                          "idaci_decile": 10,
+                          "idaopi_score": "0.012",
+                          "idaopi_rank": 32820,
+                          "idaopi_decile": 10,
+                          "lsoa": "http://localhost:8001/england_wales_lower_layer_super_output_areas/28110/"
+                        }
+                      ]
+                    },
+                    "summary": "/english_indices_of_multiple_deprivation/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/english_indices_of_multiple_deprivation/{id}/": {
+      "get": {
+        "operationId": "english_indices_of_multiple_deprivation_retrieve",
+        "description": "This endpoint returns a list of all English LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).\n\nFilter Parameters:\n\n`lsoa_code`\n\nIf none are passed, a list is returned",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this english index multiple deprivation.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "english_indices_of_multiple_deprivation"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnglishIndexMultipleDeprivation"
+                },
+                "examples": {
+                  "/englishIndicesOfMultipleDeprivation/1/": {
+                    "value": {
+                      "imd_score": "6.208",
+                      "imd_rank": 29199,
+                      "imd_decile": 9,
+                      "income_score": "0.007",
+                      "income_score_exponentially_transformed": "0.010",
+                      "income_rank": 32831,
+                      "income_decile": 10,
+                      "employment_score": "0.010",
+                      "employment_score_exponentially_transformed": "0.071",
+                      "employment_rank": 32742,
+                      "employment_decile": 10,
+                      "education_skills_training_score_exponentially_transformed": "0.002",
+                      "education_skills_training_score": "0.024",
+                      "education_skills_training_rank": 32842,
+                      "education_skills_training_decile": 10,
+                      "children_young_people_sub_domain_score": "-2.107",
+                      "children_young_people_sub_domain_rank": 32777,
+                      "children_young_people_sub_domain_decile": 10,
+                      "adult_skills_sub_domain_score": "0.032",
+                      "adult_skills_sub_domain_rank": 32843,
+                      "adult_skills_sub_domain_decile": 10,
+                      "health_deprivation_disability_score_exponentially_transformed": "0.512",
+                      "health_deprivation_disability_score": "-1.654",
+                      "health_deprivation_disability_rank": 32113,
+                      "health_deprivation_disability_decile": 10,
+                      "crime_score_exponentially_transformed": "0.127",
+                      "crime_score": "-2.012",
+                      "crime_rank": 32662,
+                      "crime_decile": 10,
+                      "barriers_to_housing_services_score_exponentially_transformed": "33.518",
+                      "barriers_to_housing_services_score": "29.472",
+                      "barriers_to_housing_services_rank": 7319,
+                      "barriers_to_housing_services_decile": 3,
+                      "geographical_barriers_sub_domain_score": "-0.430",
+                      "geographical_barriers_sub_domain_rank": 22985,
+                      "geographical_barriers_sub_domain_decile": 7,
+                      "wider_barriers_sub_domain_score": "3.587",
+                      "wider_barriers_sub_domain_rank": 3216,
+                      "wider_barriers_sub_domain_decile": 1,
+                      "living_environment_score": "31.873",
+                      "living_environment_score_exponentially_transformed": "32.163",
+                      "living_environment_rank": 7789,
+                      "living_environment_decile": 3,
+                      "indoors_sub_domain_score": "0.006",
+                      "indoors_sub_domain_rank": 16364,
+                      "indoors_sub_domain_decile": 5,
+                      "outdoors_sub_domain_score": "1.503",
+                      "outdoors_sub_domain_rank": 1615,
+                      "outdoors_sub_domain_decile": 1,
+                      "idaci_score": "0.006",
+                      "idaci_rank": 32806,
+                      "idaci_decile": 10,
+                      "idaopi_score": "0.012",
+                      "idaopi_rank": 32820,
+                      "idaopi_decile": 10,
+                      "lsoa": "http://localhost:8001/england_wales_lower_layer_super_output_areas/28110/"
+                    },
+                    "summary": "/english_indices_of_multiple_deprivation/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/green_space/": {
+      "get": {
+        "operationId": "green_space_list",
+        "description": "This endpoint returns a list of local authorities in the UK with data relating to green space and access to green space.",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "green_space"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedGreenSpaceList"
+                },
+                "examples": {
+                  "/greenSpace/1/": {
+                    "value": {
+                      "count": 123,
+                      "next": "http://api.example.org/accounts/?page=4",
+                      "previous": "http://api.example.org/accounts/?page=2",
+                      "results": [
+                        {
+                          "houses_address_count": 53082,
+                          "houses_addresses_with_private_outdoor_space_count": 51390,
+                          "houses_outdoor_space_total_area": 14593876,
+                          "houses_percentage_of_addresses_with_private_outdoor_space": 0,
+                          "houses_average_size_private_outdoor_space": 284,
+                          "houses_median_size_private_outdoor_space": 204,
+                          "flats_address_count": 65346,
+                          "flats_addresses_with_private_outdoor_space_count": 46221,
+                          "flats_outdoor_space_total_area": 2953183,
+                          "flats_outdoor_space_count": 9280,
+                          "flats_percentage_of_addresses_with_private_outdoor_space": 0,
+                          "flats_average_size_private_outdoor_space": 318,
+                          "flats_average_number_of_flats_sharing_a_garden": 5,
+                          "total_addresses_count": 118428,
+                          "total_addresses_with_private_outdoor_space_count": 97611,
+                          "total_percentage_addresses_with_private_outdoor_space": 17547060,
+                          "total_average_size_private_outdoor_space": 0,
+                          "local_authority": "{BASE_URL}/local_authority_districts/340/"
+                        }
+                      ]
+                    },
+                    "summary": "/green_space/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/green_space/{id}/": {
+      "get": {
+        "operationId": "green_space_retrieve",
+        "description": "This endpoint returns a list of local authorities in the UK with data relating to green space and access to green space.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this green space.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "green_space"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GreenSpace"
+                },
+                "examples": {
+                  "/greenSpace/1/": {
+                    "value": {
+                      "houses_address_count": 53082,
+                      "houses_addresses_with_private_outdoor_space_count": 51390,
+                      "houses_outdoor_space_total_area": 14593876,
+                      "houses_percentage_of_addresses_with_private_outdoor_space": 0,
+                      "houses_average_size_private_outdoor_space": 284,
+                      "houses_median_size_private_outdoor_space": 204,
+                      "flats_address_count": 65346,
+                      "flats_addresses_with_private_outdoor_space_count": 46221,
+                      "flats_outdoor_space_total_area": 2953183,
+                      "flats_outdoor_space_count": 9280,
+                      "flats_percentage_of_addresses_with_private_outdoor_space": 0,
+                      "flats_average_size_private_outdoor_space": 318,
+                      "flats_average_number_of_flats_sharing_a_garden": 5,
+                      "total_addresses_count": 118428,
+                      "total_addresses_with_private_outdoor_space_count": 97611,
+                      "total_percentage_addresses_with_private_outdoor_space": 17547060,
+                      "total_average_size_private_outdoor_space": 0,
+                      "local_authority": "{BASE_URL}/local_authority_districts/340/"
+                    },
+                    "summary": "/green_space/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/index_of_multiple_deprivation_quantile": {
+      "get": {
+        "operationId": "index_of_multiple_deprivation_quantile_retrieve",
+        "description": "This endpoint returns an Index of Multiple Deprivations against a postcode, from either England, Wales, Scotland or Northern Ireland.\n\nParameters:\n\n`postcode`: string **[Mandatory]**\n\n`quantile`: integer **[Mandatory]**, one of [2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20]",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "postcode",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Postcode",
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "quantile",
+            "schema": {
+              "type": "integer",
+              "enum": [
+                10,
+                12,
+                18,
+                2,
+                20,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8
+              ]
+            },
+            "description": "Quantile",
+            "required": true
+          }
+        ],
+        "tags": [
+          "index_of_multiple_deprivation_quantile"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "examples": {
+                  "/indexOfMultipleDeprivationQuantile?postcode=SW1A1AA&quantile=10": {
+                    "value": {
+                      "rank": 24862,
+                      "requested_quantile": 10,
+                      "requested_quantile_name": "decile",
+                      "data_quantile": 8,
+                      "country": "england",
+                      "error": null
+                    },
+                    "externalValue": "external value",
+                    "summary": "/index_of_multiple_deprivation_quantile?postcode=SW1A1AA&quantile=10"
+                  },
+                  "/indexOfMultipleDeprivationQuantile?postcode=B346DX&quantile=2": {
+                    "value": {
+                      "result": {
+                        "rank": 9304,
+                        "requested_quantile": 2,
+                        "requested_quantile_name": "median",
+                        "data_quantile": 1,
+                        "country": "england",
+                        "error": null
+                      }
+                    },
+                    "externalValue": "external value",
+                    "summary": "/index_of_multiple_deprivation_quantile?postcode=B346DX&quantile=2"
+                  }
+                }
+              }
+            },
+            "description": "Valid Response"
+          }
+        }
+      }
+    },
+    "/indices_of_multiple_deprivation": {
+      "get": {
+        "operationId": "indices_of_multiple_deprivation_retrieve",
+        "description": "This endpoint returns an index of multiple deprivations against a postcode, from either England, Wales, Scotland or Northern Ireland.\n\nParameters:\n\n`postcode`: string **[Mandatory]**",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "postcode",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Postcode",
+            "required": true,
+            "examples": {
+              "LowDeprivation": {
+                "value": "SW1A 1AA",
+                "summary": "Low Deprivation",
+                "description": "Example low deprivation postcode"
+              },
+              "HighDeprivation": {
+                "value": "CO15 2DQ",
+                "summary": "High Deprivation",
+                "description": "Example high deprivation postcode"
+              }
+            }
+          }
+        ],
+        "tags": [
+          "indices_of_multiple_deprivation"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UKIndexofMultipleDeprivation"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/local_authority_districts/": {
+      "get": {
+        "operationId": "local_authority_districts_list",
+        "description": "This endpoint returns a list of Local Authority Districts (2019) across England, Scotland and Wales.\n\nFilter Parameters:\n\n`year`\n\n`local_authority_district_code`\n\n`local_authority_district_name`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "local_authority_district_code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "local_authority_district_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "local_authority_districts"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "examples": {
+                  "/localAuthorityDistricts/1/": {
+                    "value": {
+                      "local_authority_district_code": "E06000002",
+                      "local_authority_district_name": "Middlesbrough",
+                      "year": 2019
+                    },
+                    "externalValue": "external value",
+                    "summary": "/local_authority_districts/1/"
+                  }
+                }
+              }
+            },
+            "description": "Valid Response"
+          }
+        }
+      }
+    },
+    "/local_authority_districts/{id}/": {
+      "get": {
+        "operationId": "local_authority_districts_retrieve",
+        "description": "This endpoint returns a list of Local Authority Districts (2019) across England, Scotland and Wales.\n\nFilter Parameters:\n\n`year`\n\n`local_authority_district_code`\n\n`local_authority_district_name`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this ('Local Authority',).",
+            "required": true
+          }
+        ],
+        "tags": [
+          "local_authority_districts"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "examples": {
+                  "/localAuthorityDistricts/1/": {
+                    "value": {
+                      "local_authority_district_code": "E06000002",
+                      "local_authority_district_name": "Middlesbrough",
+                      "year": 2019
+                    },
+                    "externalValue": "external value",
+                    "summary": "/local_authority_districts/1/"
+                  }
+                }
+              }
+            },
+            "description": "Valid Response"
+          }
+        }
+      }
+    },
+    "/northern_ireland_indices_of_multiple_deprivation/": {
+      "get": {
+        "operationId": "northern_ireland_indices_of_multiple_deprivation_list",
+        "description": "This endpoint returns a list of all Northern Ireland SOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2020).\n\nFilter Parameters:\n\n`soa_code`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "access_to_services_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "crime_and_disorder_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "education_skills_and_training_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "employment_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "health_deprivation_and_disability_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "imd_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "income_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "living_environment_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "local_authority_code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "soa_zone_code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "soa_zone_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "northern_ireland_indices_of_multiple_deprivation"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedNorthernIrelandIndexMultipleDeprivationList"
+                },
+                "examples": {
+                  "/northernIrelandIndicesOfMultipleDeprivation/1/": {
+                    "value": {
+                      "count": 123,
+                      "next": "http://api.example.org/accounts/?page=4",
+                      "previous": "http://api.example.org/accounts/?page=2",
+                      "results": [
+                        {
+                          "imd_rank": 516,
+                          "year": 2017,
+                          "income_rank": 790,
+                          "employment_rank": 888,
+                          "health_deprivation_and_disability_rank": 890,
+                          "education_skills_and_training_rank": 254,
+                          "access_to_services_rank": 17,
+                          "living_environment_rank": 75,
+                          "crime_and_disorder_rank": 874,
+                          "soa": "http://localhost:8001/northern_ireland_small_output_areas/1/",
+                          "type": "English"
+                        }
+                      ]
+                    },
+                    "summary": "/northern_ireland_indices_of_multiple_deprivation/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/northern_ireland_indices_of_multiple_deprivation/{id}/": {
+      "get": {
+        "operationId": "northern_ireland_indices_of_multiple_deprivation_retrieve",
+        "description": "This endpoint returns a list of all Northern Ireland SOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2020).\n\nFilter Parameters:\n\n`soa_code`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this northern ireland index multiple deprivation.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "northern_ireland_indices_of_multiple_deprivation"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NorthernIrelandIndexMultipleDeprivation"
+                },
+                "examples": {
+                  "/northernIrelandIndicesOfMultipleDeprivation/1/": {
+                    "value": {
+                      "imd_rank": 516,
+                      "year": 2017,
+                      "income_rank": 790,
+                      "employment_rank": 888,
+                      "health_deprivation_and_disability_rank": 890,
+                      "education_skills_and_training_rank": 254,
+                      "access_to_services_rank": 17,
+                      "living_environment_rank": 75,
+                      "crime_and_disorder_rank": 874,
+                      "soa": "http://localhost:8001/northern_ireland_small_output_areas/1/",
+                      "type": "English"
+                    },
+                    "summary": "/northern_ireland_indices_of_multiple_deprivation/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/northern_ireland_small_output_areas/": {
+      "get": {
+        "operationId": "northern_ireland_small_output_areas_list",
+        "description": "This endpoint returns a list of SOAs in Northern Ireland.\n\nFilter Parameters:\n\n`year`\n\n`soa_code`\n\n`soa_name`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "soa_code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "soa_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "northern_ireland_small_output_areas"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedSOAList"
+                },
+                "examples": {
+                  "/northernIrelandSmallOutputAreas/1/": {
+                    "value": {
+                      "count": 123,
+                      "next": "http://api.example.org/accounts/?page=4",
+                      "previous": "http://api.example.org/accounts/?page=2",
+                      "results": [
+                        {
+                          "year": 2001,
+                          "soa_code": "95AA01S1",
+                          "soa_name": "Aldergrove_1"
+                        }
+                      ]
+                    },
+                    "summary": "/northern_ireland_small_output_areas/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/northern_ireland_small_output_areas/{id}/": {
+      "get": {
+        "operationId": "northern_ireland_small_output_areas_retrieve",
+        "description": "This endpoint returns a list of SOAs in Northern Ireland.\n\nFilter Parameters:\n\n`year`\n\n`soa_code`\n\n`soa_name`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this soa.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "northern_ireland_small_output_areas"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SOA"
+                },
+                "examples": {
+                  "/northernIrelandSmallOutputAreas/1/": {
+                    "value": {
+                      "year": 2001,
+                      "soa_code": "95AA01S1",
+                      "soa_name": "Aldergrove_1"
+                    },
+                    "summary": "/northern_ireland_small_output_areas/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/scotland_data_zones/": {
+      "get": {
+        "operationId": "scotland_data_zones_list",
+        "description": "This endpoint returns a list of all Scottish data zones (2011) and their associated local authority district.\n\nFilter Parameters:\n\n`year`\n\n`data_zone_code`\n\n`data_zone_name`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "data_zone_code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "data_zone_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "local_authority_code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "local_authority_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "scotland_data_zones"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedDataZoneList"
+                },
+                "examples": {
+                  "/scotlandDataZones/1/": {
+                    "value": {
+                      "count": 123,
+                      "next": "http://api.example.org/accounts/?page=4",
+                      "previous": "http://api.example.org/accounts/?page=2",
+                      "results": [
+                        {
+                          "data_zone_code": "S01006506",
+                          "data_zone_name": "Culter - 01",
+                          "year": 2011,
+                          "local_authority": "{BASE_URL}/local_authority_districts/340/"
+                        }
+                      ]
+                    },
+                    "summary": "/scotland_data_zones/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/scotland_data_zones/{id}/": {
+      "get": {
+        "operationId": "scotland_data_zones_retrieve",
+        "description": "This endpoint returns a list of all Scottish data zones (2011) and their associated local authority district.\n\nFilter Parameters:\n\n`year`\n\n`data_zone_code`\n\n`data_zone_name`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this data zone.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "scotland_data_zones"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataZone"
+                },
+                "examples": {
+                  "/scotlandDataZones/1/": {
+                    "value": {
+                      "data_zone_code": "S01006506",
+                      "data_zone_name": "Culter - 01",
+                      "year": 2011,
+                      "local_authority": "{BASE_URL}/local_authority_districts/340/"
+                    },
+                    "summary": "/scotland_data_zones/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/scottish_indices_of_multiple_deprivation/": {
+      "get": {
+        "operationId": "scottish_indices_of_multiple_deprivation_list",
+        "description": "This endpoint returns a list of Scottish data zones with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2017).\n\nFilter Parameters:\n\n`data_zone_code`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "access_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "crime_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "data_zone",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "data_zone_code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "data_zone_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "education_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "employment_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "health_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "housing_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "imd_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "income_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "local_authority_code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "scottish_indices_of_multiple_deprivation"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedScottishIndexMultipleDeprivationList"
+                },
+                "examples": {
+                  "/scottishIndicesOfMultipleDeprivation/1/": {
+                    "value": {
+                      "count": 123,
+                      "next": "http://api.example.org/accounts/?page=4",
+                      "previous": "http://api.example.org/accounts/?page=2",
+                      "results": [
+                        {
+                          "year": 2020,
+                          "version": 2,
+                          "imd_rank": 4691,
+                          "income_rank": 3936,
+                          "employment_rank": 3220,
+                          "education_rank": 5887,
+                          "health_rank": 5174,
+                          "access_rank": 4724,
+                          "crime_rank": 4664,
+                          "housing_rank": 3248,
+                          "data_zone": "{BASE_URL}/scotland_data_zones/1/",
+                          "type": "English"
+                        }
+                      ]
+                    },
+                    "summary": "/scottish_indices_of_multiple_deprivation/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/scottish_indices_of_multiple_deprivation/{id}/": {
+      "get": {
+        "operationId": "scottish_indices_of_multiple_deprivation_retrieve",
+        "description": "This endpoint returns a list of Scottish data zones with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2017).\n\nFilter Parameters:\n\n`data_zone_code`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this scottish index multiple deprivation.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "scottish_indices_of_multiple_deprivation"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScottishIndexMultipleDeprivation"
+                },
+                "examples": {
+                  "/scottishIndicesOfMultipleDeprivation/1/": {
+                    "value": {
+                      "year": 2020,
+                      "version": 2,
+                      "imd_rank": 4691,
+                      "income_rank": 3936,
+                      "employment_rank": 3220,
+                      "education_rank": 5887,
+                      "health_rank": 5174,
+                      "access_rank": 4724,
+                      "crime_rank": 4664,
+                      "housing_rank": 3248,
+                      "data_zone": "{BASE_URL}/scotland_data_zones/1/",
+                      "type": "English"
+                    },
+                    "summary": "/scottish_indices_of_multiple_deprivation/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/welsh_indices_of_multiple_deprivation/": {
+      "get": {
+        "operationId": "welsh_indices_of_multiple_deprivation_list",
+        "description": "This endpoint returns a list of Welsh LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).\n\nFilter Parameters:\n\n`lsoa_code`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "access_to_services_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "access_to_services_quartile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "access_to_services_quintile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "access_to_services_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "access_to_services_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "community_safety_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "community_safety_quartile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "community_safety_quintile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "community_safety_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "community_safety_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "education_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "education_quartile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "education_quintile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "education_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "education_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "employment_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "employment_quartile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "employment_quintile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "employment_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "employment_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "health_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "health_quartile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "health_quintile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "health_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "health_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "housing_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "housing_quartile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "housing_quintile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "housing_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "housing_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "imd_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "imd_quartile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "imd_quintile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "imd_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "imd_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "income_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "income_quartile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "income_quintile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "income_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "income_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "local_authority_code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lsoa",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lsoa_code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lsoa_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "physical_environment_decile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "physical_environment_quartile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "physical_environment_quintile",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "physical_environment_rank",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "physical_environment_score",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "welsh_indices_of_multiple_deprivation"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedWelshIndexMultipleDeprivationList"
+                },
+                "examples": {
+                  "/welshIndicesOfMultipleDeprivation/1/": {
+                    "value": {
+                      "count": 123,
+                      "next": "http://api.example.org/accounts/?page=4",
+                      "previous": "http://api.example.org/accounts/?page=2",
+                      "results": [
+                        {
+                          "imd_rank": 885,
+                          "imd_quartile": 2,
+                          "imd_quintile": 3,
+                          "imd_decile": 5,
+                          "imd_score": "19.2",
+                          "income_rank": 898,
+                          "income_quartile": 2,
+                          "income_quintile": 3,
+                          "income_decile": 5,
+                          "income_score": "17.0",
+                          "employment_rank": 659,
+                          "employment_quartile": 2,
+                          "employment_quintile": 2,
+                          "employment_decile": 4,
+                          "employment_score": "23.9",
+                          "health_rank": 1213,
+                          "health_quartile": 3,
+                          "health_quintile": 4,
+                          "health_decile": 7,
+                          "health_score": "10.3",
+                          "education_rank": 1057,
+                          "education_quartile": 3,
+                          "education_quintile": 3,
+                          "education_decile": 6,
+                          "education_score": "13.4",
+                          "access_to_services_rank": 221,
+                          "access_to_services_quartile": 1,
+                          "access_to_services_quintile": 1,
+                          "access_to_services_decile": 2,
+                          "access_to_services_score": "47.5",
+                          "housing_rank": 935,
+                          "housing_quartile": 2,
+                          "housing_quintile": 3,
+                          "housing_decile": 5,
+                          "housing_score": "16.1",
+                          "community_safety_rank": 914,
+                          "community_safety_quartile": 2,
+                          "community_safety_quintile": 3,
+                          "community_safety_decile": 5,
+                          "community_safety_score": "16.6",
+                          "physical_environment_rank": 1859,
+                          "physical_environment_quartile": 4,
+                          "physical_environment_quintile": 5,
+                          "physical_environment_decile": 10,
+                          "physical_environment_score": "0.6",
+                          "lsoa": "{BASE_URL}/england_wales_lower_layer_super_output_areas/33054/",
+                          "year": 2019,
+                          "type": "English"
+                        }
+                      ]
+                    },
+                    "summary": "/welsh_indices_of_multiple_deprivation/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/welsh_indices_of_multiple_deprivation/{id}/": {
+      "get": {
+        "operationId": "welsh_indices_of_multiple_deprivation_retrieve",
+        "description": "This endpoint returns a list of Welsh LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).\n\nFilter Parameters:\n\n`lsoa_code`\n\nIf none are passed, a list is returned.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this welsh index multiple deprivation.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "welsh_indices_of_multiple_deprivation"
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WelshIndexMultipleDeprivation"
+                },
+                "examples": {
+                  "/welshIndicesOfMultipleDeprivation/1/": {
+                    "value": {
+                      "imd_rank": 885,
+                      "imd_quartile": 2,
+                      "imd_quintile": 3,
+                      "imd_decile": 5,
+                      "imd_score": "19.2",
+                      "income_rank": 898,
+                      "income_quartile": 2,
+                      "income_quintile": 3,
+                      "income_decile": 5,
+                      "income_score": "17.0",
+                      "employment_rank": 659,
+                      "employment_quartile": 2,
+                      "employment_quintile": 2,
+                      "employment_decile": 4,
+                      "employment_score": "23.9",
+                      "health_rank": 1213,
+                      "health_quartile": 3,
+                      "health_quintile": 4,
+                      "health_decile": 7,
+                      "health_score": "10.3",
+                      "education_rank": 1057,
+                      "education_quartile": 3,
+                      "education_quintile": 3,
+                      "education_decile": 6,
+                      "education_score": "13.4",
+                      "access_to_services_rank": 221,
+                      "access_to_services_quartile": 1,
+                      "access_to_services_quintile": 1,
+                      "access_to_services_decile": 2,
+                      "access_to_services_score": "47.5",
+                      "housing_rank": 935,
+                      "housing_quartile": 2,
+                      "housing_quintile": 3,
+                      "housing_decile": 5,
+                      "housing_score": "16.1",
+                      "community_safety_rank": 914,
+                      "community_safety_quartile": 2,
+                      "community_safety_quintile": 3,
+                      "community_safety_decile": 5,
+                      "community_safety_score": "16.6",
+                      "physical_environment_rank": 1859,
+                      "physical_environment_quartile": 4,
+                      "physical_environment_quintile": 5,
+                      "physical_environment_decile": 10,
+                      "physical_environment_score": "0.6",
+                      "lsoa": "{BASE_URL}/england_wales_lower_layer_super_output_areas/33054/",
+                      "year": 2019,
+                      "type": "English"
+                    },
+                    "summary": "/welsh_indices_of_multiple_deprivation/1/"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DataZone": {
+        "type": "object",
+        "properties": {
+          "data_zone_code": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "data_zone_name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "year": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Data Zone Year"
+          },
+          "local_authority": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "data_zone_code",
+          "data_zone_name",
+          "local_authority",
+          "year"
+        ]
+      },
+      "EnglishIndexMultipleDeprivation": {
+        "type": "object",
+        "properties": {
+          "imd_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Index of Multiple Deprivation (IMD) Score",
+            "description": "Index of Multiple Deprivation (IMD) Score"
+          },
+          "imd_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Index of Multiple Deprivation",
+            "description": "Index of Multiple Deprivation (IMD) Rank (where 1 is most deprived)"
+          },
+          "imd_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Index of Multiple Deprivation (IMD) Decile",
+            "description": "Index of Multiple Deprivation (IMD) Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "income_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Income Score (rate)",
+            "description": "Income Score (rate)"
+          },
+          "income_score_exponentially_transformed": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Income Score exponentially tranformed",
+            "description": "Income Score exponentially tranformed"
+          },
+          "income_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "description": "Income Rank (where 1 is most deprived)"
+          },
+          "income_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "description": "Income Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "employment_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Employment Score (rate)",
+            "description": "Employment Score (rate)"
+          },
+          "employment_score_exponentially_transformed": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "description": "Employment Score exponentially transformed"
+          },
+          "employment_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "description": "Employment Rank (where 1 is most deprived)"
+          },
+          "employment_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "description": "Employment Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "education_skills_training_score_exponentially_transformed": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Education, Skills and Training Score exponentially transformed",
+            "description": "Education, Skills and Training Score exponentially transformed"
+          },
+          "education_skills_training_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Education, Skills and Training Score (rate)",
+            "description": "Education, Skills and Training Score (rate)"
+          },
+          "education_skills_training_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Education, Skills and Training Rank",
+            "description": "Education, Skills and Training Rank (where 1 is most deprived)"
+          },
+          "education_skills_training_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Education, Skills and Training Decile",
+            "description": "Education, Skills and Training Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "children_young_people_sub_domain_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Children and Young People Sub-domain Score (rate)",
+            "description": "Children and Young People Sub-domain Score (rate)"
+          },
+          "children_young_people_sub_domain_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "title": "Children and Young People Sub-domain Rank (where 1 is most deprived)",
+            "description": "Children and Young People Sub-domain Rank (where 1 is most deprived)"
+          },
+          "children_young_people_sub_domain_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "title": "Children and Young People Sub-domain Decile (where 1 is most deprived) Decile",
+            "description": "Children and Young People Sub-domain Decile (where 1 is most deprived) Decile"
+          },
+          "adult_skills_sub_domain_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Adult Skills Sub-domain Score (rate)",
+            "description": "Adult Skills Sub-domain Score (rate)"
+          },
+          "adult_skills_sub_domain_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "title": "Adult Skills Sub-domain Rank (where 1 is most deprived)",
+            "description": "Adult Skills Sub-domain Rank (where 1 is most deprived)"
+          },
+          "adult_skills_sub_domain_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "title": "Adult Skills Sub-domain Decile (where 1 is most deprived) Decile",
+            "description": "Adult Skills Sub-domain Decile (where 1 is most deprived) Decile"
+          },
+          "health_deprivation_disability_score_exponentially_transformed": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Health Deprivation and Disability Score exponentially transformed",
+            "description": "Health Deprivation and Disability Score exponentially transformed"
+          },
+          "health_deprivation_disability_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Health Deprivation and Disability Score (rate)",
+            "description": "Health Deprivation and Disability Score (rate)"
+          },
+          "health_deprivation_disability_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Health Deprivation and Disability Rank",
+            "description": "Health Deprivation and Disability Rank (where 1 is most deprived)"
+          },
+          "health_deprivation_disability_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Health Deprivation and Disability Decile",
+            "description": "Health Deprivation and Disability Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "crime_score_exponentially_transformed": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "description": "Crime Score exponentially transformed"
+          },
+          "crime_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Crime Score (rate)",
+            "description": "Crime Score (rate)"
+          },
+          "crime_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "description": "Crime Rank (where 1 is most deprived)"
+          },
+          "crime_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "description": "Crime Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "barriers_to_housing_services_score_exponentially_transformed": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Barriers to Housing and Services Score Exponentially transformed",
+            "description": "Barriers to Housing and Services Score Exponentially transformed"
+          },
+          "barriers_to_housing_services_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Barriers to Housing and Services Score (rate)",
+            "description": "Barriers to Housing and Services Score (rate)"
+          },
+          "barriers_to_housing_services_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Barriers to Housing and Services Rank",
+            "description": "Barriers to Housing and Services Rank (where 1 is most deprived)"
+          },
+          "barriers_to_housing_services_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Barriers to Housing and Services Decile",
+            "description": "Barriers to Housing and Services Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "geographical_barriers_sub_domain_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "description": "Geographical Barriers Sub-domain Score (rate)"
+          },
+          "geographical_barriers_sub_domain_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "description": "Geographical Barriers Sub-domain Rank (where 1 is most deprived)"
+          },
+          "geographical_barriers_sub_domain_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "description": "Geographical Barriers Sub-domain Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "wider_barriers_sub_domain_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Wider Barriers Sub-domain Score (rate)",
+            "description": "Wider Barriers Sub-domain Score (rate)"
+          },
+          "wider_barriers_sub_domain_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "description": "Wider Barriers Sub-domain Rank (where 1 is most deprived)"
+          },
+          "wider_barriers_sub_domain_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "description": "Wider Barriers Sub-domain Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "living_environment_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Living Environment Score (rate)",
+            "description": "Living Environment Score (rate)"
+          },
+          "living_environment_score_exponentially_transformed": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "description": "Living Environment Score exponentially transformed"
+          },
+          "living_environment_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "description": "Living Environment Rank (where 1 is most deprived)"
+          },
+          "living_environment_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "description": "Living Environment Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "indoors_sub_domain_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Indoors Sub-domain Score (rate)",
+            "description": "Indoors Sub-domain Score (rate)"
+          },
+          "indoors_sub_domain_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "description": "Indoors Sub-domain Rank (where 1 is most deprived)"
+          },
+          "indoors_sub_domain_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "description": "Indoors Sub-domain Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "outdoors_sub_domain_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Outdoors Sub-domain Score (rate)",
+            "description": "Outdoors Sub-domain Score (rate)"
+          },
+          "outdoors_sub_domain_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "description": "Outdoors Sub-domain Rank(where 1 is most deprived)"
+          },
+          "outdoors_sub_domain_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "description": "Outdoors Sub-domain Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "idaci_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Income Deprivation Affecting Children Index Score (rate)",
+            "description": "Income Deprivation Affecting Children Index (IDACI) Score (rate)"
+          },
+          "idaci_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "title": "Income Deprivation Affecting Children Index Rank",
+            "description": "Income Deprivation Affecting Children Index (IDACI) Rank (where 1 is most deprived)"
+          },
+          "idaci_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "title": "Income Deprivation Affecting Children Index Decile",
+            "description": "Income Deprivation Affecting Children Index (IDACI) Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "idaopi_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,2}(?:\\.\\d{0,3})?$",
+            "nullable": true,
+            "title": "Income Deprivation Affecting Older People Index Score (rate)",
+            "description": "Income Deprivation Affecting Older People Index (IDAOPI) Score (rate)"
+          },
+          "idaopi_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "title": "Income Deprivation Affecting Older People Index Rank",
+            "description": "Income Deprivation Affecting Older People Index (IDAOPI) Rank (where 1 is most deprived)"
+          },
+          "idaopi_decile": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "title": "Income Deprivation Affecting Older People Index Decile",
+            "description": "Income Deprivation Affecting Older People Index (IDAOPI) Decile (where 1 is most deprived 10% of LSOAs)"
+          },
+          "lsoa": {
+            "type": "string",
+            "format": "uri"
+          },
+          "type": {
+            "type": "string",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "barriers_to_housing_services_decile",
+          "barriers_to_housing_services_rank",
+          "crime_decile",
+          "crime_rank",
+          "education_skills_training_decile",
+          "education_skills_training_rank",
+          "employment_decile",
+          "employment_rank",
+          "health_deprivation_disability_decile",
+          "health_deprivation_disability_rank",
+          "imd_decile",
+          "imd_rank",
+          "income_decile",
+          "income_rank",
+          "living_environment_decile",
+          "living_environment_rank",
+          "lsoa",
+          "type"
+        ]
+      },
+      "GreenSpace": {
+        "type": "object",
+        "properties": {
+          "houses_address_count": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Houses - Address Count"
+          },
+          "houses_addresses_with_private_outdoor_space_count": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Houses - Addresses with private outdoor space Count"
+          },
+          "houses_outdoor_space_total_area": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Houses - Outdoor space total area (m2)"
+          },
+          "houses_percentage_of_addresses_with_private_outdoor_space": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Houses - Percentage of addresses with private outdoor space"
+          },
+          "houses_average_size_private_outdoor_space": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Houses - Average size of private outdoor space (m2)"
+          },
+          "houses_median_size_private_outdoor_space": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Houses - Median size of private outdoor space (m2)"
+          },
+          "flats_address_count": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Flats - Address Count"
+          },
+          "flats_addresses_with_private_outdoor_space_count": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Flats - Addresses with private outdoor space Count"
+          },
+          "flats_outdoor_space_total_area": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Flats - Outdoor space total area (m2)"
+          },
+          "flats_outdoor_space_count": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Flats - Count of flats with outdoor space"
+          },
+          "flats_percentage_of_addresses_with_private_outdoor_space": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Flats - Percentage of addresses with private outdoor space"
+          },
+          "flats_average_size_private_outdoor_space": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Flats - Average size of private outdoor space (m2)"
+          },
+          "flats_average_number_of_flats_sharing_a_garden": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Flats - Average number of flats sharing a garden"
+          },
+          "total_addresses_count": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Total - count of all addresses"
+          },
+          "total_addresses_with_private_outdoor_space_count": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Total - count of all addresses with private outdoor space"
+          },
+          "total_percentage_addresses_with_private_outdoor_space": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Total - percentage of all addresses with private outdoor space"
+          },
+          "total_average_size_private_outdoor_space": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Total - average size of all private outdoor space"
+          },
+          "local_authority": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "flats_address_count",
+          "flats_addresses_with_private_outdoor_space_count",
+          "flats_average_number_of_flats_sharing_a_garden",
+          "flats_average_size_private_outdoor_space",
+          "flats_outdoor_space_count",
+          "flats_outdoor_space_total_area",
+          "flats_percentage_of_addresses_with_private_outdoor_space",
+          "houses_address_count",
+          "houses_addresses_with_private_outdoor_space_count",
+          "houses_average_size_private_outdoor_space",
+          "houses_median_size_private_outdoor_space",
+          "houses_outdoor_space_total_area",
+          "houses_percentage_of_addresses_with_private_outdoor_space",
+          "local_authority",
+          "total_addresses_count",
+          "total_addresses_with_private_outdoor_space_count",
+          "total_average_size_private_outdoor_space",
+          "total_percentage_addresses_with_private_outdoor_space"
+        ]
+      },
+      "LSOA": {
+        "type": "object",
+        "properties": {
+          "lsoa_code": {
+            "type": "string",
+            "title": "LSOA code (2011)",
+            "maxLength": 50
+          },
+          "lsoa_name": {
+            "type": "string",
+            "title": "LSOA name (2011)",
+            "maxLength": 50
+          },
+          "year": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "title": "Year LSOA calculated"
+          },
+          "total_population_mid_2015": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "title": "Total population: mid 2015 (excluding prisoners)",
+            "description": "Total population: mid 2015 (excluding prisoners)"
+          },
+          "dependent_children_mid_2015": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "title": "Dependent Children aged 0-15: mid 2015 (excluding prisoners)",
+            "description": "Dependent Children aged 0-15: mid 2015 (excluding prisoners)"
+          },
+          "population_16_59_mid_2015": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "title": "Population aged 16-59: mid 2015 (excluding prisoners)",
+            "description": "Population aged 16-59: mid 2015 (excluding prisoners)"
+          },
+          "older_population_over_16_mid_2015": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "title": "Older population aged 60 and over: mid 2015 (excluding prisoners)",
+            "description": "Older population aged 60 and over: mid 2015 (excluding prisoners)"
+          },
+          "working_age_population_over_18_mid_2015": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "nullable": true,
+            "title": "Working age population 18-59/64: for use with Employment Deprivation Domain (excluding prisoners)",
+            "description": "Working age population 18-59/64: for use with Employment Deprivation Domain (excluding prisoners)"
+          }
+        },
+        "required": [
+          "lsoa_code",
+          "lsoa_name",
+          "year"
+        ]
+      },
+      "NorthernIrelandIndexMultipleDeprivation": {
+        "type": "object",
+        "properties": {
+          "imd_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "year": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "income_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "employment_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "health_deprivation_and_disability_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "education_skills_and_training_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "access_to_services_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "living_environment_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "crime_and_disorder_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "soa": {
+            "type": "string",
+            "format": "uri"
+          },
+          "type": {
+            "type": "string",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "access_to_services_rank",
+          "crime_and_disorder_rank",
+          "education_skills_and_training_rank",
+          "employment_rank",
+          "health_deprivation_and_disability_rank",
+          "imd_rank",
+          "income_rank",
+          "living_environment_rank",
+          "soa",
+          "type",
+          "year"
+        ]
+      },
+      "PaginatedDataZoneList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataZone"
+            }
+          }
+        }
+      },
+      "PaginatedEnglishIndexMultipleDeprivationList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnglishIndexMultipleDeprivation"
+            }
+          }
+        }
+      },
+      "PaginatedGreenSpaceList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GreenSpace"
+            }
+          }
+        }
+      },
+      "PaginatedLSOAList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LSOA"
+            }
+          }
+        }
+      },
+      "PaginatedNorthernIrelandIndexMultipleDeprivationList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NorthernIrelandIndexMultipleDeprivation"
+            }
+          }
+        }
+      },
+      "PaginatedSOAList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SOA"
+            }
+          }
+        }
+      },
+      "PaginatedScottishIndexMultipleDeprivationList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScottishIndexMultipleDeprivation"
+            }
+          }
+        }
+      },
+      "PaginatedWelshIndexMultipleDeprivationList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WelshIndexMultipleDeprivation"
+            }
+          }
+        }
+      },
+      "SOA": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "soa_code": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "soa_name": {
+            "type": "string",
+            "maxLength": 50
+          }
+        },
+        "required": [
+          "soa_code",
+          "soa_name",
+          "year"
+        ]
+      },
+      "ScottishIndexMultipleDeprivation": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "version": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "imd_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "income_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "employment_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "education_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "health_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "access_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "crime_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "housing_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "data_zone": {
+            "type": "string",
+            "format": "uri"
+          },
+          "type": {
+            "type": "string",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "access_rank",
+          "crime_rank",
+          "data_zone",
+          "education_rank",
+          "employment_rank",
+          "health_rank",
+          "housing_rank",
+          "imd_rank",
+          "income_rank",
+          "type",
+          "version",
+          "year"
+        ]
+      },
+      "UKIndexofMultipleDeprivation": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/EnglishIndexMultipleDeprivation"
+          },
+          {
+            "$ref": "#/components/schemas/WelshIndexMultipleDeprivation"
+          },
+          {
+            "$ref": "#/components/schemas/ScottishIndexMultipleDeprivation"
+          },
+          {
+            "$ref": "#/components/schemas/NorthernIrelandIndexMultipleDeprivation"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "English": "#/components/schemas/NorthernIrelandIndexMultipleDeprivation"
+          }
+        }
+      },
+      "WelshIndexMultipleDeprivation": {
+        "type": "object",
+        "properties": {
+          "imd_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "imd_quartile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "imd_quintile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "imd_decile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "imd_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,1})?$",
+            "nullable": true
+          },
+          "income_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "income_quartile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "income_quintile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "income_decile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "income_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,1})?$",
+            "nullable": true
+          },
+          "employment_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "employment_quartile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "employment_quintile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "employment_decile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "employment_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,1})?$",
+            "nullable": true
+          },
+          "health_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "health_quartile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "health_quintile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "health_decile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "health_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,1})?$",
+            "nullable": true
+          },
+          "education_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "education_quartile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "education_quintile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "education_decile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "education_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,1})?$",
+            "nullable": true
+          },
+          "access_to_services_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "access_to_services_quartile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "access_to_services_quintile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "access_to_services_decile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "access_to_services_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,1})?$",
+            "nullable": true
+          },
+          "housing_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "housing_quartile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "housing_quintile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "housing_decile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "housing_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,1})?$",
+            "nullable": true
+          },
+          "community_safety_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "community_safety_quartile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "community_safety_quintile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "community_safety_decile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "community_safety_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,1})?$",
+            "nullable": true
+          },
+          "physical_environment_rank": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "physical_environment_quartile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "physical_environment_quintile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "physical_environment_decile": {
+            "type": "integer",
+            "maximum": 32767,
+            "minimum": -32768
+          },
+          "physical_environment_score": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,3}(?:\\.\\d{0,1})?$",
+            "nullable": true
+          },
+          "lsoa": {
+            "type": "string",
+            "format": "uri"
+          },
+          "year": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "type": {
+            "type": "string",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "access_to_services_decile",
+          "access_to_services_quartile",
+          "access_to_services_quintile",
+          "access_to_services_rank",
+          "community_safety_decile",
+          "community_safety_quartile",
+          "community_safety_quintile",
+          "community_safety_rank",
+          "education_decile",
+          "education_quartile",
+          "education_quintile",
+          "education_rank",
+          "employment_decile",
+          "employment_quartile",
+          "employment_quintile",
+          "employment_rank",
+          "health_decile",
+          "health_quartile",
+          "health_quintile",
+          "health_rank",
+          "housing_decile",
+          "housing_quartile",
+          "housing_quintile",
+          "housing_rank",
+          "imd_decile",
+          "imd_quartile",
+          "imd_quintile",
+          "imd_rank",
+          "income_decile",
+          "income_quartile",
+          "income_quintile",
+          "income_rank",
+          "lsoa",
+          "physical_environment_decile",
+          "physical_environment_quartile",
+          "physical_environment_quintile",
+          "physical_environment_rank",
+          "type",
+          "year"
+        ]
+      }
+    }
+  }
+}
