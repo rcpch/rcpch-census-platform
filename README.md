@@ -1,6 +1,6 @@
-# RCPCH Census Platform
+# RCPCH Census Engine
 
-This project is a python 3.11 / Django Rest Framework project providing UK census data, especially Index of Multiple Deprivation as a service.
+This Django Rest Framework project provides UK Census data, especially _Index of Multiple Deprivation_, as a service. It is a dependency for [The RCPCH Audit Engine](https://github.com/rcpch/rcpch-audit-engine).
 
 <p align="center">
     <p align="center">
@@ -10,18 +10,24 @@ This project is a python 3.11 / Django Rest Framework project providing UK censu
 
 ## Why is it needed?
 
-The [Office of National Statistics](https://www.ons.gov.uk) publishes all the Census data exhaustively - this project is not intended to replace it. There is a need though for RCPCH to be able to describe the lived environment and experience of children and young people in a meaningful way, to inform research, audit and clinical practice. The project will curate social and environmental data where they have impact on children's health or on paediatrics, available to clinicians and researchers. It is a work in progress. The first application within this project is an API to address deprivation, by reporting indices of multiple deprivation from across the UK against a postcode. It is consumed by software that RCPCH provide.
+This project is not intended to replace the [Office of National Statistics](https://www.ons.gov.uk), which exhaustively publishes all Census data. However, the RCPCH require meaningfully describing the lived environment and experience of children and young people, informing research, audit and clinical practice.
+
+The Census Platform curates social and environmental data that impact children's health or Paediatrics, making it available to clinicians and researchers.
+
+The project's first application is an API to address deprivation. Using a postcode, it reports on Indices of Multiple Deprivation from across the UK. Other RCPCH projects, such as the RCPCH Audit Engine, consume this API.
+
+## Background information
 
 ### UK Areas
 
-The UK can be divided into different areas
+The UK is divided into different areas:
 
 1. Output Areas (OAs) - 40-625 households
 2. Lower Layer Super Output Areas (LSOAs) - 400-3000 households
 3. Middle Layer Super Output Areas (MSOAs) - 2000-15000 households
 4. Local Authorities
 
-Each fits within the one below it like a Russian doll.
+Each fits within the subsequent like a Russian doll.
 
 There are other ways of describing areas across the UK:
 
@@ -30,35 +36,50 @@ There are other ways of describing areas across the UK:
 3. Local Enterprise Partnerships
 4. Parliamentary Constituencies
 
-These do not always fit within the output areas, and boundaries can change.
+Unfortunately, these do not always fit within the output areas, and boundaries can change.
 
-There is a better explainer [here](https://ocsi.uk/2019/03/18/lsoas-leps-and-lookups-a-beginners-guide-to-statistical-geographies/)
+Please see the comprehensive explainer [here](https://ocsi.uk/2019/03/18/lsoas-leps-and-lookups-a-beginners-guide-to-statistical-geographies/).
 
 Within healthcare, there are several other important organisational boundaries.
 
-Integrated Care Boards were introduced on 1st July 2022, taking over from Sustainability and Transformation Partnerships (STPs) and 106 Clinical Commissioning Groups (CCGs) as the top-level organisational units for planning and commissioning health and social care. Commissioning now is controlled by the 42 ICBs (and ICPs or integrated care partnerships). Other hierarchies include providers (such as NHS Trusts, Mental Health Trusts, GP surgeries, pharmacies, ambulance services etc) and Primary Care Networks (PCNs).
+Integrated Care Boards were introduced on 1st July 2022, taking over from Sustainability and Transformation Partnerships (STPs) and 106 Clinical Commissioning Groups (CCGs) as the top-level organisational units for planning and commissioning health and social care. Commissioning is now controlled by the 42 ICBs (and ICPs or integrated care partnerships). Other hierarchies include providers (such as NHS Trusts, Mental Health Trusts, and GP surgeries) and Primary Care Networks (PCNs).
 
 ### Indices of Multiple Deprivation (IMD)
 
-Indices of Multiple Deprivation (IMDs) are not standardised across the devolved nations. They are specific to each country and are derived from census data. The methodology for the calculation though is essentially the same. It involves breaking the country up into units comparable by population size - in England and Wales, this is LSOAs, in Scotland it is Data Zones and in Northern Ireland it is SOAs. Each unit then is allocated a score to summarise certain deprivation domains. These vary across the 4 countries: 
+Indices of Multiple Deprivation (IMDs) are not standardised across the devolved nations.
 
-| England                          | Wales                 | Scotland          | Northern Ireland                  |
-|:---------------------------------|:----------------------|:------------------|:----------------------------------|
-| income                           | income                | income            | income                            |
-| employment                       | employment            | employment        | employment                        |
-| education                        | health                | education         | health deprivation and disability |
-| health                           | education             | health            | education skills and training     |
-| crime                            | access to services    | access            | access to services                |
-| barriers to housing and services | housing               | crime             | living environment                |
-| living environment               | community safety      | housing           | crime and disorder                |
-|                                  | physical environment  |                   |                                   |
-| *32844 LSOAs*                    | *1909 LSOAs*          | *6976 Data Zones* | *890 SOAs*                        |
-| *2019 data*                      | *2019 data*           | *2020 data*       | *2017 data*                       |
+They are specific to each country and are derived from census data. However, the calculation methodology is essentially the same.
 
-In England, there are also subdomains for education (children and young people and adult skills), barriers to housing and services (geographical barriers and wider barriers) and living environment (indoors and outdoors).
+First, countries are sub-divided into units comparable by population size:
 
-These domains are then weighted and contribute to the final index of multiple deprivation score. Based on the score in each LSOA, LSOAs are then ranked by deprivation score, and then split into quantiles (with the lower quantiles the most deprived). It is important to say that the rankings do not compare between countries - that is a given decile in one country is not the same as the same decile in another, and this is because the scores are not standardised across the UK, only across each nation. An attempt to do this has been made by [MySociety](https://github.com/mysociety/composite_uk_imd) who have published a Composite UK IMD which brings together all the datasets across the devolved nations. In the process, however, a lot of the detail is lost so whilst this allows the user to compare deprivation scores across countries, [it is not possible to compare the subdomains](https://github.com/mysociety/composite_uk_imd/issues/2). For our purposes, therefore, we will use the individual countries scores, but report these with an appropriate warning.
+| Country          | Sub-Unit Name |
+| :--------------- | :------------ |
+| England & Wales  | LSOAs         |
+| Scotland         | Data Zones    |
+| Northern Ireland | SOAs          |
 
+Each unit is allocated a score to summarise certain deprivation domains. These vary across the four countries:
+
+| England                          | Wales                | Scotland          | Northern Ireland                  |
+| :------------------------------- | :------------------- | :---------------- | :-------------------------------- |
+| income                           | income               | income            | income                            |
+| employment                       | employment           | employment        | employment                        |
+| education                        | education            | education         | education skills and training     |
+| health                           | health               | health            | health deprivation and disability |
+| barriers to housing and services | access to services   | access            | access to services                |
+| crime                            | housing              | crime             | crime and disorder                |
+| living environment               | community safety     | housing           | living environment                |
+|                                  | physical environment |                   |                                   |
+| _32844 LSOAs_                    | _1909 LSOAs_         | _6976 Data Zones_ | _890 SOAs_                        |
+| _2019 data_                      | _2019 data_          | _2020 data_       | _2017 data_                       |
+
+In England, there are also subdomains for **education** (children and young people and adult skills), **barriers to housing and services** (geographical barriers and wider barriers) and **living environment** (indoors and outdoors).
+
+These domains are weighted and contribute to the final Index Of Multiple Deprivation Score.
+
+LSOAs are then ranked by Deprivation Score and split into quantiles (lower quantiles being most deprived).
+
+**The rankings do not compare between countries**: a given decile in one country is not the same as in another because scores are not standardised across the UK, only within each nation. A Composite UK IMD has been attempted by [MySociety](https://github.com/mysociety/composite_uk_imd), which combines all the datasets across the devolved nations. However, in the process, a lot of the detail is lost, so whilst this allows the user to compare deprivation scores across countries, [it is not possible to compare the subdomains](https://github.com/mysociety/composite_uk_imd/issues/2). Therefore, we use the individual country scores but report with an appropriate warning.
 
 ## Getting Started
 
