@@ -6,6 +6,7 @@ autopep8
 coverage
 black
 pytest-django
+pytest-factoryboy
 
 # third party imports
 bump2version

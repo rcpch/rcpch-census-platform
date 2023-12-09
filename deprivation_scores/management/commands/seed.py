@@ -264,6 +264,9 @@ def update_english_imd_data_with_supplementary_indices():
 
 
 def update_english_imd_data_with_scores():
+    if EnglishIndexMultipleDeprivation.objects.all()[0].imd_score is not None:
+        print("IMD scores already exist for England. Skipping...")
+        return
     # import domains of deprivation data
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_SCORES_OF_DEPRIVATION}"
     with open(path, "r") as f:
@@ -621,7 +624,7 @@ def add_welsh_2019_scores_to_existing_2019_lsoas():
 def add_northern_ireland_soas_and_deprivation_domains_with_ranks():
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{NORTHERN_IRELAND_SOAS_AND_IMD_RANKS}"
 
-    if SOA.objects.exists() and SOA.objects.all().count() == 891:
+    if SOA.objects.exists() and SOA.objects.all().count() == 890:
         print(R + "Northern Ireland SOAs already added. Skipping..." + W)
         pass
     else:
