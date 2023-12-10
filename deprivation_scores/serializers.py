@@ -417,7 +417,7 @@ class WelshIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerial
                 "crime_rank": 4664,
                 "housing_rank": 3248,
                 "data_zone": "{BASE_URL}/scotland_data_zones/1/",
-                "type": "English",
+                "type": "Scottish",
             },
             response_only=True,
         )
