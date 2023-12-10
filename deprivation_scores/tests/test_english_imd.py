@@ -6,6 +6,7 @@ import pytest
 
 # rcpch_census_platform imports
 from deprivation_scores.constants import ENGLISH_IMD_TEST_DATA
+from deprivation_scores.general_functions import quantile_for_rank
 
 
 # Assert LSOA returns correct IMD rank
@@ -15,7 +16,7 @@ from deprivation_scores.constants import ENGLISH_IMD_TEST_DATA
 @pytest.mark.django_db
 @pytest.mark.usefixtures("seed_data_fixture")
 @pytest.mark.parametrize("english_test_data", ENGLISH_IMD_TEST_DATA)
-def test_correctly_return_imd_raw_score(api_client, english_test_data) -> None:
+def test_correctly_return_english_imd(api_client, english_test_data) -> None:
     """
     The IMD raw score returned is correct
     :param api_client
@@ -41,3 +42,21 @@ def test_correctly_return_imd_raw_score(api_client, english_test_data) -> None:
     assert (
         str(response.data["imd_decile"]) == imd_decile
     ), f"{postcode} should have returned a deprivation decile of {imd_decile}"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("english_test_data", ENGLISH_IMD_TEST_DATA)
+def test_english_decile_calculation(english_test_data) -> None:
+    """
+    Should return the correct decile from the rank
+    """
+    expected_decile = int(english_test_data["Index of Multiple Deprivation Decile"])
+    decile = quantile_for_rank(
+        rank=int(english_test_data["Index of Multiple Deprivation Rank"]),
+        requested_quantile=10,
+        country="england",
+    )
+
+    assert (
+        decile["data_quantile"] == expected_decile
+    ), f"{decile['data_quantile']} was calculated, but {expected_decile} was expected."
