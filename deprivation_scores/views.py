@@ -131,13 +131,13 @@ class LSOAViewSet(viewsets.ReadOnlyModelViewSet):
 class SOAViewSet(viewsets.ReadOnlyModelViewSet):
     """
     This endpoint returns a list of SOAs in Northern Ireland.
-    
+
     Filter Parameters:
 
     `year`
-    
+
     `soa_code`
-    
+
     `soa_name`
 
     If none are passed, a list is returned.
@@ -169,13 +169,13 @@ class GreenSpaceViewSet(viewsets.ReadOnlyModelViewSet):
 class DataZoneViewSet(viewsets.ReadOnlyModelViewSet):
     """
     This endpoint returns a list of all Scottish data zones (2011) and their associated local authority district.
-    
+
     Filter Parameters:
 
     `year`
-    
+
     `data_zone_code`
-    
+
     `data_zone_name`
 
     If none are passed, a list is returned.
@@ -210,7 +210,7 @@ class EnglishIndexMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 class WelshMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     This endpoint returns a list of Welsh LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).
-    
+
     Filter Parameters:
 
     `lsoa_code`
@@ -230,7 +230,7 @@ class WelshMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 class ScottishMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     This endpoint returns a list of Scottish data zones with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2017).
-    
+
     Filter Parameters:
 
     `data_zone_code`
@@ -352,6 +352,7 @@ class UKIndexMultipleDeprivationView(APIView):
 
         """
         post_code = self.request.query_params.get("postcode", None)
+
         if post_code:
             if is_valid_postcode(postcode=post_code):
                 lsoa_object = lsoa_for_postcode(postcode=post_code)

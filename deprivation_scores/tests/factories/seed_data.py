@@ -1,9 +1,11 @@
-import pytest
+# python imports
 
-from rest_framework.test import APIClient
-
-from django.core.management import call_command
+# import django
 from django.apps import apps
+
+# third party libraries
+import pytest
+from django.core.management import call_command
 
 
 @pytest.mark.django_db
@@ -19,12 +21,3 @@ def seed_data_fixture(django_db_setup, django_db_blocker):
             # call_command("seed", mode="add_scottish_imds")
         else:
             print("Test database already seeded. Skipping...")
-
-
-@pytest.fixture(scope="function")
-def api_client() -> APIClient:
-    """
-    Fixture to provide an API client
-    :return: APIClient
-    """
-    yield APIClient()
