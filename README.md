@@ -391,4 +391,12 @@ Vary: Accept
 
 This information comes directly from the remarkable [postcodes.io](https://postcodes.io) which offers this as a free service. This is a dependency of the RCPCH Census Platform API, since it is used to get LSOAs from a postcode. This process is complicated as boundaries frequently change.
 
+## Testing
+
+Pytest-django has been used as a dependency for this project.
+
+Currently there are 796 England gold standards which test the IMD rank and decile returned from the API.
+
+In addition the same standards are used to test the local quantile calculation, which returns a quantile (one of [2,3,4,5,6,7,8,10,12,18,20]) against a country. Tests currently only in place for England.
+
 [![DOI](https://zenodo.org/badge/568991339.svg)](https://zenodo.org/badge/latestdoi/568991339)
