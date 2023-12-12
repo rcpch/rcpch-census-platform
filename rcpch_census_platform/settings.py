@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "django_filters",
     "drf_spectacular",
     "deprivation_scores",
+    "organisation_bank",
 ]
 
 MIDDLEWARE = [
@@ -156,9 +157,9 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [],
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    'DEFAULT_RENDERER_CLASSES': [
-            'rest_framework.renderers.JSONRenderer',
-        ],
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
 }
 
 # drf-spectacular schema settings
