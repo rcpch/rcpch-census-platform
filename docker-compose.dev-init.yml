@@ -1,55 +1,94 @@
-# runs a local version of RCPCHCensusEngine for development on port 8001
-# syncs changes in local code folder to the RCPCHCensusEngine container
-# migrates the database and seeds the database
-# YOU ONLY NEED TO USE THIS COMPOSE FILE THE FIRST TIME
+version: "3.11"
 
-version: '3.9'
+x-global-environment: &global
+  env_file:
+    - envs/.env # env file - NOT committed to Git
 
 services:
-
-  # web container - runs the django app
-  web:
-    build: .
+  # Caddy reverse proxy - web-facing SSL server
+  caddy:
+    <<: *global # this will inherit all the envs from x-global-environment
+    depends_on:
+      - django
+    image: caddy
     ports:
-      - 8001:8001
+      - "80:80"
+      - "443:443"
+    restart: always
     volumes:
-      - .:/app
-    environment:
-      # these env vars are ONLY for development
-      - RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER=rcpchCensususer
-      - RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD=password
-      - RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME=rcpchCensusdb
-      - RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST=db
-      - RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT=5432
-      - RCPCH_CENSUS_ENGINE_SECRET_KEY=mysecretkey
-      - DEBUG=True
-      - DJANGO_ALLOWED_HOSTS=0.0.0.0
-      - DJANGO_CSRF_TRUSTED_ORIGINS=https://localhost,https://0.0.0.0
+      - caddy-data:/data/
+      - caddy-data:/config/
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./staticdocs:/srv/staticdocs
+
+  # Django web application
+  django: &django
+    <<: *global # this will inherit all the envs from x-global-environment
+    build: .
+    depends_on:
+      - postgis
+      - redis
+    volumes:
+      - .:/app/
     command: >
       sh -c "python -u manage.py collectstatic --noinput &&
             python -u manage.py migrate &&
-            python manage.py seed --mode='add_organisational_areas' &&
-            python manage.py seed --mode='add_english_imds' &&
-            python manage.py seed --mode='add_welsh_imds' &&
-            python manage.py seed --mode='add_scottish_imds' &&
-            python manage.py seed --mode='add_northern_ireland_imds' &&
-            python manage.py runserver 0.0.0.0:8001"
-    # ensures that docker compose always displays log output
-    tty: true
-    stdin_open: true
-            
-  # db container - runs postgres
-  db:
-    image: postgres:latest
+            # python manage.py seed --mode='add_organisational_areas' &&
+            # python manage.py seed --mode='add_english_imds' &&
+            # python manage.py seed --mode='add_welsh_imds' &&
+            # python manage.py seed --mode='add_scottish_imds' &&
+            # python manage.py seed --mode='add_northern_ireland_imds' &&
+            echo $$DJANGO_STARTUP_COMMAND &&
+            $$DJANGO_STARTUP_COMMAND"
+    restart: always
+
+  # PostgreSQL with PostGIS extension
+  postgis:
+    <<: *global # this will inherit all the envs from x-global-environment
+    image: postgis/postgis:15-3.3
     volumes:
-      - "datadb:/var/lib/postgresql/data"
-    environment:
-      - POSTGRES_USER=rcpchCensususer
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=rcpchCensusdb
-    # ensures that docker compose always displays log output
-    tty: true
-    stdin_open: true
+      - postgis-data:/var/lib/postgresql/data
+    restart: always
+
+  # Redis backend for Celery task scheduler
+  redis:
+    image: redis:alpine
+    expose:
+      - 6379
+    restart: always
+
+  # Celery worker
+  celeryworker:
+    <<: *django # this will inherit all the settings from the django service
+    command: celery -A rcpch-census-platform worker -l info
+    restart: always
+
+  # Flower UI for Celery tasks
+  flower:
+    <<: *django # this will inherit all the settings from the django service
+    ports:
+      - 8888:8888
+    volumes:
+      - flower-data:/data
+    command: celery -A rcpch-census-platform flower --persistent=True -url_prefix=/flower
+    restart: always
+
+  # Celery scheduled tasks/cron
+  celerybeat:
+    <<: *django # this will inherit all the settings from the django service
+    command: celery -A rcpch-census-platform beat -l info
+    restart: always
+
+  mkdocs:
+    <<: *django # this will inherit all the settings from the django service
+    ports:
+      - 8001:8001
+    command: >
+      sh -c "mkdocs build --config-file documentation/mkdocs.yml &&
+        mkdocs serve --config-file documentation/mkdocs.yml"
+    restart: always
 
 volumes:
-  datadb:
+  caddy-data:
+  flower-data:
+  postgis-data:

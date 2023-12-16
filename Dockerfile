@@ -1,11 +1,11 @@
 # Base Docker image Official Python 3.11
 FROM python:3.11
 
-# Set 'build-time' environment variables  
+# Set 'build-time' environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# Setup GDAL + PILLOW required for CAPTCHA
+# Setup GDAL + PILLOW required for CAPTCHA and postgis
 RUN apt-get update &&\
     apt-get install -y binutils libproj-dev gdal-bin libgdal-dev python3-gdal &&\
     apt-get install -y  libz-dev libjpeg-dev libfreetype6-dev
@@ -24,12 +24,12 @@ WORKDIR /app/requirements/
 RUN pip install --upgrade pip 
 RUN pip install -r /app/requirements/development-requirements.txt
 
+# Set safe working directory for git
+RUN git config --global --add safe.directory /app
+
 # Set working directory back to main app
 WORKDIR /app/
 
 # Copy application code into image
 # (Excludes any files/dirs matched by patterns in .dockerignore)
 COPY . /app/
-
-# Use port 8001 in development (may be overridden by docker-compose file)
-EXPOSE 8001
