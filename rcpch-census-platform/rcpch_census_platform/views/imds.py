@@ -1,11 +1,11 @@
+from django.apps import apps
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import (
     viewsets,
     serializers,  # serializers here required for drf-spectacular @extend_schema
 )
-from rest_framework.decorators import api_view
 from rest_framework.views import APIView, Response
 from rest_framework.exceptions import ParseError
-from django_filters.rest_framework import DjangoFilterBackend
 
 from drf_spectacular.utils import (
     extend_schema,
@@ -16,175 +16,43 @@ from drf_spectacular.utils import (
 )
 from drf_spectacular.types import OpenApiTypes
 
-from .general_functions import quantile_for_rank
-
-from .filter_sets import (
-    DataZoneFilter,
+from ..filter_sets import (
     EnglishIndexMultipleDeprivationFilter,
     WelshIndexMultipleDeprivationFilter,
     ScottishIndexMultipleDeprivationFilter,
     NorthernIrelandIndexMultipleDeprivationFilter,
 )
 
-from .models import (
-    LocalAuthority,
-    LSOA,
-    GreenSpace,
-    DataZone,
-    SOA,
-    EnglishIndexMultipleDeprivation,
-    WelshIndexMultipleDeprivation,
-    ScottishIndexMultipleDeprivation,
-    NorthernIrelandIndexMultipleDeprivation,
+from ..general_functions import (
+    lsoa_for_postcode,
+    regions_for_postcode,
+    is_valid_postcode,
+    quantile_for_rank,
 )
-from .serializers import (
-    LocalAuthorityDistrictSerializer,
-    LSOASerializer,
-    GreenSpaceSerializer,
-    DataZoneSerializer,
-    SOASerializer,
+
+EnglishIndexMultipleDeprivation = apps.get_model(
+    "rcpch_census_platform", "EnglishIndexMultipleDeprivation"
+)
+WelshIndexMultipleDeprivation = apps.get_model(
+    "rcpch_census_platform", "WelshIndexMultipleDeprivation"
+)
+ScottishIndexMultipleDeprivation = apps.get_model(
+    "rcpch_census_platform", "ScottishIndexMultipleDeprivation"
+)
+NorthernIrelandIndexMultipleDeprivation = apps.get_model(
+    "rcpch_census_platform", "NorthernIrelandIndexMultipleDeprivation"
+)
+
+LSOA = apps.get_model("rcpch_census_platform", "LSOA")
+DataZone = apps.get_model("rcpch_census_platform", "DataZone")
+SOA = apps.get_model("rcpch_census_platform", "SOA")
+
+from ..serializers import (
     EnglishIndexMultipleDeprivationSerializer,
     WelshIndexMultipleDeprivationSerializer,
     ScottishIndexMultipleDeprivationSerializer,
     NorthernIrelandIndexMultipleDeprivationSerializer,
 )
-from .general_functions import (
-    lsoa_for_postcode,
-    regions_for_postcode,
-    is_valid_postcode,
-)
-
-
-@extend_schema(
-    request=LocalAuthorityDistrictSerializer,
-    responses={
-        200: OpenApiResponse(
-            response=OpenApiTypes.OBJECT,
-            description="Valid Response",
-            examples=[
-                OpenApiExample(
-                    "/local_authority_districts/1/",
-                    external_value="external value",
-                    value={
-                        "local_authority_district_code": "E06000002",
-                        "local_authority_district_name": "Middlesbrough",
-                        "year": 2019,
-                    },
-                    response_only=True,
-                ),
-            ],
-        ),
-    },
-)
-class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    This endpoint returns a list of Local Authority Districts (2019) across England, Scotland and Wales.
-
-    Filter Parameters:
-
-    `year`
-
-    `local_authority_district_code`
-
-    `local_authority_district_name`
-
-    If none are passed, a list is returned.
-
-    """
-
-    queryset = LocalAuthority.objects.all().order_by("-local_authority_district_code")
-    serializer_class = LocalAuthorityDistrictSerializer
-    filterset_fields = [
-        "local_authority_district_code",
-        "local_authority_district_name",
-        "year",
-    ]
-    filter_backends = [DjangoFilterBackend]
-
-
-@extend_schema(request=LSOASerializer)
-class LSOAViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    This endpoint returns a list of LSOAs in England and Wales.
-
-    Filter Parameters:
-
-    `year`
-
-    `lsoa_code`
-
-    `lsoa_name`
-
-    If none are passed, a list is returned.
-
-    """
-
-    queryset = LSOA.objects.all().order_by("-lsoa_code")
-    serializer_class = LSOASerializer
-    filterset_fields = ["lsoa_code", "lsoa_name", "year"]
-    filter_backends = [DjangoFilterBackend]
-
-
-@extend_schema(
-    request=SOASerializer,
-)
-class SOAViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    This endpoint returns a list of SOAs in Northern Ireland.
-    
-    Filter Parameters:
-
-    `year`
-    
-    `soa_code`
-    
-    `soa_name`
-
-    If none are passed, a list is returned.
-    """
-
-    queryset = SOA.objects.all().order_by("-soa_code")
-    serializer_class = SOASerializer
-    filterset_fields = ["year", "soa_code", "soa_name"]
-    filter_backends = [DjangoFilterBackend]
-
-
-@extend_schema(
-    request=GreenSpaceSerializer,
-)
-class GreenSpaceViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-
-    This endpoint returns a list of local authorities in the UK with data relating to green space and access to green space.
-
-    """
-
-    queryset = GreenSpace.objects.all().order_by("-total_addresses_count")
-    serializer_class = GreenSpaceSerializer
-
-
-@extend_schema(
-    request=DataZoneSerializer,
-)
-class DataZoneViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    This endpoint returns a list of all Scottish data zones (2011) and their associated local authority district.
-    
-    Filter Parameters:
-
-    `year`
-    
-    `data_zone_code`
-    
-    `data_zone_name`
-
-    If none are passed, a list is returned.
-    """
-
-    queryset = DataZone.objects.all().order_by("data_zone_code")
-    serializer_class = DataZoneSerializer
-    filterset_class = DataZoneFilter
-    filter_backends = [DjangoFilterBackend]
 
 
 class EnglishIndexMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -210,7 +78,7 @@ class EnglishIndexMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 class WelshMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     This endpoint returns a list of Welsh LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).
-    
+
     Filter Parameters:
 
     `lsoa_code`
@@ -230,7 +98,7 @@ class WelshMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 class ScottishMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     This endpoint returns a list of Scottish data zones with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2017).
-    
+
     Filter Parameters:
 
     `data_zone_code`
@@ -264,41 +132,6 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = NorthernIrelandIndexMultipleDeprivationSerializer
     filterset_class = NorthernIrelandIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
-
-
-# custom views / endpoints
-class PostcodeView(APIView):
-    @extend_schema(
-        parameters=[
-            OpenApiParameter(
-                name="postcode",
-                description="Postcode for postcodes.io",
-                required=True,
-                type=OpenApiTypes.STR,
-                examples=[
-                    OpenApiExample(
-                        name="Buckingham Palace",
-                        value="SW1A 1AA",
-                    ),
-                    OpenApiExample(
-                        name="Great Ormond Street Hospital",
-                        value="WC1N 3JH",
-                    ),
-                ],
-            ),
-        ],
-    )
-    def get(self, request):
-        """
-        This is a proxy for postcodes.io, an api that looks up a given postcode
-        and returns LSOA code, CCG code and other important codes information
-        """
-        postcode = request.query_params.get("postcode")
-        if postcode:
-            response = regions_for_postcode(postcode=postcode)
-            return Response(response)
-        else:
-            raise ParseError(detail="Postcode cannot be blank")
 
 
 class UKIndexMultipleDeprivationView(APIView):

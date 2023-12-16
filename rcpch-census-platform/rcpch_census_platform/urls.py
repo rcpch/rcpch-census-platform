@@ -47,15 +47,15 @@ drf_routes = [
         "indices_of_multiple_deprivation",
         view=UKIndexMultipleDeprivationView.as_view(),
     ),
-    path("index_of_multiple_deprivation_quantile",
+    path(
+        "index_of_multiple_deprivation_quantile",
         view=UKIndexMultipleDeprivationQuantileView.as_view(),
     ),
-
     # JSON Schema
     path("schema/", SpectacularJSONAPIView.as_view(), name="schema"),
-
     # Swagger UI
-    path("swagger-ui/",
+    path(
+        "swagger-ui/",
         SpectacularSwaggerView.as_view(),
         name="swagger-ui",
     ),

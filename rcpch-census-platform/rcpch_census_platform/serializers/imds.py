@@ -1,151 +1,20 @@
+from django.apps import apps
 from rest_framework import serializers
 
 from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 
-from .models import (
-    LSOA,
-    LocalAuthority,
-    GreenSpace,
-    DataZone,
-    SOA,
-    EnglishIndexMultipleDeprivation,
-    WelshIndexMultipleDeprivation,
-    ScottishIndexMultipleDeprivation,
-    NorthernIrelandIndexMultipleDeprivation,
+EnglishIndexMultipleDeprivation = apps.get_model(
+    "rcpch_census_platform", "EnglishIndexMultipleDeprivation"
 )
-
-
-@extend_schema_serializer(
-    examples=[
-        OpenApiExample(
-            "/england_wales_lower_layer_super_output_areas/1/",
-            value={
-                "lsoa_code": "E01012057",
-                "lsoa_name": "Middlesbrough 009E",
-                "year": 2011,
-                "total_population_mid_2015": "null",
-                "dependent_children_mid_2015": "null",
-                "population_16_59_mid_2015": "null",
-                "older_population_over_16_mid_2015": "null",
-                "working_age_population_over_18_mid_2015": "null",
-            },
-            response_only=True,
-        )
-    ]
+WelshIndexMultipleDeprivation = apps.get_model(
+    "rcpch_census_platform", "WelshIndexMultipleDeprivation"
 )
-class LSOASerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = LSOA
-        fields = [
-            "lsoa_code",
-            "lsoa_name",
-            "year",
-            "total_population_mid_2015",
-            "dependent_children_mid_2015",
-            "population_16_59_mid_2015",
-            "older_population_over_16_mid_2015",
-            "working_age_population_over_18_mid_2015",
-        ]
-
-
-class LocalAuthorityDistrictSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = LocalAuthority
-        fields = [
-            "local_authority_district_code",
-            "local_authority_district_name",
-            "year",
-        ]
-
-
-@extend_schema_serializer(
-    examples=[
-        OpenApiExample(
-            "/green_space/1/",
-            value={
-                "houses_address_count": 53082,
-                "houses_addresses_with_private_outdoor_space_count": 51390,
-                "houses_outdoor_space_total_area": 14593876,
-                "houses_percentage_of_addresses_with_private_outdoor_space": 0,
-                "houses_average_size_private_outdoor_space": 284,
-                "houses_median_size_private_outdoor_space": 204,
-                "flats_address_count": 65346,
-                "flats_addresses_with_private_outdoor_space_count": 46221,
-                "flats_outdoor_space_total_area": 2953183,
-                "flats_outdoor_space_count": 9280,
-                "flats_percentage_of_addresses_with_private_outdoor_space": 0,
-                "flats_average_size_private_outdoor_space": 318,
-                "flats_average_number_of_flats_sharing_a_garden": 5,
-                "total_addresses_count": 118428,
-                "total_addresses_with_private_outdoor_space_count": 97611,
-                "total_percentage_addresses_with_private_outdoor_space": 17547060,
-                "total_average_size_private_outdoor_space": 0,
-                "local_authority": "{BASE_URL}/local_authority_districts/340/",
-            },
-            response_only=True,
-        )
-    ]
+ScottishIndexMultipleDeprivation = apps.get_model(
+    "rcpch_census_platform", "ScottishIndexMultipleDeprivation"
 )
-class GreenSpaceSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = GreenSpace
-        # depth = 1
-        fields = [
-            "houses_address_count",
-            "houses_addresses_with_private_outdoor_space_count",
-            "houses_outdoor_space_total_area",
-            "houses_outdoor_space_total_area",
-            "houses_percentage_of_addresses_with_private_outdoor_space",
-            "houses_average_size_private_outdoor_space",
-            "houses_median_size_private_outdoor_space",
-            "flats_address_count",
-            "flats_addresses_with_private_outdoor_space_count",
-            "flats_outdoor_space_total_area",
-            "flats_outdoor_space_count",
-            "flats_percentage_of_addresses_with_private_outdoor_space",
-            "flats_average_size_private_outdoor_space",
-            "flats_average_number_of_flats_sharing_a_garden",
-            "total_addresses_count",
-            "total_addresses_with_private_outdoor_space_count",
-            "total_percentage_addresses_with_private_outdoor_space",
-            "total_average_size_private_outdoor_space",
-            "local_authority",
-        ]
-
-
-@extend_schema_serializer(
-    examples=[
-        OpenApiExample(
-            "/scotland_data_zones/1/",
-            value={
-                "data_zone_code": "S01006506",
-                "data_zone_name": "Culter - 01",
-                "year": 2011,
-                "local_authority": "{BASE_URL}/local_authority_districts/340/",
-            },
-            response_only=True,
-        )
-    ]
+NorthernIrelandIndexMultipleDeprivation = apps.get_model(
+    "rcpch_census_platform", "NorthernIrelandIndexMultipleDeprivation"
 )
-class DataZoneSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = DataZone
-        fields = ["data_zone_code", "data_zone_name", "year", "local_authority"]
-
-
-@extend_schema_serializer(
-    examples=[
-        OpenApiExample(
-            "/northern_ireland_small_output_areas/1/",
-            value={"year": 2001, "soa_code": "95AA01S1", "soa_name": "Aldergrove_1"},
-            response_only=True,
-        )
-    ]
-)
-class SOASerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = SOA
-        fields = ["year", "soa_code", "soa_name"]
 
 
 @extend_schema_serializer(
