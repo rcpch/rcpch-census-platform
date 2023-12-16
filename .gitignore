@@ -126,3 +126,5 @@ staticfiles/
 .data
 
 celerybeat-schedule
+
+staticdocs/

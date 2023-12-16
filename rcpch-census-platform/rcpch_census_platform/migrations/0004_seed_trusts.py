@@ -41,7 +41,7 @@ def seed_trusts(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("epilepsy12", "0003_ods_codes_to_abstraction_levels"),
+        ("rcpch_census_platform", "0003_ods_codes_to_abstraction_levels"),
     ]
 
     operations = [migrations.RunPython(seed_trusts)]

@@ -97,6 +97,20 @@ class Command(BaseCommand):
         elif options["mode"] == "add_northern_ireland_imds":
             self.stdout.write(B + "Adding Northern Ireland SOAs and IMDs" + W)
             add_northern_ireland_soas_and_deprivation_domains_with_ranks()
+        elif options["mode"] == "seed_all_imds":
+            add_lsoas_2011_wards_2019_to_LADS_2019()
+            add_scottish_data_zones_and_local_authorities()
+            add_lad_access_to_outdoor_space()
+            add_welsh_2019_domains_and_ranks_to_existing_2019_lsoas()
+            add_welsh_2019_scores_to_existing_2019_lsoas()
+            add_english_deprivation_scores_and_domains_to_2011_lsoas()
+            update_english_imd_data_with_subdomains()
+            update_english_imd_data_with_supplementary_indices()
+            update_english_imd_data_with_scores()
+            update_english_imd_data_with_transformed_scores()
+            add_scottish_deprivation_ranks_and_domains_to_2011_datazones()
+            add_northern_ireland_soas_and_deprivation_domains_with_ranks()
+
         else:
             self.stdout.write("No options supplied...")
         self.stdout.write(image())
