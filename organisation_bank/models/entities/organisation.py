@@ -8,7 +8,6 @@ from django.contrib.gis.db.models import (
 )
 
 # 3rd party
-from simple_history.models import HistoricalRecords
 from ..time_and_user_abstract_base_classes import TimeStampAbstractBaseClass
 
 
@@ -40,7 +39,7 @@ class Organisation(TimeStampAbstractBaseClass):
         null=True, blank=True, default=None
     )  # date this Organisation was last amended according to the ORD
 
-    paediatric_diabetes_unit = models.ForeignObject(
+    paediatric_diabetes_unit = models.ForeignKey(
         to="organisation_bank.PaediatricDiabetesUnit",
         on_delete=models.CASCADE,
         null=True,
@@ -95,8 +94,6 @@ class Organisation(TimeStampAbstractBaseClass):
     country = models.ForeignKey(
         to="organisation_bank.Country", on_delete=models.PROTECT, null=True, blank=True
     )
-
-    history = HistoricalRecords()
 
     @property
     def _history_user(self):

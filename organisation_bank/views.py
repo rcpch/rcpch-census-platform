@@ -16,10 +16,10 @@ from drf_spectacular.utils import (
 )
 from drf_spectacular.types import OpenApiTypes
 
-from .filter_sets import (
-)
+# from .filter_sets import (
+# )
 
-from .models import (
+from .models.entities import (
     Country,
     GeneralPractice,
     IntegratedCareBoard,
@@ -27,11 +27,9 @@ from .models import (
     NHSEnglandRegion,
     OPENUKNetwork,
     Organisation,
-    PaediatricDiabetesUnit
+    PaediatricDiabetesUnit,
 )
-from .serializers import (
-    CountrySerializer
-)
+from .serializers import CountrySerializer
 
 
 @extend_schema(
@@ -45,15 +43,15 @@ from .serializers import (
                     "/country/1/",
                     external_value="external value",
                     value={
-                        "boundary_identifier":""
-                        "name":""
-                        "welsh_name":""
-                        "bng_e":""
-                        "bng_n":""
-                        "long":""
-                        "lat":""
-                        "globalid":""
-                        "geom":""
+                        "boundary_identifier": "E92000001",
+                        "name": "England",
+                        "welsh_name": "Lloegr",
+                        "bng_e": "394883",
+                        "bng_n": "370883",
+                        "long": "-2.07811",
+                        "lat": "53.235",
+                        "globalid": "f6b76559-3626-49b8-b50b-bd15efcb0505",
+                        "geom": "",
                     },
                     response_only=True,
                 ),

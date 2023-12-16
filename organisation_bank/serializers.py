@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 
-from .models import (
+from .models.entities import (
     Country,
     GeneralPractice,
     IntegratedCareBoard,
@@ -19,14 +19,14 @@ from .models import (
         OpenApiExample(
             "/country/1/",
             value={
-                "boundary_identifier": "",
-                "name": "",
-                "welsh_name": "",
-                "bng_e": "",
-                "bng_n": "",
-                "long": "",
-                "lat": "",
-                "globalid": "",
+                "boundary_identifier": "E92000001",
+                "name": "England",
+                "welsh_name": "Lloegr",
+                "bng_e": "394883",
+                "bng_n": "370883",
+                "long": "-2.07811",
+                "lat": "53.235",
+                "globalid": "f6b76559-3626-49b8-b50b-bd15efcb0505",
                 "geom": "",
             },
             response_only=True,
@@ -76,16 +76,16 @@ class GeneralPracticeSerializer(serializers.HyperlinkedModelSerializer):
         OpenApiExample(
             "/integrated_care_board/1/",
             value={
-                "boundary_identifier": "",
-                "name": "",
-                "bng_e": "",
-                "bng_n": "",
-                "long": "",
-                "lat": "",
-                "globalid": "",
+                "boundary_identifier": "E54000030",
+                "name": "NHS South East London Integrated Care Board",
+                "bng_e": "541305",
+                "bng_n": "168583",
+                "long": "0.029892",
+                "lat": "51.3987",
+                "globalid": "39c8c149-5e5f-4bfa-87ae-9b5daf7f9e08",
                 "geom": "",
-                "ods_code": "",
-                "publication_date": "",
+                "ods_code": "QKK",
+                "publication_date": "15/03/2023",
             },
             response_only=True,
         )

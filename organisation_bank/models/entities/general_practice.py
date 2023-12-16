@@ -8,7 +8,7 @@ from django.contrib.gis.db.models import (
 )
 
 # 3rd party
-from ..time_and_user_abstract_base_classes import TimeStampAbstractBaseClass
+from ..time_and_user_abstract_base_classes import *
 
 
 class GeneralPractice(TimeStampAbstractBaseClass):

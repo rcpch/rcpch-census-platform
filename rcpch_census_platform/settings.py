@@ -164,7 +164,7 @@ REST_FRAMEWORK = {
 
 # drf-spectacular schema settings
 SPECTACULAR_SETTINGS = {
-    "TITLE": "Deprivation Scores API",
+    "TITLE": "RCPCH Census Platform API",
     "DESCRIPTION": "UK census data, especially Index of Multiple Deprivation, as a service.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
