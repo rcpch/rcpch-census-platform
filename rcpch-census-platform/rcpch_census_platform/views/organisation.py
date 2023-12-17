@@ -91,7 +91,7 @@ class OrganisationViewSet(viewsets.ReadOnlyModelViewSet):
 
     """
 
-    queryset = Organisation.objects.all().order_by("-name")
+    queryset = Organisation.objects.all().order_by("name")
     serializer_class = OrganisationSerializer
     filterset_fields = [
         "ods_code",
@@ -106,7 +106,6 @@ class OrganisationViewSet(viewsets.ReadOnlyModelViewSet):
         "latitude",
         "longitude",
         "postcode",
-        # "geocode_coordinates",
         "active",
         "published_at",
         "paediatric_diabetes_unit",
