@@ -73,7 +73,7 @@ ROOT_URLCONF = "rcpch-census-platform.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [Path(BASE_DIR, "templates")],
+        "DIRS": [os.path.join(settings_dir, "templates")],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -172,6 +172,7 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
     ],
 }
 
