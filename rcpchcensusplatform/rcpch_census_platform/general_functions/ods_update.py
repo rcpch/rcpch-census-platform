@@ -1,6 +1,7 @@
 # python imports
 import requests
 from requests.exceptions import HTTPError
+import os
 
 # django imports
 from django.conf import settings
@@ -25,7 +26,7 @@ def fetch_updated_organisations(time_frame: int = 30):
         timezone.now() - timezone.timedelta(days=time_frame), "Y-m-d"
     )
 
-    url = "https://directory.spineservices.nhs.uk/ORD/2-0-0"
+    url = os.get_env("NHS_ODS_API_URL")
 
     request_url = f"{url}/sync?LastChangeDate={since_date}"
 
