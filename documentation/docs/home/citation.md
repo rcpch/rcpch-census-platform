@@ -1,10 +1,10 @@
 ---
-title: Citing the Epilepsy12 audit
-author: Dr Marcus Baw
+title: Citing the RCPCH Census Platform
+author: Dr Simon Chapman
 ---
 
-## Citation of the Epilepsy12 audit in academic publications
+## Citation of the RCPCH Census Platform in academic publications
 
 You can use our Zenodo DOI button to cite this audit
 
-[![DOI](https://zenodo.org/badge/415328052.svg)](https://zenodo.org/badge/latestdoi/415328052)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7750692.svg)](https://doi.org/10.5281/zenodo.7750692)
