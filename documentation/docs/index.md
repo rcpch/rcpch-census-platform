@@ -11,7 +11,7 @@ This project is a python 3.11 / Django Rest Framework project providing UK censu
 
 <p align="center">
     <p align="center">
-    <img src='https://github.com/rcpch/rcpch-census-platform/blob/main/static/images/rcpch-logo-mobile.4d5b446caf9a.svg' alt='RCPCH Logo'>
+    <img src='https://github.com/rcpch/rcpch-census-platform/blob/eatyourpeas/issue20/documentation/docs/_assets/_images/rcpch-logo-mobile.4d5b446caf9a.svg' alt='RCPCH Logo'>
     </p>
 </p>
 
