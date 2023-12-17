@@ -60,7 +60,7 @@ services:
   # Celery worker
   celeryworker:
     <<: *django # this will inherit all the settings from the django service
-    command: celery -A rcpch-census-platform worker -l info
+    command: celery -A rcpchcensusplatform worker -l info
     restart: always
 
   # Flower UI for Celery tasks
@@ -70,13 +70,13 @@ services:
       - 8888:8888
     volumes:
       - flower-data:/data
-    command: celery -A rcpch-census-platform flower --persistent=True -url_prefix=/flower
+    command: celery -A rcpchcensusplatform flower --persistent=True -url_prefix=/flower
     restart: always
 
   # Celery scheduled tasks/cron
   celerybeat:
     <<: *django # this will inherit all the settings from the django service
-    command: celery -A rcpch-census-platform beat -l info
+    command: celery -A rcpchcensusplatform beat -l info
     restart: always
 
   mkdocs:
