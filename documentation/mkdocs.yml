@@ -1,6 +1,6 @@
 # main site metadata and titles
-site_name: RCPCH Epilepsy12 - Documentation
-site_description: RCPCH Epilepsy12 - Documentation
+site_name: RCPCH Census Platform - Documentation
+site_description: RCPCH Census Platform - Documentation
 site_author: The Royal College of Paediatrics and Child Health
 site_url: !ENV DOCS_URL
 
@@ -80,7 +80,7 @@ plugins:
       #two_columns_level: 3
       #render_js: true
       #headless_chrome_path: headless-chromium
-      output_path: pdf/rcpch-epilepsy12-full-documentation.pdf
+      output_path: pdf/rcpch-census_platform-full-documentation.pdf
       enabled_if_env: ENABLE_PDF_EXPORT
       #debug_html: true
       #show_anchors: true
@@ -129,7 +129,8 @@ extra:
 nav:
   - Home:
     - 'index.md'
-    - 'home/aims-and-kpis.md'
+    - 'home/getting-started.md'
+    - 'home/routes.md'
     - 'home/citation.md'
   - Contact:
     - 'contact/contact-rcpch.md'
