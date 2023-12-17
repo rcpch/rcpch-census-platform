@@ -1,30 +1,18 @@
+from django.apps import apps
 from django_filters.filterset import FilterSet, CharFilter, NumberFilter
-from .models import (
-    DataZone,
-    EnglishIndexMultipleDeprivation,
-    WelshIndexMultipleDeprivation,
-    ScottishIndexMultipleDeprivation,
-    NorthernIrelandIndexMultipleDeprivation,
+
+EnglishIndexMultipleDeprivation = apps.get_model(
+    "rcpch_census_platform", "EnglishIndexMultipleDeprivation"
 )
-
-
-class DataZoneFilter(FilterSet):
-    local_authority_code = CharFilter(
-        field_name="local_authority__local_authority_district_code",
-        lookup_expr="icontains",
-    )
-    local_authority_name = CharFilter(
-        field_name="local_authority__local_authority_name",
-        lookup_expr="icontains",
-    )
-
-    class Meta:
-        model = DataZone
-        fields = (
-            "data_zone_code",
-            "data_zone_name",
-            "year",
-        )
+WelshIndexMultipleDeprivation = apps.get_model(
+    "rcpch_census_platform", "WelshIndexMultipleDeprivation"
+)
+ScottishIndexMultipleDeprivation = apps.get_model(
+    "rcpch_census_platform", "ScottishIndexMultipleDeprivation"
+)
+NorthernIrelandIndexMultipleDeprivation = apps.get_model(
+    "rcpch_census_platform", "NorthernIrelandIndexMultipleDeprivation"
+)
 
 
 class EnglishIndexMultipleDeprivationFilter(FilterSet):

@@ -16,7 +16,7 @@ from drf_spectacular.utils import (
 )
 from drf_spectacular.types import OpenApiTypes
 
-from ..filter_sets import (
+from ..filtersets import (
     EnglishIndexMultipleDeprivationFilter,
     WelshIndexMultipleDeprivationFilter,
     ScottishIndexMultipleDeprivationFilter,

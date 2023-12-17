@@ -7,9 +7,7 @@ from rest_framework import (
 
 from rest_framework.views import APIView, Response
 
-from ..filter_sets import (
-    DataZoneFilter,
-)
+from ..filtersets import DataZoneFilter
 
 from drf_spectacular.utils import (
     extend_schema,

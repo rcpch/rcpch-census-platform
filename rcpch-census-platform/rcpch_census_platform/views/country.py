@@ -16,20 +16,8 @@ from drf_spectacular.utils import (
 )
 from drf_spectacular.types import OpenApiTypes
 
-# from .filter_sets import (
-# )
-
-from .models.entities import (
-    Country,
-    GeneralPractice,
-    IntegratedCareBoard,
-    LondonBorough,
-    NHSEnglandRegion,
-    OPENUKNetwork,
-    Organisation,
-    PaediatricDiabetesUnit,
-)
-from .serializers import CountrySerializer
+from ..models import Country
+from ..serializers import CountrySerializer
 
 
 @extend_schema(
