@@ -33,7 +33,6 @@ def fetch_updated_organisations(time_frame: int = 30):
     try:
         response = requests.get(
             url=request_url,
-            # headers={"subscription-key": f"{settings.NHS_ODS_API_KEY}"},
             timeout=10,  # times out after 10 seconds
         )
         response.raise_for_status()
