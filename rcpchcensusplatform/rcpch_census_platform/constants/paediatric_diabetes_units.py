@@ -13,7 +13,7 @@ PZ_CODES = [
     {"ods_code": "RP5BA", "npda_code": "PZ016"},
     {"ods_code": "RBD01", "npda_code": "PZ017"},
     {"ods_code": "RYR18", "npda_code": "PZ018"},
-    {"ods_code": "RDDH0", "npda_code": "PZ019"},
+    {"ods_code": "RAJ12", "npda_code": "PZ019"},  # basildon formerly RDDH0
     {"ods_code": "RJL30", "npda_code": "PZ020"},
     {"ods_code": "RDU50", "npda_code": "PZ021"},
     {"ods_code": "RNNBX", "npda_code": "PZ022"},
@@ -39,7 +39,7 @@ PZ_CODES = [
     {"ods_code": "RWWWH", "npda_code": "PZ049"},
     {"ods_code": "RVR", "npda_code": "PZ050"},
     {"ods_code": "RJL32", "npda_code": "PZ053"},
-    {"ods_code": "RD300", "npda_code": "PZ054"},
+    {"ods_code": "R0D01", "npda_code": "PZ054"},  # Poole Hospital formerly RD300
     {"ods_code": "RWEAA", "npda_code": "PZ055"},
     {"ods_code": "RAX01", "npda_code": "PZ057"},
     {"ods_code": "R1HNH", "npda_code": "PZ058"},
@@ -69,7 +69,10 @@ PZ_CODES = [
     {"ods_code": "RK950", "npda_code": "PZ096"},
     {"ods_code": "RXK02", "npda_code": "PZ097"},
     {"ods_code": "RWH", "npda_code": "PZ099"},
-    {"ods_code": "RBZ12", "npda_code": "PZ100"},
+    {
+        "ods_code": "RH880",
+        "npda_code": "PZ100",
+    },  # North Devon formerly RBZ12 til 1/3/22
     {"ods_code": "RR801", "npda_code": "PZ101"},
     {"ods_code": "RAS01", "npda_code": "PZ102"},
     {"ods_code": "RRF02", "npda_code": "PZ104"},
@@ -95,9 +98,12 @@ PZ_CODES = [
     {"ods_code": "RQM01", "npda_code": "PZ130"},
     {"ods_code": "RGN80", "npda_code": "PZ131"},
     {"ods_code": "RTRAT", "npda_code": "PZ133"},
-    {"ods_code": "RXH06", "npda_code": "PZ135"},
+    {"ods_code": "G0W1C", "npda_code": "PZ135"},  # Royal Alexandra
     {"ods_code": "R0A", "npda_code": "PZ136"},
-    {"ods_code": "RBA11", "npda_code": "PZ137"},
+    {
+        "ods_code": "RH5A8",
+        "npda_code": "PZ137",
+    },  # Musgrove park formerly RBA11 til 31/3/2020
     {"ods_code": "RJC02", "npda_code": "PZ138"},
     {"ods_code": "RA723", "npda_code": "PZ139"},
     {"ods_code": "RMP01", "npda_code": "PZ140"},
@@ -122,7 +128,10 @@ PZ_CODES = [
     {"ods_code": "RWDLP", "npda_code": "PZ168"},
     {"ods_code": "RNZ02", "npda_code": "PZ169"},
     {"ods_code": "RBL14", "npda_code": "PZ170"},
-    {"ods_code": "RQ8L0", "npda_code": "PZ171"},
+    {
+        "ods_code": "R1LCT",
+        "npda_code": "PZ171",
+    },  # broomfield formerly RQ8L0 to 31/3/2020
     {"ods_code": "RWG02", "npda_code": "PZ172"},
     {"ods_code": "RA430", "npda_code": "PZ173"},
     {"ods_code": "RNQ51", "npda_code": "PZ174"},
