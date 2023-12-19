@@ -7,3 +7,4 @@ from .postcode import (
 )
 from .quantile import quantile_for_rank
 from .ods_update import *
+from .organisation_from_ods_code import *

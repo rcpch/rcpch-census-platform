@@ -30,24 +30,3 @@ def fetch_all_gp_surgeries(
         print(e.response.text)
 
     return response.json()["Organisations"]
-
-
-def fetch_gp_practice_for_ods_code(ods_code: str):
-    """
-    Returns GP Practice for ODS Code
-    """
-
-    url = os.getenv("NHS_ODS_API_URL")
-
-    request_url = f"{url}/organisations/{ods_code}"
-
-    try:
-        response = requests.get(
-            url=request_url,
-            timeout=10,  # times out after 10 seconds
-        )
-        response.raise_for_status()
-    except HTTPError as e:
-        print(e.response.text)
-
-    return response.json()["Organisation"]

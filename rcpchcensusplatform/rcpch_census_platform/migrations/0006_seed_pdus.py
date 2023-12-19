@@ -8,6 +8,8 @@ from ..constants import (
     PZ_CODES,
 )
 
+from ..general_functions import fetch_organisation_by_ods_code
+
 
 def seed_pdus(apps, schema_editor):
     """
@@ -58,7 +60,42 @@ def seed_pdus(apps, schema_editor):
                     "\033[31m",
                 )
             else:
-                print(f"{pdu['ods_code']} does not exist in the database.")
+                # this organisation is associate with a pz code but does not exist in the organisation list we have
+                ORD_organisation = fetch_organisation_by_ods_code(pdu["ods_code"])
+                if ORD_organisation is not None:
+                    parent_trust = Trust.objects.get(
+                        ods_code=ORD_organisation["Rels"]["Rel"][0]["Target"]["OrgId"][
+                            "extension"
+                        ]
+                    )
+                    paediatric_diabetes_unit = PaediatricDiabetesUnit.objects.create(
+                        pz_code=pdu["npda_code"]
+                    )
+                    try:
+                        Organisation.objects.create(
+                            ods_code=pdu["ods_code"],
+                            name=ORD_organisation["Name"],
+                            address1=ORD_organisation["GeoLoc"]["Location"]["AddrLn1"],
+                            city=ORD_organisation["GeoLoc"]["Location"]["Town"],
+                            county=ORD_organisation["GeoLoc"]["Location"]["County"],
+                            postcode=ORD_organisation["GeoLoc"]["Location"]["PostCode"],
+                            active=ORD_organisation["Status"] == "Active",
+                            published_at=ORD_organisation["Date"][0]["Start"],
+                            trust=parent_trust,
+                            local_health_board=parent_trust.local_health_board,
+                            integrated_care_board=parent_trust.integrated_care_board,
+                            nhs_england_region=parent_trust.nhs_england_region,
+                            openuk_network=parent_trust.openuk_network,
+                            paediatric_diabetes_unit=paediatric_diabetes_unit,
+                            london_borough=parent_trust.london_borough,
+                            country=parent_trust.country,
+                        )
+                    except Exception as error:
+                        print(f"{ORD_organisation['Name']} not saved due to {error}")
+                else:
+                    print(
+                        f"{pdu['ods_code']} not saved as it does not exist or the ORD server is down."
+                    )
 
 
 class Migration(migrations.Migration):
