@@ -1,10 +1,7 @@
 ---
-title: NHS Organisational Areas and Index of Multiple Deprivation
+title: Organisational Areas and Index of Multiple Deprivation
 author: Dr Simon Chapman
 ---
-
-# UK Areas
-
 The UK can be divided into different areas
 
 1. Output Areas (OAs) - 40-625 households

@@ -20,7 +20,7 @@ site_dir: ../staticdocs
 
 # theme settings, fonts, colours
 theme:
-  favicon: _assets/_images/epilepsy12-logo-1.png
+  favicon: ../docs/_assets/_images/rcpch-logo-mobile.4d5b446caf9a.svg
   name: material
   #custom_dir: rcpch-theme
   features:
@@ -62,7 +62,7 @@ plugins:
   - search
   - with-pdf:
       back_cover: false
-      cover_title: RCPCH Cesnsus Platform Documentation
+      cover_title: RCPCH Census Platform Documentation
       cover_subtitle: User and Developer Manual
       #custom_template_path: TEMPLATES PATH
       #toc_title: TOC TITLE TEXT
@@ -129,7 +129,8 @@ extra:
 nav:
   - Home:
     - 'index.md'
-    - 'home/nhs-organisational-areas.md'
+    - 'home/organisational-areas.md'
+    - 'home/nhs-organisations.md'
     - 'home/getting-started.md'
     - 'home/routes.md'
     - 'home/citation.md'
