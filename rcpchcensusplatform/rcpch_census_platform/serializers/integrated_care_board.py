@@ -26,7 +26,7 @@ IntegratedCareBoard = apps.get_model("rcpch_census_platform", "IntegratedCareBoa
         )
     ]
 )
-class IntegratedCareBoardSerializer(serializers.HyperlinkedModelSerializer):
+class IntegratedCareBoardSerializer(serializers.ModelSerializer):
     class Meta:
         model = IntegratedCareBoard
         # depth = 1

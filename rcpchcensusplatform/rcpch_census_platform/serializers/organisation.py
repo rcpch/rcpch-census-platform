@@ -19,10 +19,11 @@ PaediatricDiabetesUnit = apps.get_model(
     "rcpch_census_platform", "PaediatricDiabetesUnit"
 )
 
-from .trust import TrustSerializer
 from .country import CountrySerializer
 from .integrated_care_board import IntegratedCareBoardSerializer
+from .local_health_board import LocalHealthBoardSerializer
 from .nhs_england_region import NHSEnglandRegionSerializer
+from .trust import TrustSerializer
 
 
 @extend_schema_serializer(
@@ -60,9 +61,7 @@ from .nhs_england_region import NHSEnglandRegionSerializer
 )
 class OrganisationSerializer(serializers.ModelSerializer):
     trust = TrustSerializer()
-    local_health_board = serializers.SlugRelatedField(
-        many=False, read_only=True, slug_field="name"
-    )
+    local_health_board = LocalHealthBoardSerializer()
     integrated_care_board = IntegratedCareBoardSerializer()
     nhs_england_region = NHSEnglandRegionSerializer()
     openuk_network = serializers.SlugRelatedField(
