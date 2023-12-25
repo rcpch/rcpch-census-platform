@@ -24,6 +24,7 @@ from .integrated_care_board import IntegratedCareBoardSerializer
 from .local_health_board import LocalHealthBoardSerializer
 from .nhs_england_region import NHSEnglandRegionSerializer
 from .openuk_network import OPENUKNetworkSerializer
+from .paediatric_diabetes_unit import PaediatricDiabetesUnitSerializer
 from .trust import TrustSerializer
 
 
@@ -66,9 +67,7 @@ class OrganisationSerializer(serializers.ModelSerializer):
     integrated_care_board = IntegratedCareBoardSerializer()
     nhs_england_region = NHSEnglandRegionSerializer()
     openuk_network = OPENUKNetworkSerializer()
-    paediatric_diabetes_unit = serializers.SlugRelatedField(
-        many=False, read_only=True, slug_field="pz_code"
-    )
+    paediatric_diabetes_unit = PaediatricDiabetesUnitSerializer()
     london_borough = serializers.SlugRelatedField(
         many=False, read_only=True, slug_field="name"
     )

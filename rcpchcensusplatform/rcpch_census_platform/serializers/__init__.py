@@ -5,4 +5,5 @@ from .integrated_care_board import IntegratedCareBoardSerializer
 from .nhs_england_region import NHSEnglandRegionSerializer
 from .output_areas import *
 from .organisation import OrganisationSerializer
+from .paediatric_diabetes_unit import PaediatricDiabetesUnitSerializer
 from .trust import TrustSerializer
