@@ -1,10 +1,9 @@
+from django.apps import apps
 from rest_framework import serializers
 
 from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 
-from ..models import (
-    IntegratedCareBoard,
-)
+IntegratedCareBoard = apps.get_model("rcpch_census_platform", "IntegratedCareBoard")
 
 
 @extend_schema_serializer(

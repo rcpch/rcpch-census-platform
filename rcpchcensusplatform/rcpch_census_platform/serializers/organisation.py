@@ -13,18 +13,16 @@ IntegratedCareBoard = apps.get_model("rcpch_census_platform", "IntegratedCareBoa
 LocalHealthBoard = apps.get_model("rcpch_census_platform", "LocalHealthBoard")
 LondonBorough = apps.get_model("rcpch_census_platform", "LondonBorough")
 NHSEnglandRegion = apps.get_model("rcpch_census_platform", "NHSEnglandRegion")
-# Trust = apps.get_model("rcpch_census_platform", "Trust")
+Trust = apps.get_model("rcpch_census_platform", "Trust")
 OPENUKNetwork = apps.get_model("rcpch_census_platform", "OPENUKNetwork")
 PaediatricDiabetesUnit = apps.get_model(
     "rcpch_census_platform", "PaediatricDiabetesUnit"
 )
 
-from ..serializers import (
-    IntegratedCareBoardSerializer,
-    CountrySerializer,
-    NHSEnglandRegionSerializer,
-    TrustSerializer,
-)
+from .trust import TrustSerializer
+from .country import CountrySerializer
+from .integrated_care_board import IntegratedCareBoardSerializer
+from .nhs_england_region import NHSEnglandRegionSerializer
 
 
 @extend_schema_serializer(
