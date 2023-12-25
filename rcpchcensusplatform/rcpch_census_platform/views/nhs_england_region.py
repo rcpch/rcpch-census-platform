@@ -84,6 +84,6 @@ class NHSEnglandRegionViewSet(viewsets.ReadOnlyModelViewSet):
         "long",
         "lat",
         "globalid",
-        "geom",
+        # "geom",
     ]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = (DjangoFilterBackend,)

@@ -86,4 +86,4 @@ class TrustViewSet(viewsets.ReadOnlyModelViewSet):
         "published_at",
         "ods_code",
     ]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = (DjangoFilterBackend,)

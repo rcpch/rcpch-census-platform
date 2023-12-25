@@ -162,12 +162,12 @@ class WelshIndexMultipleDeprivationFilter(FilterSet):
 
 
 class ScottishIndexMultipleDeprivationFilter(FilterSet):
-    data_zone_code = CharFilter(
-        field_name="data_zone__data_zone_code",
+    code = CharFilter(
+        field_name="data_zone__code",
         lookup_expr="icontains",
     )
-    data_zone_name = CharFilter(
-        field_name="data_zone__data_zone_name",
+    name = CharFilter(
+        field_name="data_zone__name",
         lookup_expr="icontains",
     )
     local_authority_code = CharFilter(

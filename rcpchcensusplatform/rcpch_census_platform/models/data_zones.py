@@ -8,8 +8,8 @@ class DataZone(models.Model):
     Scotland only
     """
 
-    data_zone_code = models.CharField("Data Zone Code", max_length=50, unique=True)
-    data_zone_name = models.CharField(
+    code = models.CharField("Data Zone Code", max_length=50, unique=True)
+    name = models.CharField(
         "Data Zone Name",
         max_length=100,
     )
@@ -18,3 +18,8 @@ class DataZone(models.Model):
         to=LocalAuthority,
         on_delete=models.CASCADE,
     )
+
+    class Meta:
+        verbose_name = "Data Zone"
+        verbose_name_plural = "Data Zones"
+        ordering = ("name",)

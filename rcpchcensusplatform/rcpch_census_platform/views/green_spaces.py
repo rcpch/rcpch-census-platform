@@ -32,3 +32,5 @@ class GreenSpaceViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = GreenSpace.objects.all().order_by("-total_addresses_count")
     serializer_class = GreenSpaceSerializer
+    filterset_fields = "__all__"
+    filter_backends = (DjangoFilterBackend,)

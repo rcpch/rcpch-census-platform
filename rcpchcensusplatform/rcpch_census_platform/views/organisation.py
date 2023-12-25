@@ -119,4 +119,4 @@ class OrganisationViewSet(viewsets.ReadOnlyModelViewSet):
         "london_borough",
         "country",
     ]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = (DjangoFilterBackend,)

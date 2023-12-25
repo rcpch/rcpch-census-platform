@@ -17,7 +17,7 @@ class DataZoneFilter(FilterSet):
     class Meta:
         model = DataZone
         fields = (
-            "data_zone_code",
-            "data_zone_name",
+            "code",
+            "name",
             "year",
         )

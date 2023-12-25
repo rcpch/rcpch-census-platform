@@ -694,8 +694,8 @@ def add_scottish_deprivation_ranks_and_domains_to_2011_datazones():
         return
 
     for row in data[1:]:  # skip the first row
-        if DataZone.objects.filter(data_zone_code=row[0], year=2011).exists():
-            data_zone = DataZone.objects.filter(data_zone_code=row[0], year=2011).get()
+        if DataZone.objects.filter(code=row[0], year=2011).exists():
+            data_zone = DataZone.objects.filter(code=row[0], year=2011).get()
 
             ScottishIndexMultipleDeprivation.objects.create(
                 imd_rank=row[2],

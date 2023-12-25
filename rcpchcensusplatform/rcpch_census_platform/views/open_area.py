@@ -73,7 +73,7 @@ class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
         "local_authority_district_name",
         "year",
     ]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = (DjangoFilterBackend,)
 
 
 @extend_schema(request=LSOASerializer)
@@ -96,7 +96,7 @@ class LSOAViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = LSOA.objects.all().order_by("-lsoa_code")
     serializer_class = LSOASerializer
     filterset_fields = ["lsoa_code", "lsoa_name", "year"]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = (DjangoFilterBackend,)
 
 
 @extend_schema(
@@ -120,7 +120,7 @@ class SOAViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = SOA.objects.all().order_by("-soa_code")
     serializer_class = SOASerializer
     filterset_fields = ["year", "soa_code", "soa_name"]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = (DjangoFilterBackend,)
 
 
 @extend_schema(
@@ -134,14 +134,14 @@ class DataZoneViewSet(viewsets.ReadOnlyModelViewSet):
 
     `year`
 
-    `data_zone_code`
+    `code`
 
-    `data_zone_name`
+    `name`
 
     If none are passed, a list is returned.
     """
 
-    queryset = DataZone.objects.all().order_by("data_zone_code")
+    queryset = DataZone.objects.all().order_by("code")
     serializer_class = DataZoneSerializer
     filterset_class = DataZoneFilter
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = (DjangoFilterBackend,)
