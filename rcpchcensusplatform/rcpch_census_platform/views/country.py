@@ -78,6 +78,5 @@ class CountryViewSet(viewsets.ReadOnlyModelViewSet):
         "long",
         "lat",
         "globalid",
-        # "geom",
     ]
     filter_backends = (DjangoFilterBackend,)

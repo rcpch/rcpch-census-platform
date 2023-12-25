@@ -28,20 +28,19 @@ from ..serializers import NHSEnglandRegionSerializer
             description="Valid Response",
             examples=[
                 OpenApiExample(
-                    "/country/1/",
+                    "/nhs_england_region/1/",
                     external_value="external value",
                     value={
-                        "region_code": "",
-                        "publication_date": "",
-                        "boundary_identifier": "E92000001",
-                        "name": "England",
-                        "welsh_name": "Lloegr",
-                        "bng_e": "394883",
-                        "bng_n": "370883",
-                        "long": "-2.07811",
-                        "lat": "53.235",
-                        "globalid": "f6b76559-3626-49b8-b50b-bd15efcb0505",
-                        "geom": "",
+                        "region_code": "Y58",
+                        "publication_date": "2022-07-30",
+                        "boundary_identifier": "E40000006",
+                        "name": "South West",
+                        "bng_e": 285015,
+                        "bng_n": 102567,
+                        "long": -3.63343,
+                        "lat": 50.8112,
+                        "globalid": "4e8906ed-a19e-49ac-a111-3474937655e9",
+                        "geom": "SRID=27700;MULTIPOLYGON (((87767.5686999997 8868.28480000049, 89125.5478999997 ...",
                     },
                     response_only=True,
                 ),
@@ -59,7 +58,6 @@ class NHSEnglandRegionViewSet(viewsets.ReadOnlyModelViewSet):
     `publication_date`
     `boundary_identifier`
     `name`
-    `welsh_name`
     `bng_e`
     `bng_n`
     `long`
@@ -78,12 +76,10 @@ class NHSEnglandRegionViewSet(viewsets.ReadOnlyModelViewSet):
         "publication_date",
         "boundary_identifier",
         "name",
-        "welsh_name",
         "bng_e",
         "bng_n",
         "long",
         "lat",
         "globalid",
-        # "geom",
     ]
     filter_backends = (DjangoFilterBackend,)

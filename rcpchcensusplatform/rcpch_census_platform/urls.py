@@ -43,8 +43,13 @@ router.register(
 )
 
 # organisation bank views
-router.register(r"organisations", viewset=OrganisationViewSet)
-router.register(r"nhs_england_regions", viewset=NHSEnglandRegionViewSet)
+router.register(r"organisations", viewset=OrganisationViewSet, basename="organisation")
+router.register(
+    r"nhs_england_regions",
+    viewset=NHSEnglandRegionViewSet,
+    basename="nhs_england_region",
+)
+
 
 drf_routes = [
     # rest framework paths
