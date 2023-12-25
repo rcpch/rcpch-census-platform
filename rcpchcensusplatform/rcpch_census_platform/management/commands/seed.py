@@ -385,8 +385,8 @@ def add_scottish_data_zones_and_local_authorities():
                 lad_count += 1
 
             data_zone, created = DataZone.objects.get_or_create(
-                data_zone_code=row[0],
-                data_zone_name=row[1],
+                code=row[0],
+                name=row[1],
                 year=2011,
                 local_authority=local_authority,
             )

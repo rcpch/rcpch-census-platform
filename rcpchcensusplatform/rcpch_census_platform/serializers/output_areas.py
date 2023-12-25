@@ -61,8 +61,8 @@ class LocalAuthorityDistrictSerializer(serializers.HyperlinkedModelSerializer):
         OpenApiExample(
             "/scotland_data_zones/1/",
             value={
-                "data_zone_code": "S01006506",
-                "data_zone_name": "Culter - 01",
+                "code": "S01006506",
+                "name": "Culter - 01",
                 "year": 2011,
                 "local_authority": "{BASE_URL}/local_authority_districts/340/",
             },
@@ -73,7 +73,7 @@ class LocalAuthorityDistrictSerializer(serializers.HyperlinkedModelSerializer):
 class DataZoneSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = DataZone
-        fields = ["data_zone_code", "data_zone_name", "year", "local_authority"]
+        fields = ["code", "name", "year", "local_authority"]
 
 
 @extend_schema_serializer(

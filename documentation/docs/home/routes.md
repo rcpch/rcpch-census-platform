@@ -9,11 +9,11 @@ There are 10 routes that accept GET requests, all of which return lists that can
 1. ```/local_authority_districts/```: params include ```local_authority_district_code```, ```local_authority_district_name```, ```year``` or if none is passed, a list of all local authorities in the UK is returned
 2. ```/england_wales_lower_layer_super_output_areas/```: params include ```lsoa_code```, ```lsoa_name```, ```year```. If none is passed, a list of all LSOAs is returned.
 3. ```/northern_ireland_small_output_areas/```: params include ```soa_code```, ```soa_name```, ```year```. If none is passed, a list of all SOAs is returned.
-4. ```/scotland_datazones/```: params include ```data_zone_code```,```data_zone_name```,```year```,```local_authority_code```. If none is passed, a list of all Data Zones is returned.
+4. ```/scotland_datazones/```: params include ```code```,```name```,```year```,```local_authority_code```. If none is passed, a list of all Data Zones is returned.
 5. ```/greenspace/```: returns data on green space access by local authority in England, Scotland and Wales
 6. ```/english_indices_of_multiple_deprivation/```: params include ```lsoa_code_name``` or ```lsoa_code```, ```local_authority_code``` as well any of the return object fields. It returns a list of all English indices of deprivation
 7. ```/welsh_indices_of_multiple_deprivation/```: params include ```lsoa_code```, ```local_authority_code``` as well any of the return object fields. It returns a list of all Welsh indices of deprivation
-8. ```/scottish_indices_of_multiple_deprivation/```: params include ```data_zone_code``` and ```data_zone_name```, ```local_authority_code``` as well as any of the return object fields. It returns a list of all Scottish indices of deprivation.
+8. ```/scottish_indices_of_multiple_deprivation/```: params include ```code``` and ```name```, ```local_authority_code``` as well as any of the return object fields. It returns a list of all Scottish indices of deprivation.
 9. ```/northern_ireland_indices_of_multiple_deprivation/```: params include ```soa_code``` and ```soa_code_name``` as well as any of the return object fields. It returns a list of all Scottish indices of deprivation
 10. ```/indices_of_multiple_deprivation/```: takes a UK postcode (mandatory) and returns deprivation score and quantiles for that LSOA
 11. ```/index_of_multiple_deprivation_quantile/```: takes a UK postcode (mandatory) and a requested quantile (mandatory) and returns a deprivation quantile.
@@ -169,8 +169,8 @@ Scotland (```rcpch-census-engine.azurewebsites.net/api/v1/indices_of_multiple_de
     "housing_rank": 3076,
     "data_zone": {
         "id": 4968,
-        "data_zone_code": "S01011473",
-        "data_zone_name": "Motherwell South - 03",
+        "code": "S01011473",
+        "name": "Motherwell South - 03",
         "year": 2011,
         "local_authority": 361
     }

@@ -15,6 +15,7 @@ from .views import (
     UKIndexMultipleDeprivationQuantileView,
     # organisation bank viewsets
     OrganisationViewSet,
+    IntegratedCareBoardViewSet,
     NHSEnglandRegionViewSet,
 )
 
@@ -44,6 +45,11 @@ router.register(
 
 # organisation bank views
 router.register(r"organisations", viewset=OrganisationViewSet, basename="organisation")
+router.register(
+    r"integrated_care_boards",
+    viewset=IntegratedCareBoardViewSet,
+    basename="integrated_care_board",
+)
 router.register(
     r"nhs_england_regions",
     viewset=NHSEnglandRegionViewSet,

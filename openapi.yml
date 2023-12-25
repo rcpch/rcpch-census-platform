@@ -666,15 +666,15 @@ paths:
       operationId: scotland_data_zones_list
       description: |-
         Returns a list of all Scottish data zones (2011) and their associated local authority district
-        Filter params include: "year","data_zone_code","data_zone_name"
+        Filter params include: "year","code","name"
         If none are passed, a list is returned
       parameters:
       - in: query
-        name: data_zone_code
+        name: code
         schema:
           type: string
       - in: query
-        name: data_zone_name
+        name: name
         schema:
           type: string
       - in: query
@@ -709,7 +709,7 @@ paths:
       operationId: scotland_data_zones_retrieve
       description: |-
         Returns a list of all Scottish data zones (2011) and their associated local authority district
-        Filter params include: "year","data_zone_code","data_zone_name"
+        Filter params include: "year","code","name"
         If none are passed, a list is returned
       parameters:
       - in: path
@@ -732,7 +732,7 @@ paths:
       operationId: scottish_indices_of_multiple_deprivation_list
       description: |-
         Returns a list of Scottish data zones with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2017).
-        Filter params include: "data_zone_code"
+        Filter params include: "code"
         If none are passed, a list is returned
       parameters:
       - in: query
@@ -748,11 +748,11 @@ paths:
         schema:
           type: integer
       - in: query
-        name: data_zone_code
+        name: code
         schema:
           type: string
       - in: query
-        name: data_zone_name
+        name: name
         schema:
           type: string
       - in: query
@@ -811,7 +811,7 @@ paths:
       operationId: scottish_indices_of_multiple_deprivation_retrieve
       description: |-
         Returns a list of Scottish data zones with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2017).
-        Filter params include: "data_zone_code"
+        Filter params include: "code"
         If none are passed, a list is returned
       parameters:
       - in: path
@@ -1082,10 +1082,10 @@ components:
     DataZone:
       type: object
       properties:
-        data_zone_code:
+        code:
           type: string
           maxLength: 50
-        data_zone_name:
+        name:
           type: string
           maxLength: 100
         year:
@@ -1097,8 +1097,8 @@ components:
           type: string
           format: uri
       required:
-      - data_zone_code
-      - data_zone_name
+      - code
+      - name
       - local_authority
       - year
     EnglishIndexMultipleDeprivation:

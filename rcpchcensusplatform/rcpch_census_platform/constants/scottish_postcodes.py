@@ -790,7 +790,7 @@ SCOTTISH_ADDRESSES = [
 
 SCOTTISH_IMD_TEST_DATA = [
     {
-        "data_zone_code:": "S01006506",
+        "code:": "S01006506",
         "Data zone name": "Culter - 01",
         "Local authority": "Aberdeen City",
         "SIMD 2020v2 rank": "4691",
@@ -813,7 +813,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Aberdeen South and North Kincardine",
     },
     {
-        "data_zone_code:": "S01010782",
+        "code:": "S01010782",
         "Data zone name": "Wick North - 01",
         "Local authority": "Highland",
         "SIMD 2020v2 rank": "1555",
@@ -836,7 +836,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Caithness, Sutherland and Ross",
     },
     {
-        "data_zone_code:": "S01012127",
+        "code:": "S01012127",
         "Data zone name": "Paisley Central - 02",
         "Local authority": "Renfrewshire",
         "SIMD 2020v2 rank": "2124",
@@ -859,7 +859,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Paisley",
     },
     {
-        "data_zone_code:": "S01009140",
+        "code:": "S01009140",
         "Data zone name": "Falkirk - Grahamston - 03",
         "Local authority": "Falkirk",
         "SIMD 2020v2 rank": "1481",
@@ -882,7 +882,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Falkirk West",
     },
     {
-        "data_zone_code:": "S01012275",
+        "code:": "S01012275",
         "Data zone name": "Galashiels - N - Town Centre",
         "Local authority": "Scottish Borders",
         "SIMD 2020v2 rank": "1696",
@@ -905,7 +905,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Midlothian South, Tweeddale and Lau",
     },
     {
-        "data_zone_code:": "S01008160",
+        "code:": "S01008160",
         "Data zone name": "Lennoxtown - 03",
         "Local authority": "East Dunbartonshire",
         "SIMD 2020v2 rank": "2036",
@@ -928,7 +928,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Strathkelvin and Bearsden",
     },
     {
-        "data_zone_code:": "S01007705",
+        "code:": "S01007705",
         "Data zone name": "City Centre - 05",
         "Local authority": "Dundee City",
         "SIMD 2020v2 rank": "1414",
@@ -951,7 +951,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Dundee City West",
     },
     {
-        "data_zone_code:": "S01012275",
+        "code:": "S01012275",
         "Data zone name": "Galashiels - N - Town Centre",
         "Local authority": "Scottish Borders",
         "SIMD 2020v2 rank": "1696",
@@ -974,7 +974,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Midlothian South, Tweeddale and Lau",
     },
     {
-        "data_zone_code:": "S01011473",
+        "code:": "S01011473",
         "Data zone name": "Motherwell South - 03",
         "Local authority": "North Lanarkshire",
         "SIMD 2020v2 rank": "192",
@@ -997,7 +997,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Motherwell and Wishaw",
     },
     {
-        "data_zone_code:": "S01008587",
+        "code:": "S01008587",
         "Data zone name": "Blackford, West Mains and Mayfield Road - 0",
         "Local authority": "City of Edinburgh",
         "SIMD 2020v2 rank": "5588",
@@ -1020,7 +1020,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Edinburgh Southern",
     },
     {
-        "data_zone_code:": "S01008674",
+        "code:": "S01008674",
         "Data zone name": "Old Town, Princes Street and Leith Street -",
         "Local authority": "City of Edinburgh",
         "SIMD 2020v2 rank": "4105",
@@ -1043,7 +1043,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Edinburgh Central",
     },
     {
-        "data_zone_code:": "S01011473",
+        "code:": "S01011473",
         "Data zone name": "Motherwell South - 03",
         "Local authority": "North Lanarkshire",
         "SIMD 2020v2 rank": "192",
@@ -1066,7 +1066,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Motherwell and Wishaw",
     },
     {
-        "data_zone_code:": "S01012127",
+        "code:": "S01012127",
         "Data zone name": "Paisley Central - 02",
         "Local authority": "Renfrewshire",
         "SIMD 2020v2 rank": "2124",
@@ -1089,7 +1089,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Paisley",
     },
     {
-        "data_zone_code:": "S01009041",
+        "code:": "S01009041",
         "Data zone name": "Stornoway West - 04",
         "Local authority": "Na h-Eileanan Siar",
         "SIMD 2020v2 rank": "1938",
@@ -1112,7 +1112,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Na h-Eileanan an Iar",
     },
     {
-        "data_zone_code:": "S01008734",
+        "code:": "S01008734",
         "Data zone name": "Duddingston and Portobello South - 01",
         "Local authority": "City of Edinburgh",
         "SIMD 2020v2 rank": "4812",
@@ -1135,7 +1135,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Edinburgh Eastern",
     },
     {
-        "data_zone_code:": "S01009862",
+        "code:": "S01009862",
         "Data zone name": "Ibrox East and Cessnock - 01",
         "Local authority": "Glasgow City",
         "SIMD 2020v2 rank": "401",
@@ -1158,7 +1158,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Glasgow Southside",
     },
     {
-        "data_zone_code:": "S01013380",
+        "code:": "S01013380",
         "Data zone name": "Whitburn, Croftmalloch and Greenrigg - 03",
         "Local authority": "West Lothian",
         "SIMD 2020v2 rank": "4536",
@@ -1181,7 +1181,7 @@ SCOTTISH_IMD_TEST_DATA = [
         "Scottish parliamentary constituency": "Linlithgow",
     },
     {
-        "data_zone_code:": "S01010338",
+        "code:": "S01010338",
         "Data zone name": "Milton East - 04",
         "Local authority": "Glasgow City",
         "SIMD 2020v2 rank": "122",

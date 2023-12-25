@@ -58,13 +58,13 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
-                    "data_zone_code",
+                    "code",
                     models.CharField(
                         max_length=50, unique=True, verbose_name="Data Zone Code"
                     ),
                 ),
                 (
-                    "data_zone_name",
+                    "name",
                     models.CharField(max_length=100, verbose_name="Data Zone Name"),
                 ),
                 ("year", models.IntegerField(verbose_name="Data Zone Year")),
