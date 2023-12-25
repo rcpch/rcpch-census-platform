@@ -23,6 +23,7 @@ from .country import CountrySerializer
 from .integrated_care_board import IntegratedCareBoardSerializer
 from .local_health_board import LocalHealthBoardSerializer
 from .nhs_england_region import NHSEnglandRegionSerializer
+from .openuk_network import OPENUKNetworkSerializer
 from .trust import TrustSerializer
 
 
@@ -43,7 +44,7 @@ from .trust import TrustSerializer
                 "latitude": "52.17513275",
                 "longitude": "0.140753239",
                 "postcode": "CB2 0QQ",
-                # "geocode_coordinates": "",
+                "geocode_coordinates": "",
                 "active": "",
                 "published_at": "",
                 "paediatric_diabetes_unit": "",
@@ -64,9 +65,7 @@ class OrganisationSerializer(serializers.ModelSerializer):
     local_health_board = LocalHealthBoardSerializer()
     integrated_care_board = IntegratedCareBoardSerializer()
     nhs_england_region = NHSEnglandRegionSerializer()
-    openuk_network = serializers.SlugRelatedField(
-        many=False, read_only=True, slug_field="name"
-    )
+    openuk_network = OPENUKNetworkSerializer()
     paediatric_diabetes_unit = serializers.SlugRelatedField(
         many=False, read_only=True, slug_field="pz_code"
     )
