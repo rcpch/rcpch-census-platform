@@ -13,9 +13,17 @@ IntegratedCareBoard = apps.get_model("rcpch_census_platform", "IntegratedCareBoa
 LocalHealthBoard = apps.get_model("rcpch_census_platform", "LocalHealthBoard")
 LondonBorough = apps.get_model("rcpch_census_platform", "LondonBorough")
 NHSEnglandRegion = apps.get_model("rcpch_census_platform", "NHSEnglandRegion")
+# Trust = apps.get_model("rcpch_census_platform", "Trust")
 OPENUKNetwork = apps.get_model("rcpch_census_platform", "OPENUKNetwork")
 PaediatricDiabetesUnit = apps.get_model(
     "rcpch_census_platform", "PaediatricDiabetesUnit"
+)
+
+from ..serializers import (
+    IntegratedCareBoardSerializer,
+    CountrySerializer,
+    NHSEnglandRegionSerializer,
+    TrustSerializer,
 )
 
 
@@ -53,28 +61,22 @@ PaediatricDiabetesUnit = apps.get_model(
     ]
 )
 class OrganisationSerializer(serializers.ModelSerializer):
-    # paediatric_diabetes_unit = serializers.SlugRelatedField(
-    #     many=True, read_only=True, slug_field="pz_code"
-    # )
-    trust = serializers.SlugRelatedField(many=False, read_only=True, slug_field="name")
+    trust = TrustSerializer()
     local_health_board = serializers.SlugRelatedField(
         many=False, read_only=True, slug_field="name"
     )
-    integrated_care_board = serializers.SlugRelatedField(
-        many=False, read_only=True, slug_field="name"
-    )
-    nhs_england_region = serializers.SlugRelatedField(
-        many=False, read_only=True, slug_field="name"
-    )
+    integrated_care_board = IntegratedCareBoardSerializer()
+    nhs_england_region = NHSEnglandRegionSerializer()
     openuk_network = serializers.SlugRelatedField(
         many=False, read_only=True, slug_field="name"
+    )
+    paediatric_diabetes_unit = serializers.SlugRelatedField(
+        many=False, read_only=True, slug_field="pz_code"
     )
     london_borough = serializers.SlugRelatedField(
         many=False, read_only=True, slug_field="name"
     )
-    country = serializers.SlugRelatedField(
-        many=False, read_only=True, slug_field="name"
-    )
+    country = CountrySerializer()
 
     class Meta:
         model = Organisation
@@ -91,10 +93,10 @@ class OrganisationSerializer(serializers.ModelSerializer):
             "latitude",
             "longitude",
             "postcode",
-            # "geocode_coordinates",
+            "geocode_coordinates",
             "active",
             "published_at",
-            # "paediatric_diabetes_unit",
+            "paediatric_diabetes_unit",
             "trust",
             "local_health_board",
             "integrated_care_board",
@@ -103,3 +105,4 @@ class OrganisationSerializer(serializers.ModelSerializer):
             "london_borough",
             "country",
         ]
+        depth = 1

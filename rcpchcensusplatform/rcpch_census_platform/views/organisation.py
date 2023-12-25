@@ -50,6 +50,7 @@ from ..serializers import OrganisationSerializer
                         "integrated_care_board": "",
                         "nhs_england_region": "",
                         "openuk_network": "",
+                        "paediatric_diabetes_unit": "",
                         "london_borough": "",
                         "country": "",
                     },
@@ -84,6 +85,7 @@ class OrganisationViewSet(viewsets.ReadOnlyModelViewSet):
     `integrated_care_board`
     `nhs_england_region`
     `openuk_network`
+    `paediatric_diabetes_unit`
     `london_borough`
     `country`
 

@@ -15,6 +15,7 @@ from .views import (
     UKIndexMultipleDeprivationQuantileView,
     # organisation bank viewsets
     OrganisationViewSet,
+    NHSEnglandRegionViewSet,
 )
 
 from drf_spectacular.views import SpectacularJSONAPIView, SpectacularSwaggerView
@@ -43,6 +44,7 @@ router.register(
 
 # organisation bank views
 router.register(r"organisations", viewset=OrganisationViewSet)
+router.register(r"nhs_england_regions", viewset=NHSEnglandRegionViewSet)
 
 drf_routes = [
     # rest framework paths
