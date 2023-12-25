@@ -22,6 +22,7 @@ PaediatricDiabetesUnit = apps.get_model(
 from .country import CountrySerializer
 from .integrated_care_board import IntegratedCareBoardSerializer
 from .local_health_board import LocalHealthBoardSerializer
+from .london_borough import LondonBoroughSerializer
 from .nhs_england_region import NHSEnglandRegionSerializer
 from .openuk_network import OPENUKNetworkSerializer
 from .paediatric_diabetes_unit import PaediatricDiabetesUnitSerializer
@@ -68,9 +69,7 @@ class OrganisationSerializer(serializers.ModelSerializer):
     nhs_england_region = NHSEnglandRegionSerializer()
     openuk_network = OPENUKNetworkSerializer()
     paediatric_diabetes_unit = PaediatricDiabetesUnitSerializer()
-    london_borough = serializers.SlugRelatedField(
-        many=False, read_only=True, slug_field="name"
-    )
+    london_borough = LondonBoroughSerializer()
     country = CountrySerializer()
 
     class Meta:

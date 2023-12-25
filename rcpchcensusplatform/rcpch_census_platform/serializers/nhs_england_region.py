@@ -28,7 +28,7 @@ NHSEnglandRegion = apps.get_model("rcpch_census_platform", "NHSEnglandRegion")
         )
     ]
 )
-class NHSEnglandRegionSerializer(serializers.HyperlinkedModelSerializer):
+class NHSEnglandRegionSerializer(serializers.ModelSerializer):
     class Meta:
         model = NHSEnglandRegion
         # depth = 1
