@@ -129,6 +129,7 @@ extra:
 nav:
   - Home:
     - 'index.md'
+    - 'home/nhs-organisational-areas.md'
     - 'home/getting-started.md'
     - 'home/routes.md'
     - 'home/citation.md'
