@@ -50,7 +50,7 @@ from ..serializers import NHSEnglandRegionSerializer
 )
 class NHSEnglandRegionViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    This endpoint returns a list of Countries from the UK.
+    This endpoint returns a list of NHS England regions, or an individual region by region_code
 
     Filter Parameters:
 
@@ -71,6 +71,7 @@ class NHSEnglandRegionViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = NHSEnglandRegion.objects.all().order_by("-name")
     serializer_class = NHSEnglandRegionSerializer
+    lookup_field = "region_code"
     filterset_fields = [
         "region_code",
         "publication_date",

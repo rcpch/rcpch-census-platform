@@ -26,7 +26,7 @@ from ..models import Trust
         )
     ]
 )
-class TrustSerializer(serializers.HyperlinkedModelSerializer):
+class TrustSerializer(serializers.ModelSerializer):
     class Meta:
         model = Trust
         # depth = 1

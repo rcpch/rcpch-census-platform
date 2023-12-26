@@ -8,6 +8,7 @@ from .views import (
     OrganisationViewSet,
     IntegratedCareBoardViewSet,
     NHSEnglandRegionViewSet,
+    TrustViewSet,
 )
 
 from drf_spectacular.views import SpectacularJSONAPIView, SpectacularSwaggerView
@@ -17,6 +18,11 @@ router.register(r"green_space", viewset=GreenSpaceViewSet)
 
 # organisation bank views
 router.register(r"organisations", viewset=OrganisationViewSet, basename="organisation")
+router.register(
+    r"trusts",
+    viewset=TrustViewSet,
+    basename="trust",
+)
 router.register(
     r"integrated_care_boards",
     viewset=IntegratedCareBoardViewSet,

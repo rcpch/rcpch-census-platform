@@ -100,3 +100,25 @@ class OrganisationSerializer(serializers.ModelSerializer):
             "country",
         ]
         depth = 1
+
+
+class TrustWithNestedOrganisationsSerializer(serializers.ModelSerializer):
+    organisations = OrganisationSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Trust
+        # depth = 1
+        fields = [
+            "ods_code",
+            "name",
+            "address_line_1",
+            "address_line_2",
+            "town",
+            "postcode",
+            "country",
+            "telephone",
+            "website",
+            "active",
+            "published_at",
+            "organisations",
+        ]

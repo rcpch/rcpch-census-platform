@@ -50,7 +50,7 @@ from ..serializers import IntegratedCareBoardSerializer
 )
 class IntegratedCareBoardViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    This endpoint returns a list of Countries from the UK.
+    This endpoint returns a list of Integrated Care Boards from England and Wales, or an individual ICB by ODS code.
 
     Filter Parameters:
 
@@ -71,6 +71,7 @@ class IntegratedCareBoardViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = IntegratedCareBoard.objects.all().order_by("-name")
     serializer_class = IntegratedCareBoardSerializer
+    lookup_field = "ods_code"
     filterset_fields = [
         "boundary_identifier",
         "name",

@@ -17,7 +17,7 @@ from drf_spectacular.utils import (
 from drf_spectacular.types import OpenApiTypes
 
 from ..models import Trust
-from ..serializers import TrustSerializer
+from ..serializers import TrustSerializer, TrustWithNestedOrganisationsSerializer
 
 
 @extend_schema(
@@ -51,7 +51,7 @@ from ..serializers import TrustSerializer
 )
 class TrustViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    This endpoint returns a list of Countries from the UK.
+    This endpoint returns a list of NHS Trusts from England, or an individual Trust by ODS code, with all child organisations nested.
 
     Filter Parameters:
 
@@ -71,8 +71,9 @@ class TrustViewSet(viewsets.ReadOnlyModelViewSet):
 
     """
 
-    queryset = Trust.objects.all().order_by("-name")
-    serializer_class = TrustSerializer
+    queryset = Trust.objects.all().order_by("name")
+    serializer_class = TrustWithNestedOrganisationsSerializer
+    lookup_field = "ods_code"
     filterset_fields = [
         "name",
         "address_line_1",
