@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "whitenoise.runserver_nostatic",
     "rest_framework",
+    "rest_framework_gis",
     "django_filters",
     "drf_spectacular",
     "rcpchcensusplatform.rcpch_census_platform",

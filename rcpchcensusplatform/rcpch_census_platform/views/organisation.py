@@ -21,7 +21,7 @@ from ..models import Organisation
 from ..serializers import OrganisationSerializer
 
 
-@extend_schema_view(
+@extend_schema(
     request=OrganisationSerializer,
     responses={
         200: OpenApiResponse(

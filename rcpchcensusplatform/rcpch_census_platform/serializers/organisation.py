@@ -102,8 +102,14 @@ class OrganisationSerializer(serializers.ModelSerializer):
         depth = 1
 
 
+class OrganisationNoParentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Organisation
+        fields = ["ods_code", "name"]
+
+
 class TrustWithNestedOrganisationsSerializer(serializers.ModelSerializer):
-    organisations = OrganisationSerializer(many=True, read_only=True)
+    organisations = OrganisationNoParentsSerializer(many=True, read_only=True)
 
     class Meta:
         model = Trust

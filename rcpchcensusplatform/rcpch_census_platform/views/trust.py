@@ -21,7 +21,7 @@ from ..serializers import TrustSerializer, TrustWithNestedOrganisationsSerialize
 
 
 @extend_schema(
-    request=TrustSerializer,
+    request=TrustWithNestedOrganisationsSerializer,
     responses={
         200: OpenApiResponse(
             response=OpenApiTypes.OBJECT,
@@ -42,6 +42,7 @@ from ..serializers import TrustSerializer, TrustWithNestedOrganisationsSerialize
                         "website": "",
                         "active": "",
                         "published_at": "",
+                        "organisations": "",
                     },
                     response_only=True,
                 ),

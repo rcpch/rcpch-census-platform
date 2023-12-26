@@ -61,6 +61,7 @@ class Organisation(TimeStampAbstractBaseClass):
         null=True,
         blank=True,
         default=None,
+        related_name="organisations",
     )
     local_health_board = models.ForeignKey(
         to=LocalHealthBoard,
