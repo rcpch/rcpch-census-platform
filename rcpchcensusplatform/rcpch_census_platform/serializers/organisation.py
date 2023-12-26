@@ -63,6 +63,7 @@ from .trust import TrustSerializer
     ]
 )
 class OrganisationSerializer(serializers.ModelSerializer):
+    # Serializes an organisation, nest in all related parent details
     trust = TrustSerializer()
     local_health_board = LocalHealthBoardSerializer()
     integrated_care_board = IntegratedCareBoardSerializer()
@@ -103,12 +104,16 @@ class OrganisationSerializer(serializers.ModelSerializer):
 
 
 class OrganisationNoParentsSerializer(serializers.ModelSerializer):
+    # used to serialize all child organisations in the TrustSerializer
+    # returns only ods_code and name
     class Meta:
         model = Organisation
         fields = ["ods_code", "name"]
 
 
 class TrustWithNestedOrganisationsSerializer(serializers.ModelSerializer):
+    # used to return all Trust fields as well as all related child organisations
+    # nested in
     organisations = OrganisationNoParentsSerializer(many=True, read_only=True)
 
     class Meta:
