@@ -83,7 +83,7 @@ NorthernIrelandIndexMultipleDeprivation = apps.get_model(
         )
     ]
 )
-class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer):
+class EnglishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
 
     class Meta:
@@ -149,7 +149,7 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSeri
         ]
 
     def get_type(self, obj) -> str:
-        return "English"
+        return "england"
 
 
 @extend_schema_serializer(
@@ -210,7 +210,7 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSeri
         )
     ]
 )
-class WelshIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer):
+class WelshIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
 
     class Meta:
@@ -267,7 +267,7 @@ class WelshIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerial
         ]
 
     def get_type(self, obj) -> str:
-        return "English"
+        return "wales"
 
 
 @extend_schema_serializer(
@@ -292,9 +292,7 @@ class WelshIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerial
         )
     ]
 )
-class ScottishIndexMultipleDeprivationSerializer(
-    serializers.HyperlinkedModelSerializer
-):
+class ScottishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
 
     class Meta:
@@ -315,7 +313,7 @@ class ScottishIndexMultipleDeprivationSerializer(
         ]
 
     def get_type(self, obj) -> str:
-        return "English"
+        return "scotland"
 
 
 @extend_schema_serializer(
@@ -339,9 +337,7 @@ class ScottishIndexMultipleDeprivationSerializer(
         )
     ]
 )
-class NorthernIrelandIndexMultipleDeprivationSerializer(
-    serializers.HyperlinkedModelSerializer
-):
+class NorthernIrelandIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
 
     class Meta:
@@ -361,4 +357,4 @@ class NorthernIrelandIndexMultipleDeprivationSerializer(
         ]
 
     def get_type(self, obj) -> str:
-        return "English"
+        return "northern_ireland"

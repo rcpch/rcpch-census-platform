@@ -31,7 +31,7 @@ SOA = apps.get_model("rcpch_census_platform", "SOA")
         )
     ]
 )
-class LSOASerializer(serializers.HyperlinkedModelSerializer):
+class LSOASerializer(serializers.ModelSerializer):
     class Meta:
         model = LSOA
         fields = [
@@ -46,7 +46,7 @@ class LSOASerializer(serializers.HyperlinkedModelSerializer):
         ]
 
 
-class LocalAuthorityDistrictSerializer(serializers.HyperlinkedModelSerializer):
+class LocalAuthorityDistrictSerializer(serializers.ModelSerializer):
     class Meta:
         model = LocalAuthority
         fields = [
@@ -70,7 +70,7 @@ class LocalAuthorityDistrictSerializer(serializers.HyperlinkedModelSerializer):
         )
     ]
 )
-class DataZoneSerializer(serializers.HyperlinkedModelSerializer):
+class DataZoneSerializer(serializers.ModelSerializer):
     class Meta:
         model = DataZone
         fields = ["code", "name", "year", "local_authority"]
@@ -85,7 +85,7 @@ class DataZoneSerializer(serializers.HyperlinkedModelSerializer):
         )
     ]
 )
-class SOASerializer(serializers.HyperlinkedModelSerializer):
+class SOASerializer(serializers.ModelSerializer):
     class Meta:
         model = SOA
         fields = ["year", "soa_code", "soa_name"]

@@ -25,7 +25,6 @@ from ..filtersets import (
 
 from ..general_functions import (
     lsoa_for_postcode,
-    regions_for_postcode,
     is_valid_postcode,
     quantile_for_rank,
 )
@@ -94,6 +93,7 @@ class WelshMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 
 @extend_schema(
     request=ScottishIndexMultipleDeprivationSerializer,
+    summary="This endpoint returns a list of Scottish data zones with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2017).",
 )
 class ScottishMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -101,7 +101,8 @@ class ScottishMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 
     Filter Parameters:
 
-    `data_zone_code`
+    `code`
+    `name`
 
     If none are passed, a list is returned.
     """
@@ -114,6 +115,7 @@ class ScottishMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 
 @extend_schema(
     request=NorthernIrelandIndexMultipleDeprivationSerializer,
+    summary="This endpoint returns a list of all Northern Ireland SOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2020).",
 )
 class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -134,6 +136,9 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
+@extend_schema(
+    summary="This endpoint returns an index of multiple deprivation as well as all the subscores against a postcode, from either England, Wales, Scotland or Northern Ireland.",
+)
 class UKIndexMultipleDeprivationView(APIView):
     english_serializer_class = EnglishIndexMultipleDeprivationSerializer
     welsh_serializer_class = WelshIndexMultipleDeprivationSerializer
@@ -151,14 +156,29 @@ class UKIndexMultipleDeprivationView(APIView):
                 type=OpenApiTypes.STR,
                 examples=[
                     OpenApiExample(
-                        name="Low Deprivation",
+                        name="Low Deprivation - England",
                         description="Example low deprivation postcode",
                         value="SW1A 1AA",
                     ),
                     OpenApiExample(
-                        name="High Deprivation",
+                        name="High Deprivation - England",
                         description="Example high deprivation postcode",
                         value="CO15 2DQ",
+                    ),
+                    OpenApiExample(
+                        name="Wales",
+                        description="Example low deprivation postcode in Wales",
+                        value="LL53 7BA",
+                    ),
+                    OpenApiExample(
+                        name="Scotland",
+                        description="Example Holyrood, Scottish Parliament",
+                        value="EH99 1SP",
+                    ),
+                    OpenApiExample(
+                        name="Northern Ireland",
+                        description="Example Northern Ireland Assembly",
+                        value="BT4 3XX",
                     ),
                 ],
             ),
@@ -208,7 +228,7 @@ class UKIndexMultipleDeprivationView(APIView):
                             instance=imd, context={"request": request}
                         )
                     elif lsoa_object["country"] == "Scotland":
-                        lsoa = DataZone.objects.filter(data_zone_code=lsoa_code).get()
+                        lsoa = DataZone.objects.filter(code=lsoa_code).get()
                         imd = ScottishIndexMultipleDeprivation.objects.filter(
                             data_zone=lsoa
                         ).get()
@@ -234,6 +254,9 @@ class UKIndexMultipleDeprivationView(APIView):
         return Response(response.data)
 
 
+@extend_schema(
+    summary="This endpoint returns an Index of Multiple Deprivation and Quantile against a postcode and quantile, from either England, Wales, Scotland or Northern Ireland.",
+)
 class UKIndexMultipleDeprivationQuantileView(APIView):
     @extend_schema(
         parameters=[
