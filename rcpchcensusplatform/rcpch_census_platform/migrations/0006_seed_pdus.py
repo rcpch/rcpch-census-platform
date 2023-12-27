@@ -74,7 +74,7 @@ def seed_pdus(apps, schema_editor):
                                 "OrgId"
                             ]["extension"]
                         )
-                        organisations = parent_trust.organisation_set.all()
+                        organisations = parent_trust.trust_organisations.all()
                         county = getattr(
                             ORD_organisation["GeoLoc"]["Location"], "county", None
                         )
@@ -117,7 +117,9 @@ def seed_pdus(apps, schema_editor):
                                 "OrgId"
                             ]["extension"]
                         )
-                        organisations = parent_local_health_board.organisation_set.all()
+                        organisations = (
+                            parent_local_health_board.local_health_board_organisations.all()
+                        )
                         county = getattr(
                             ORD_organisation["GeoLoc"]["Location"], "county", None
                         )
