@@ -70,7 +70,7 @@ services:
       - 8888:8888
     volumes:
       - flower-data:/data
-    command: celery -A rcpchcensusplatform flower --persistent=True -url_prefix=/flower
+    command: celery -A rcpchcensusplatform flower --persistent=True -url_prefix=flower
     restart: always
 
   # Celery scheduled tasks/cron

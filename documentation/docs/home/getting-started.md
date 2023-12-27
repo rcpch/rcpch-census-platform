@@ -5,51 +5,29 @@ author: Dr Simon Chapman
 
 ## Getting Started
 
-Written in python 3.11 and django-rest-framework. We recommend using `pyenv` or similar python version manager and virtual environment manager.
+Written in python 3.11 and django-rest-framework, with a postgresql-gis backend, it also uses celery/redis for async tasks and celery-beat for scheduling.
 
-### Option One
+Because it is complicated getting all these to these orchestrate together, the easiest way to get started is using docker. This is how it is used in production.
+
+The start scripts are all in the `s` folder. It may be necessary to change permissions to this folder first, from within the project root by:
+`chmod+x ~/s`
+
+The start script creates 8 linked docker containers under the umbrella name `rcpch-census-platform`:
+
+1. **django-1** The API
+2. **redis-1** Backend for Celery
+3. **postgis-1** The Postgresql-GIS database
+4. **celerybeat-1** Celery scheduling
+5. **celeryworker-1** Celery async tasks worker
+6. **flower-1** Browser UI to view Celery tasks - viewable on [http://0.0.0.0:8888/flower](http://0.0.0.0:8888/flower)
+7. **mkdocs-1** All documentation
+8. **caddy-1** web server
+
+Once all docker containers have been instantiated, django runs through the migrations which create the tables in the database and seed them with data. None of this data is proprietary and is openly available on the public internet. As the database is seeded, progress is logged to the console within the django container.
+
+### Steps
 
 1. clone the repo
-2. ```cd rcpch_census_platform```
-3. ```pip install -r requirements/common-requirements.txt```
-4. ```python manage.py createsuperuser --username username --email username@email.com```
-5. ```python manage.py makemigrations```
-6. ```python manage.py migrate```
-7. ```python manage.py seed --mode='add_organisational_areas'```
-8. ```python manage.py seed --mode='add_english_imds'```
-9. ```python manage.py seed --mode='add_welsh_imds'```
-10. ```python manage.py seed --mode='add_scottish_imds'```
-11. ```python manage.py seed --mode='add_northern_ireland_imds'```
+2. ```s/up```
 
-This latter step will take several minutes as it populates the database with all the census and deprivation data. If successful, it should yield the following message:
-> ![alt rcpch-census-db](static/images/census_db_screenshot.png?raw=true)
-
-The final step is to run the server:
-```python manage.py runserver```
-
-### Docker Compose development install
-
-<!-- the below needs a rewrite to include 'docker compose exec web' in front of all the commands -->
-1. clone the repo
-2. ```cd rcpch_census_platform```
-3. ```s/docker-init```
-
-If you navigate to the base url ```http://rcpch-census-platform.localhost/v1/``` and login, it should be possible then to view the data. Alternatively, add the token to Postman.
-
-## Creating openapi.yml and openapi.json files
-
-rf-spectacular can create the openapi3 spec files for you using the following command.
-
-We only really use the JSON version, but it's easy to create a YAML equivalent if needed also.
-
-JSON
-
-```shell
-docker compose -f docker-compose.dev-init.yml exec web python manage.py spectacular --file openapi.json
-```
-
-YAML
-
-```shell
-docker compose -f docker-compose.dev-init.yml exec web python manage.py spectacular --file openapi.json
-```
+If you navigate to [https://rcpch-census-platform.localhost/rcpch-census-platform/api/v1/swagger-ui/#/](https://rcpch-census-platform.localhost/rcpch-census-platform/api/v1/swagger-ui/#/) the Open API Specification and schemas are visible. If only the base url [https://rcpch-census-platform.localhost/rcpch-census-platform/api/v1/](https://rcpch-census-platform.localhost/rcpch-census-platform/api/v1/) is used, the django browsable API can be found.

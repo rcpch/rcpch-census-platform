@@ -25,8 +25,6 @@ The project is dockerised, and has containers for [Postgresql](https://www.postg
 
 There are also endpoints that list health organisational areas across the NHS, including items such as access to green space. RCPCH is open to storing data of any kind in this resource to support research and audit into children's health and environment. For users with datasets they would like RCPCH to host, or suggestions of datasets they would like to incorporate, please post as issues to the [repository](https://github.com/rcpch/rcpch-census-platform/issues).
 
-
-
 <p align="center">
     <p align="center">
     <img src='../docs/_assets/_images/rcpch-logo-mobile.4d5b446caf9a.svg' alt='RCPCH Logo'>
