@@ -12,6 +12,8 @@ Because it is complicated getting all these to these orchestrate together, the e
 The start scripts are all in the `s` folder. It may be necessary to change permissions to this folder first, from within the project root by:
 `chmod+x ~/s`
 
+**Note that nothing will work without a `.envs/.env` file with environment variables. An example file is provided.
+
 The start script creates 8 linked docker containers under the umbrella name `rcpch-census-platform`:
 
 1. **django-1** The API

@@ -99,7 +99,7 @@ env.bak/
 venv.bak/
 *live.env
 *development.env
-envs
+envs/.env
 
 # mypy
 .mypy_cache/
