@@ -152,3 +152,22 @@ class IntegratedCareBoardWithNestedOrganisationsSerializer(serializers.ModelSeri
             "publication_date",
             "integrated_care_board_organisations",
         ]
+
+
+class NHSEnglandRegionWithNestedOrganisationsSerializer(serializers.ModelSerializer):
+    # used to return key ICB fields as well as all related child organisation names and ods_codes
+    # nested in
+    nhs_england_region_organisations = OrganisationNoParentsSerializer(
+        many=True, read_only=True
+    )
+
+    class Meta:
+        model = NHSEnglandRegion
+        # depth = 1
+        fields = [
+            "region_code",
+            "publication_date",
+            "boundary_identifier",
+            "name",
+            "nhs_england_region_organisations",
+        ]

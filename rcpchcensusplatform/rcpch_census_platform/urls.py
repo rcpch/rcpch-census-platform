@@ -9,6 +9,7 @@ from .views import (
     IntegratedCareBoardViewSet,
     IntegratedCareBoardOrganisationViewSet,
     NHSEnglandRegionViewSet,
+    NHSEnglandRegionOrganisationViewSet,
     TrustViewSet,
 )
 
@@ -36,14 +37,20 @@ router.register(
 )
 # returns a list of ICBS with name, ods_code and nested organisations
 router.register(
-    r"integrated_care_boards",
+    r"integrated_care_boards/organisations",
     viewset=IntegratedCareBoardOrganisationViewSet,
     basename="integrated_care_board",
 )
 # returns a list of NHS England regions and their boundary data
 router.register(
-    r"nhs_england_regions",
+    r"nhs_england_regions/extended",
     viewset=NHSEnglandRegionViewSet,
+    basename="nhs_england_region",
+)
+# returns a list of NHS England regions and nested organisations
+router.register(
+    r"nhs_england_regions/organisations",
+    viewset=NHSEnglandRegionOrganisationViewSet,
     basename="nhs_england_region",
 )
 
