@@ -134,6 +134,8 @@ nav:
     - 'home/getting-started.md'
     - 'home/routes.md'
     - 'home/citation.md'
+  - Researchers:
+    - 'api.md'
   - Contact:
     - 'contact/contact-rcpch.md'
   - Legal:
@@ -143,5 +145,4 @@ nav:
     - 'legal/privacy-overview.md'
     - 'legal/privacy-notice.md'
     - 'legal/privacy-impact-assessment.md'
-    - 'legal/section-251.md'
     - 'legal/terms-of-service.md'

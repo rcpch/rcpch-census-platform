@@ -1,6 +1,6 @@
 ---
 title: Intellectual Property
-reviewers: Dr Marcus Baw
+reviewers: Dr Marcus Baw, Dr Simon Chapman
 ---
 
 ## Copyright
@@ -11,7 +11,7 @@ Copyright is asserted over all RCPCH intellectual property outputs by the Royal 
 
 ### Software
 
-The RCPCH Audit Engine software is licensed under the GNU Affero General Public License v3.0
+The RCPCH Census Platform software is licensed under the GNU Affero General Public License v3.0
 
 ### Documentation and textual outputs
 

@@ -3,7 +3,7 @@ title: Introduction
 author: Dr Simon Chapman
 ---
 !!! info "Guidance for Researchers"
-    Go to the Researchers' Guide above for guidance on retrieving census data.
+    Go to the [Researchers' Guide](./researchers/api.md) for guidance on retrieving census data.
 
 ## RCPCH Census Platform
 
