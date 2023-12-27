@@ -20,6 +20,7 @@ from .organisation import (
     OrganisationSerializer,
     TrustWithNestedOrganisationsSerializer,
     IntegratedCareBoardWithNestedOrganisationsSerializer,
+    LocalHealthBoardOrganisationsSerializer,
     LondonBoroughWithNestedOrganisationsSerializer,
     NHSEnglandRegionWithNestedOrganisationsSerializer,
 )

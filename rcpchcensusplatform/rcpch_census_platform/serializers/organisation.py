@@ -4597,7 +4597,9 @@ class OrganisationNoParentsSerializer(serializers.ModelSerializer):
 class TrustWithNestedOrganisationsSerializer(serializers.ModelSerializer):
     # used to return all Trust fields as well as all related child organisations
     # nested in
-    trust_organisations = OrganisationNoParentsSerializer(many=True, read_only=True)
+    organisations = OrganisationNoParentsSerializer(
+        many=True, read_only=True, source="trust_organisations"
+    )
 
     class Meta:
         model = Trust
@@ -4614,15 +4616,15 @@ class TrustWithNestedOrganisationsSerializer(serializers.ModelSerializer):
             "website",
             "active",
             "published_at",
-            "trust_organisations",
+            "organisations",
         ]
 
 
 class IntegratedCareBoardWithNestedOrganisationsSerializer(serializers.ModelSerializer):
     # used to return key ICB fields as well as all related child organisation names and ods_codes
     # nested in
-    integrated_care_board_organisations = OrganisationNoParentsSerializer(
-        many=True, read_only=True
+    organisations = OrganisationNoParentsSerializer(
+        many=True, read_only=True, source="integrated_care_board_organisations"
     )
 
     class Meta:
@@ -4633,15 +4635,15 @@ class IntegratedCareBoardWithNestedOrganisationsSerializer(serializers.ModelSeri
             "name",
             "ods_code",
             "publication_date",
-            "integrated_care_board_organisations",
+            "organisations",
         ]
 
 
 class NHSEnglandRegionWithNestedOrganisationsSerializer(serializers.ModelSerializer):
     # used to return key ICB fields as well as all related child organisation names and ods_codes
     # nested in
-    nhs_england_region_organisations = OrganisationNoParentsSerializer(
-        many=True, read_only=True
+    organisations = OrganisationNoParentsSerializer(
+        many=True, read_only=True, source="nhs_england_region_organisations"
     )
 
     class Meta:
@@ -4652,7 +4654,7 @@ class NHSEnglandRegionWithNestedOrganisationsSerializer(serializers.ModelSeriali
             "publication_date",
             "boundary_identifier",
             "name",
-            "nhs_england_region_organisations",
+            "organisations",
         ]
 
 
@@ -4669,10 +4671,40 @@ class NHSEnglandRegionWithNestedOrganisationsSerializer(serializers.ModelSeriali
     ]
 )
 class LondonBoroughWithNestedOrganisationsSerializer(serializers.ModelSerializer):
-    london_borough_organisations = OrganisationNoParentsSerializer(
-        many=True, read_only=True
+    organisations = OrganisationNoParentsSerializer(
+        many=True, read_only=True, source="london_borough_organisations"
     )
 
     class Meta:
         model = LondonBorough
-        fields = ["name", "gss_code", "london_borough_organisations"]
+        fields = ["name", "gss_code", "organisations"]
+
+
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "/local_health_board/1/organisations",
+            value={
+                "ods_code": "",
+                "boundary_identifier": "",
+                "name": "",
+            },
+            response_only=True,
+        )
+    ]
+)
+class LocalHealthBoardOrganisationsSerializer(serializers.ModelSerializer):
+    # returns local health boards with only ods_code and name and nested organisations
+    organisations = OrganisationNoParentsSerializer(
+        many=True, read_only=True, source="local_health_board_organisations"
+    )
+
+    class Meta:
+        model = LocalHealthBoard
+        # depth = 1
+        fields = [
+            "ods_code",
+            "boundary_identifier",
+            "name",
+            "organisations",
+        ]
