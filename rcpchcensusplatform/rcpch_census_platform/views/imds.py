@@ -197,7 +197,7 @@ class UKIndexMultipleDeprivationView(APIView):
     )
     def get(self, request):
         """
-        This endpoint returns an index of multiple deprivations against a postcode, from either England, Wales, Scotland or Northern Ireland.
+        This endpoint returns an index of multiple deprivations, as well as all its subscores, against a postcode, from either England, Wales, Scotland or Northern Ireland.
 
         Parameters:
 

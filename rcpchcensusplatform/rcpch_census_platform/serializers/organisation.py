@@ -114,7 +114,7 @@ class OrganisationNoParentsSerializer(serializers.ModelSerializer):
 class TrustWithNestedOrganisationsSerializer(serializers.ModelSerializer):
     # used to return all Trust fields as well as all related child organisations
     # nested in
-    organisations = OrganisationNoParentsSerializer(many=True, read_only=True)
+    trust_organisations = OrganisationNoParentsSerializer(many=True, read_only=True)
 
     class Meta:
         model = Trust
@@ -131,5 +131,24 @@ class TrustWithNestedOrganisationsSerializer(serializers.ModelSerializer):
             "website",
             "active",
             "published_at",
-            "organisations",
+            "trust_organisations",
+        ]
+
+
+class IntegratedCareBoardWithNestedOrganisationsSerializer(serializers.ModelSerializer):
+    # used to return key ICB fields as well as all related child organisation names and ods_codes
+    # nested in
+    integrated_care_board_organisations = OrganisationNoParentsSerializer(
+        many=True, read_only=True
+    )
+
+    class Meta:
+        model = IntegratedCareBoard
+        # depth = 1
+        fields = [
+            "boundary_identifier",
+            "name",
+            "ods_code",
+            "publication_date",
+            "integrated_care_board_organisations",
         ]

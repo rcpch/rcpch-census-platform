@@ -53,6 +53,7 @@ class Organisation(TimeStampAbstractBaseClass):
         null=True,
         blank=True,
         default=None,
+        related_name="paediatric_diabetes_unit_organisations",
     )
 
     trust = models.ForeignKey(
@@ -61,7 +62,7 @@ class Organisation(TimeStampAbstractBaseClass):
         null=True,
         blank=True,
         default=None,
-        related_name="organisations",
+        related_name="trust_organisations",
     )
     local_health_board = models.ForeignKey(
         to=LocalHealthBoard,
@@ -69,6 +70,7 @@ class Organisation(TimeStampAbstractBaseClass):
         null=True,
         blank=True,
         default=None,
+        related_name="local_health_board_organisations",
     )
     integrated_care_board = models.ForeignKey(
         to=IntegratedCareBoard,
@@ -76,6 +78,7 @@ class Organisation(TimeStampAbstractBaseClass):
         null=True,
         blank=True,
         default=None,
+        related_name="integrated_care_board_organisations",
     )
     nhs_england_region = models.ForeignKey(
         to=NHSEnglandRegion,
@@ -83,6 +86,7 @@ class Organisation(TimeStampAbstractBaseClass):
         null=True,
         blank=True,
         default=None,
+        related_name="nhs_england_region_organisations",
     )
     openuk_network = models.ForeignKey(
         to=OPENUKNetwork,
@@ -90,6 +94,7 @@ class Organisation(TimeStampAbstractBaseClass):
         null=True,
         blank=True,
         default=None,
+        related_name="openuk_network_organisations",
     )
     # administrative regions
     london_borough = models.ForeignKey(
@@ -98,6 +103,7 @@ class Organisation(TimeStampAbstractBaseClass):
         null=True,
         blank=True,
         default=None,
+        related_name="london_borough_organisations",
     )
 
     country = models.ForeignKey(
@@ -105,6 +111,7 @@ class Organisation(TimeStampAbstractBaseClass):
         on_delete=models.PROTECT,
         null=True,
         blank=True,
+        related_name="country_organisations",
     )
 
     @property
