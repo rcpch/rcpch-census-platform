@@ -4654,3 +4654,25 @@ class NHSEnglandRegionWithNestedOrganisationsSerializer(serializers.ModelSeriali
             "name",
             "nhs_england_region_organisations",
         ]
+
+
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "/london_borough/1/organisation",
+            value={
+                "name": "",
+                "gss_code": "",
+            },
+            response_only=True,
+        )
+    ]
+)
+class LondonBoroughWithNestedOrganisationsSerializer(serializers.ModelSerializer):
+    london_borough_organisations = OrganisationNoParentsSerializer(
+        many=True, read_only=True
+    )
+
+    class Meta:
+        model = LondonBorough
+        fields = ["name", "gss_code", "london_borough_organisations"]
