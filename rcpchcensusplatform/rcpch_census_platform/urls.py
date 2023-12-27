@@ -21,9 +21,10 @@ router.register(r"green_space", viewset=GreenSpaceViewSet)
 """
 organisation bank views
 """
-# returns a list of organisations and their nested parent details
+# returns a list of organisations and their nested parent details (without boundary data)
 router.register(r"organisations", viewset=OrganisationViewSet, basename="organisation")
-# returns a list of trusts and their details with their child organisations (ods_code and name only)
+
+# returns a list of trusts and their details with their nested child organisations (ods_code and name only)
 router.register(
     r"trusts",
     viewset=TrustViewSet,

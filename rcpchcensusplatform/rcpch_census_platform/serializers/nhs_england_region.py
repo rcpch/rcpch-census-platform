@@ -29,6 +29,7 @@ NHSEnglandRegion = apps.get_model("rcpch_census_platform", "NHSEnglandRegion")
     ]
 )
 class NHSEnglandRegionSerializer(serializers.ModelSerializer):
+    # returns NHS England regions and boundaries
     class Meta:
         model = NHSEnglandRegion
         # depth = 1
@@ -43,4 +44,32 @@ class NHSEnglandRegionSerializer(serializers.ModelSerializer):
             "lat",
             "globalid",
             "geom",
+        ]
+
+
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "/nhs_england_regions/1/limited",
+            value={
+                "region_code": "",
+                "publication_date": "",
+                "boundary_identifier": "E54000030",
+                "name": "NHS England Region",
+                "publication_date": "15/03/2023",
+            },
+            response_only=True,
+        )
+    ]
+)
+class NHSEnglandRegionLimitedSerializer(serializers.ModelSerializer):
+    # returns NHS England Regions without boundary data
+    class Meta:
+        model = NHSEnglandRegion
+        # depth = 1
+        fields = [
+            "region_code",
+            "publication_date",
+            "boundary_identifier",
+            "name",
         ]

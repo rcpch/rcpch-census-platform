@@ -42,3 +42,27 @@ class IntegratedCareBoardSerializer(serializers.ModelSerializer):
             "ods_code",
             "publication_date",
         ]
+
+
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "/integrated_care_board/1/limited",
+            value={
+                "boundary_identifier": "E54000030",
+                "name": "NHS South East London Integrated Care Board",
+                "ods_code": "QKK",
+            },
+            response_only=True,
+        )
+    ]
+)
+class IntegratedCareBoardLimitedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IntegratedCareBoard
+        # depth = 1
+        fields = [
+            "boundary_identifier",
+            "name",
+            "ods_code",
+        ]

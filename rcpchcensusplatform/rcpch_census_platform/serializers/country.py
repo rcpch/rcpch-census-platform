@@ -38,3 +38,24 @@ class CountrySerializer(serializers.HyperlinkedModelSerializer):
             "globalid",
             "geom",
         ]
+
+
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "/country/1/limited",
+            value={
+                "boundary_identifier": "E92000001",
+                "name": "England",
+            },
+            response_only=True,
+        )
+    ]
+)
+class CountryLimitedSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = Country
+        fields = [
+            "boundary_identifier",
+            "name",
+        ]

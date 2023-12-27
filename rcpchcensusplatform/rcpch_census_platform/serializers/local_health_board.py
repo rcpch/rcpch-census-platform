@@ -29,9 +29,9 @@ LocalHealthBoard = apps.get_model("rcpch_census_platform", "LocalHealthBoard")
     ]
 )
 class LocalHealthBoardSerializer(serializers.ModelSerializer):
+    # returns local health boards and boundary data
     class Meta:
         model = LocalHealthBoard
-        # depth = 1
         fields = [
             "ods_code",
             "publication_date",
@@ -44,4 +44,29 @@ class LocalHealthBoardSerializer(serializers.ModelSerializer):
             "lat",
             "globalid",
             "geom",
+        ]
+
+
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "/local_health_board/1/limited",
+            value={
+                "ods_code": "",
+                "boundary_identifier": "",
+                "name": "",
+            },
+            response_only=True,
+        )
+    ]
+)
+class LocalHealthBoardLimitedSerializer(serializers.ModelSerializer):
+    # returns local health boards with only ods_code and name
+    class Meta:
+        model = LocalHealthBoard
+        # depth = 1
+        fields = [
+            "ods_code",
+            "boundary_identifier",
+            "name",
         ]

@@ -19,11 +19,20 @@ PaediatricDiabetesUnit = apps.get_model(
     "rcpch_census_platform", "PaediatricDiabetesUnit"
 )
 
-from .country import CountrySerializer
-from .integrated_care_board import IntegratedCareBoardSerializer
-from .local_health_board import LocalHealthBoardSerializer
-from .london_borough import LondonBoroughSerializer
-from .nhs_england_region import NHSEnglandRegionSerializer
+from .country import CountrySerializer, CountryLimitedSerializer
+from .integrated_care_board import (
+    IntegratedCareBoardSerializer,
+    IntegratedCareBoardLimitedSerializer,
+)
+from .local_health_board import (
+    LocalHealthBoardSerializer,
+    LocalHealthBoardLimitedSerializer,
+)
+from .london_borough import LondonBoroughSerializer, LondonBoroughLimitedSerializer
+from .nhs_england_region import (
+    NHSEnglandRegionSerializer,
+    NHSEnglandRegionLimitedSerializer,
+)
 from .openuk_network import OPENUKNetworkSerializer
 from .paediatric_diabetes_unit import PaediatricDiabetesUnitSerializer
 from .trust import TrustSerializer
@@ -4537,15 +4546,15 @@ from .trust import TrustSerializer
     ]
 )
 class OrganisationSerializer(serializers.ModelSerializer):
-    # Serializes an organisation, nest in all related parent details
+    # Serializes an organisation, nest in all related parent details (without boundaries)
     trust = TrustSerializer()
-    local_health_board = LocalHealthBoardSerializer()
-    integrated_care_board = IntegratedCareBoardSerializer()
-    nhs_england_region = NHSEnglandRegionSerializer()
+    local_health_board = LocalHealthBoardLimitedSerializer()
+    integrated_care_board = IntegratedCareBoardLimitedSerializer()
+    nhs_england_region = NHSEnglandRegionLimitedSerializer()
     openuk_network = OPENUKNetworkSerializer()
     paediatric_diabetes_unit = PaediatricDiabetesUnitSerializer()
-    london_borough = LondonBoroughSerializer()
-    country = CountrySerializer()
+    london_borough = LondonBoroughLimitedSerializer()
+    country = CountryLimitedSerializer()
 
     class Meta:
         model = Organisation
