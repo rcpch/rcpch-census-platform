@@ -28,7 +28,7 @@ Integrated Care Boards were introduced on 1st July 2022, taking over from Sustai
 
 ## Indices of Multiple Deprivation (IMD)
 
-Indices of Multiple Deprivation (IMDs) are not standardised across the devolved nations. They are specific to each country and are derived from census data. The methodology for the calculation though is essentially the same. It involves breaking the country up into units comparable by population size - in England and Wales, this is LSOAs, in Scotland it is Data Zones and in Northern Ireland it is SOAs. Each unit then is allocated a score to summarise certain deprivation domains. These vary across the 4 countries: 
+Indices of Multiple Deprivation (IMDs) are not standardised across the devolved nations. They are specific to each country and are derived from census data. The methodology for the calculation though is essentially the same. It involves breaking the country up into units comparable by population size - in England and Wales, this is LSOAs, in Scotland it is Data Zones and in Northern Ireland it is SOAs. Each unit then is allocated a score to summarise certain deprivation domains. These vary across the 4 countries:
 
 | England                          | Wales                 | Scotland          | Northern Ireland                  |
 |:---------------------------------|:----------------------|:------------------|:----------------------------------|
