@@ -1,4 +1,5 @@
-from django.contrib.gis.db import models
+from django.db import models
+
 
 class LocalAuthority(models.Model):
     local_authority_district_code = models.CharField(
@@ -73,10 +74,12 @@ class LSOA(models.Model):
         verbose_name = ("LSOA",)
         verbose_name_plural = "LSOAs"
 
+
 class SOA(models.Model):
     """
     Northern Ireland
     """
+
     year = models.IntegerField()
     soa_code = models.CharField(max_length=50, unique=True)
     soa_name = models.CharField(max_length=50)

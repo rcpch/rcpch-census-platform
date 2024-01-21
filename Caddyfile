@@ -9,7 +9,7 @@
     tls {$TLS_SOURCE}
 
     # DJANGO
-    reverse_proxy http://django:8000
+    reverse_proxy http://django:8005
 
     # MKDOCS static files are served from a /docs path
     handle_path /docs/* {
@@ -17,11 +17,6 @@
         file_server {
             index index.html
         }
-    }
-
-    # FLOWER monitoring is served from a /flower path
-    handle /flower* {
-        reverse_proxy http://flower:8888
     }
 
     log {

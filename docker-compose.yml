@@ -25,64 +25,19 @@ services:
   django: &django
     <<: *global # this will inherit all the envs from x-global-environment
     build: .
-    depends_on:
-      - postgis
-      - redis
     volumes:
       - .:/app/
     command: >
       sh -c "python -u manage.py collectstatic --noinput &&
             python -u manage.py migrate &&
-            # python manage.py seed --mode='add_organisational_areas' &&
-            # python manage.py seed --mode='add_english_imds' &&
-            # python manage.py seed --mode='add_welsh_imds' &&
-            # python manage.py seed --mode='add_scottish_imds' &&
-            # python manage.py seed --mode='add_northern_ireland_imds' &&
             echo $$DJANGO_STARTUP_COMMAND &&
             $$DJANGO_STARTUP_COMMAND"
-    restart: always
-
-  # PostgreSQL with PostGIS extension
-  postgis:
-    <<: *global # this will inherit all the envs from x-global-environment
-    image: postgis/postgis:15-3.3
-    volumes:
-      - postgis-data:/var/lib/postgresql/data
-    restart: always
-
-  # Redis backend for Celery task scheduler
-  redis:
-    image: redis:alpine
-    expose:
-      - 6379
-    restart: always
-
-  # Celery worker
-  celeryworker:
-    <<: *django # this will inherit all the settings from the django service
-    command: celery -A rcpchcensusplatform worker -l info
-    restart: always
-
-  # Flower UI for Celery tasks
-  flower:
-    <<: *django # this will inherit all the settings from the django service
-    ports:
-      - 8888:8888
-    volumes:
-      - flower-data:/data
-    command: celery -A rcpchcensusplatform flower --persistent=True -url_prefix=flower
-    restart: always
-
-  # Celery scheduled tasks/cron
-  celerybeat:
-    <<: *django # this will inherit all the settings from the django service
-    command: celery -A rcpchcensusplatform beat -l info
     restart: always
 
   mkdocs:
     <<: *django # this will inherit all the settings from the django service
     ports:
-      - 8001:8001
+      - 8006:8006
     command: >
       sh -c "mkdocs build --config-file documentation/mkdocs.yml &&
         mkdocs serve --config-file documentation/mkdocs.yml"
@@ -90,5 +45,3 @@ services:
 
 volumes:
   caddy-data:
-  flower-data:
-  postgis-data:

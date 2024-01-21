@@ -5,17 +5,9 @@ python-dateutil
 # third party imports
 django
 djangorestframework
-djangorestframework-gis
 drf-spectacular
 django-filter
-psycopg2-binary
 whitenoise
-
-## scheduled tasks
-celery
-django-celery-beat
-flower
-redis
 
 # live application server
 gunicorn

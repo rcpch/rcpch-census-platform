@@ -1,4 +1,4 @@
-from django.contrib.gis.db import models
+from django.db import models
 
 from .output_areas import SOA, LSOA
 from .data_zones import DataZone

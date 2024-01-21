@@ -16,7 +16,6 @@ import os
 
 # third party imports
 from django.core.management.utils import get_random_secret_key
-from celery.schedules import crontab
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -44,7 +43,6 @@ ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") + [
 # Application definition
 
 INSTALLED_APPS = [
-    "django.contrib.gis",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -53,7 +51,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "whitenoise.runserver_nostatic",
     "rest_framework",
-    "rest_framework_gis",
     "django_filters",
     "drf_spectacular",
     "rcpchcensusplatform.rcpch_census_platform",
@@ -96,33 +93,14 @@ WSGI_APPLICATION = "rcpchcensusplatform.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_NAME"),
-        "USER": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_USER"),
-        "PASSWORD": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PASSWORD"),
-        "HOST": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_HOST"),
-        "PORT": os.environ.get("RCPCH_CENSUS_PLATFORM_POSTGRES_DB_PORT"),
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": os.environ.get("RCPCH_CENSUS_PLATFORM_SQLITE_DB_NAME"),
+        "USER": os.environ.get("RCPCH_CENSUS_PLATFORM_SQLITE_DB_USER"),
+        "PASSWORD": os.environ.get("RCPCH_CENSUS_PLATFORM_SQLITE_DB_PASSWORD"),
+        "HOST": os.environ.get("RCPCH_CENSUS_PLATFORM_SQLITE_DB_HOST"),
+        "PORT": os.environ.get("RCPCH_CENSUS_PLATFORM_SQLITE_DB_PORT"),
     }
 }
-
-# REDIS / Celery
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND")
-CELERY_ACCEPT_CONTENT = ["application/json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = "Europe/London"
-
-CELERY_BEAT_SCHEDULE = {
-    "update-organisations-daily-at-six-am": {
-        "task": "rcpch_census_platform.tasks.poll_ORD_spineservices_update_organisations_and_trusts",
-        "schedule": crontab(hour="6", minute=0),
-        "options": {
-            "expires": 15.0,
-        },
-    }
-}
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
@@ -191,7 +169,7 @@ REST_FRAMEWORK = {
 # drf-spectacular schema settings
 SPECTACULAR_SETTINGS = {
     "TITLE": "RCPCH Census Platform API",
-    "DESCRIPTION": "UK census and organisational data, especially Index of Multiple Deprivation, as a service.",
+    "DESCRIPTION": "UK census data, especially Index of Multiple Deprivation, as a service.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     # OTHER SETTINGS
