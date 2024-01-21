@@ -1,0 +1,43 @@
+{% extends "rest_framework/base.html" %} 
+{% load i18n %} 
+{% load static %}
+{%block title %}RCPCH Census Platform{% endblock %} 
+{% block bootstrap_theme %}
+<link
+  rel="stylesheet"
+  href="{% static 'styles/bootstrap.min.css' %}"
+  type="text/css"
+/>
+{% endblock %} 
+{% block bootstrap_navbar_variant %}{% endblock %} 
+{% block branding %}
+<a class="navbar-brand" rel="nofollow" href="#">
+  <img src="{% static 'images/rcpch-logo-mobile.4d5b446caf9a.svg' %}" />
+  RCPCH Census Platform
+</a>
+{% endblock %}
+
+<style>
+  @font-face {
+    font-family: Montserrat-Regular;
+    src: local("Montserrat-Regular"),
+      url("fonts/Montserrat/static/Montserrat-Regular.ttf") format("truetype");
+  }
+
+  body,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p {
+    color: black;
+    font-family: Montserrat-Regular;
+  }
+
+  .navbar .brand {
+    color: black;
+    font-family: Montserrat-Regular;
+  }
+</style>
