@@ -7,7 +7,7 @@ author: Dr Simon Chapman
 
 RCPCH Census Platform is an online data archive for all environmental information relating to child health. It aims to bring into one place data that is already published.
 
-RCPCH Census Platform data is not published as spreadsheets, but instead as [`JSON`](https://www.json.org/json-en.html). This is because the primary function of the Platform is supply information to other applications the RCPCH build and host. For example, the list of acute hospitals in England and Wales held serves the Epilepsy12 and NPDA audits RCPCH has built.
+RCPCH Census Platform data is not published as spreadsheets, but instead as [`JSON`](https://www.json.org/json-en.html). This is because the primary function of the Platform is supply information to other applications the RCPCH build and host. For example, this project serves the Epilepsy12 and NPDA audits RCPCH has built.
 
 To interrogate the API, one can either navigate the [browsable API](url), or use the [Open API Specification](url) to view the data. The Open API browser accepts parameters to filter searches.
 

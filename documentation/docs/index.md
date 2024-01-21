@@ -7,23 +7,23 @@ author: Dr Simon Chapman
 
 ## RCPCH Census Platform
 
-This project is a python 3.11 / Django Rest Framework project providing UK census and organisational data as a service.
+This project is a python 3.11 / Django Rest Framework project providing UK census data and indices of deprivation as a service.
 
 In particular it serves the following:
 
 1. **Index of multiple deprivation against a postcode anywhere in the UK**
-2. **List of all secondary care organisations in the UK where children are cared for.**
-This latter service in particular is important as such a list does not exist elsewhere - it pulls together acute and community hospitals across the UK, as well the NHS organisational boundaries within which they fall (Trust/Local Health Board, Integrated Care Board, NHS Region). It also references which Paediatric Diabetes Unit they form part of, or which OPEN UK children's epilepsy group they fall into.
+2. **ONS data on access to green spaces by local authority in England**
+3. **Lists of LSOAs in England and Wales, SOAs in Northern Ireland, Data Zones in Scotland**
 
-These 2 services support all RCPCH applications, in particular the Epilepsy12 and National Paediatric Diabetes Audits.
+This service supports all RCPCH applications, in particular the Epilepsy12 and National Paediatric Diabetes Audits.
 
-They are though open to anyone and do not require authentication.
+It is open to anyone and does not require authentication.
 
-The project is dockerised, and has containers for [Postgresql](https://www.postgresql.org/), [redis](https://redis.com/), [celery](https://docs.celeryq.dev/en/stable/django/first-steps-with-django.html) and [celery-beat](https://docs.celeryq.dev/en/stable/reference/celery.beat.html) for async and scheduled tasks. This documentation is also in a separate container and built with [MkDocs](https://www.mkdocs.org/)
+The project is dockerised, and has containers for [Django Rest Framework](https://www.django-rest-framework.org/) with [Sqlite3](https://www.sqlite.org/index.html) bundled in, and [Caddy](https://caddyserver.com). This documentation is also in a separate container and built with [MkDocs](https://www.mkdocs.org/).
 
 ### Other services
 
-There are also endpoints that list health organisational areas across the NHS, including items such as access to green space. RCPCH is open to storing data of any kind in this resource to support research and audit into children's health and environment. For users with datasets they would like RCPCH to host, or suggestions of datasets they would like to incorporate, please post as issues to the [repository](https://github.com/rcpch/rcpch-census-platform/issues).
+RCPCH is open to storing data of any kind in this resource to support research and audit into children's health and environment. For users with datasets they would like RCPCH to host, or suggestions of datasets they would like to incorporate, please post as issues to the [repository](https://github.com/rcpch/rcpch-census-platform/issues).
 
 <p align="center">
     <p align="center">
