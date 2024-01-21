@@ -1,5 +1,5 @@
 """
-WSGI config for rcpch_census_platform project.
+WSGI config for rcpch-census-platform project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 
@@ -11,6 +11,10 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rcpch_census_platform.settings')
+from whitenoise import WhiteNoise
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "rcpch_census_platform.settings")
 
 application = get_wsgi_application()
+
+application = WhiteNoise(application)

@@ -1,0 +1,47 @@
+version: "3.11"
+
+x-global-environment: &global
+  env_file:
+    - envs/.env # env file - NOT committed to Git
+
+services:
+  # Caddy reverse proxy - web-facing SSL server
+  caddy:
+    <<: *global # this will inherit all the envs from x-global-environment
+    depends_on:
+      - django
+    image: caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: always
+    volumes:
+      - caddy-data:/data/
+      - caddy-data:/config/
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./staticdocs:/srv/staticdocs
+
+  # Django web application
+  django: &django
+    <<: *global # this will inherit all the envs from x-global-environment
+    build: .
+    volumes:
+      - .:/app/
+    command: >
+      sh -c "python -u manage.py collectstatic --noinput &&
+            python -u manage.py migrate &&
+            echo $$DJANGO_STARTUP_COMMAND &&
+            $$DJANGO_STARTUP_COMMAND"
+    restart: always
+
+  mkdocs:
+    <<: *django # this will inherit all the settings from the django service
+    ports:
+      - 8006:8006
+    command: >
+      sh -c "mkdocs build --config-file documentation/mkdocs.yml &&
+        mkdocs serve --config-file documentation/mkdocs.yml"
+    restart: always
+
+volumes:
+  caddy-data:

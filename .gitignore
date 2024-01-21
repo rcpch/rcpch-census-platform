@@ -99,6 +99,7 @@ env.bak/
 venv.bak/
 *live.env
 *development.env
+envs/.env
 
 # mypy
 .mypy_cache/
@@ -123,3 +124,7 @@ staticfiles/
 # Docker and docker compose
 .pip_cache
 .data
+
+celerybeat-schedule
+
+staticdocs/

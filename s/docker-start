@@ -1,9 +1,0 @@
-#!/bin/bash
-
-# scripts may need to be made executable on some platforms before they can be run
-# chmod +x <filename> is the command to do this on unixy systems
-
-# starts the postgres and application containers
-# DOES NOT MIGRATE OR SEED DATA (this is done in the s/docker-init script)
-
-docker compose -f docker-compose.dev.yml up

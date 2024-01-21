@@ -1,24 +1,38 @@
-from typing import Literal
-from math import floor
-import sys
+# python libraries
 import csv
+import sys
 from decimal import Decimal
-from django.core.management.base import BaseCommand
+import time
 
+# django
+from django.core.management.base import BaseCommand
 from django.conf import settings
-from ...models import (
-    LSOA,
-    MSOA,
-    LocalAuthority,
-    Ward,
-    GreenSpace,
-    DataZone,
-    SOA,
-    EnglishIndexMultipleDeprivation,
-    WelshIndexMultipleDeprivation,
-    ScottishIndexMultipleDeprivation,
-    NorthernIrelandIndexMultipleDeprivation,
+from django.apps import apps
+
+# RCPCH
+
+LSOA = apps.get_model("deprivation_scores", "LSOA")
+MSOA = apps.get_model("deprivation_scores", "MSOA")
+LocalAuthority = apps.get_model("deprivation_scores", "LocalAuthority")
+Ward = apps.get_model("deprivation_scores", "Ward")
+GreenSpace = apps.get_model("deprivation_scores", "GreenSpace")
+DataZone = apps.get_model("deprivation_scores", "DataZone")
+SOA = apps.get_model("deprivation_scores", "SOA")
+EnglishIndexMultipleDeprivation = apps.get_model(
+    "deprivation_scores", "EnglishIndexMultipleDeprivation"
 )
+WelshIndexMultipleDeprivation = apps.get_model(
+    "deprivation_scores", "WelshIndexMultipleDeprivation"
+)
+ScottishIndexMultipleDeprivation = apps.get_model(
+    "deprivation_scores", "ScottishIndexMultipleDeprivation"
+)
+NorthernIrelandIndexMultipleDeprivation = apps.get_model(
+    "deprivation_scores", "NorthernIrelandIndexMultipleDeprivation"
+)
+
+
+from ...general_functions import quantile_for_rank
 
 
 IMD_2019_DOMAINS_OF_DEPRIVATION = "File_2_-_IoD2019_Domains_of_Deprivation.csv"
@@ -83,57 +97,73 @@ class Command(BaseCommand):
         elif options["mode"] == "add_northern_ireland_imds":
             self.stdout.write(B + "Adding Northern Ireland SOAs and IMDs" + W)
             add_northern_ireland_soas_and_deprivation_domains_with_ranks()
+        elif options["mode"] == "seed_all_imds":
+            seed_all_imds_and_dependencies()
         else:
             self.stdout.write("No options supplied...")
         self.stdout.write(image())
         self.stdout.write("done.")
 
 
+def seed_all_imds_and_dependencies():
+    """
+    Main function that seeds all organisational areas and IMD data
+    """
+    add_lsoas_2011_wards_2019_to_LADS_2019()
+    add_scottish_data_zones_and_local_authorities()
+    add_lad_access_to_outdoor_space()
+    add_welsh_2019_domains_and_ranks_to_existing_2019_lsoas()
+    add_welsh_2019_scores_to_existing_2019_lsoas()
+    add_english_deprivation_scores_and_domains_to_2011_lsoas()
+    update_english_imd_data_with_subdomains()
+    update_english_imd_data_with_supplementary_indices()
+    update_english_imd_data_with_scores()
+    update_english_imd_data_with_transformed_scores()
+    add_scottish_deprivation_ranks_and_domains_to_2011_datazones()
+    add_northern_ireland_soas_and_deprivation_domains_with_ranks()
+
+
 def add_lsoas_2011_wards_2019_to_LADS_2019():
     # import LSOA 2011/Ward & LAD 2019 boundaries
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{LSOA_2011_WARD_LAD_2019}"
 
-    if LocalAuthority.objects.exists() and LocalAuthority.objects.all().count() == 371:
+    with open(path, "r") as f:
+        print(
+            G
+            + "- Adding English & Welsh 2019 Local Authority Districts and 2011 LSOAs..."
+            + W,
+            end="\n",
+            flush=True,
+        )
+        data = list(csv.reader(f, delimiter=","))
+
+    if LocalAuthority.objects.exists() and LocalAuthority.objects.all().count() == len(
+        data[1:]
+    ):
         print(R + "Local Authorities already added. Skipping..." + W)
         pass
     else:
         lad_counter = 0
         lsoa_counter = 0
-
-        with open(path, "r") as f:
-            print(
-                G
-                + "- Adding English & Welsh 2019 Local Authority Districts and 2011 LSOAs..."
-                + W,
-                end="\n",
-                flush=True,
+        for row in data[1:]:
+            (
+                local_authority_district_2019,
+                created,
+            ) = LocalAuthority.objects.get_or_create(
+                local_authority_district_code=row[5],
+                local_authority_district_name=row[6],
+                year=2019,
             )
-            data = list(csv.reader(f, delimiter=","))
-            for row in data[1:]:
-                (
-                    local_authority_district_2019,
-                    created,
-                ) = LocalAuthority.objects.get_or_create(
-                    local_authority_district_code=row[5],
-                    local_authority_district_name=row[6],
-                    year=2019,
-                )
-                if created:
-                    lad_counter += 1
+            if created:
+                lad_counter += 1
 
-                LSOA.objects.create(
-                    lsoa_code=row[1],
-                    lsoa_name=row[2],
-                    year=2011,
-                    local_authority_district=local_authority_district_2019,
-                )
-                lsoa_counter += 1
-                progress_bar(
-                    iteration=lsoa_counter,
-                    total=34753,
-                    prefix="Progress",
-                    suffix="Complete",
-                )
+            LSOA.objects.update_or_create(
+                lsoa_code=row[1],
+                lsoa_name=row[2],
+                year=2011,
+                local_authority_district=local_authority_district_2019,
+            )
+            lsoa_counter += 1
         print(
             f"Complete. Added total {lad_counter} local authority districts and {lsoa_counter} lsoas.\n",
             flush=True,  # should be a total of 34753 LSOAs and 339 LADs
@@ -142,13 +172,6 @@ def add_lsoas_2011_wards_2019_to_LADS_2019():
 
 def add_english_deprivation_scores_and_domains_to_2011_lsoas():
     # import domains of deprivation data
-
-    if (
-        EnglishIndexMultipleDeprivation.objects.exists()
-        and EnglishIndexMultipleDeprivation.objects.count() == 32844
-    ):
-        print(R + "English indices already exist! Skipping..." + W)
-        return
 
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_DOMAINS_OF_DEPRIVATION}"
     with open(path, "r") as f:
@@ -160,38 +183,37 @@ def add_english_deprivation_scores_and_domains_to_2011_lsoas():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in data[1:]:  # skip the first row
-            if LSOA.objects.filter(lsoa_code=row[0], year=2011).exists():
-                lsoa = LSOA.objects.filter(lsoa_code=row[0], year=2011).get()
+    if (
+        EnglishIndexMultipleDeprivation.objects.exists()
+        and EnglishIndexMultipleDeprivation.objects.count() == len(data[1:])  # 32844
+    ):
+        print(R + "English indices already exist! Skipping..." + W)
+        return
 
-                EnglishIndexMultipleDeprivation.objects.create(
-                    imd_rank=int(float(row[4])),
-                    imd_decile=int(float(row[5])),
-                    income_rank=int(float(row[6])),
-                    income_decile=int(float(row[7])),
-                    employment_rank=int(float(row[8])),
-                    employment_decile=int(float(row[9])),
-                    education_skills_training_rank=int(float(row[10])),
-                    education_skills_training_decile=int(float(row[11])),
-                    health_deprivation_disability_rank=int(float(row[12])),
-                    health_deprivation_disability_decile=int(float(row[13])),
-                    crime_rank=int(float(row[14])),
-                    crime_decile=int(float(row[15])),
-                    barriers_to_housing_services_rank=int(float(row[16])),
-                    barriers_to_housing_services_decile=int(float(row[17])),
-                    living_environment_rank=int(float(row[18])),
-                    living_environment_decile=int(float(row[19])),
-                    lsoa=lsoa,
-                )
-                count += 1
+    for row in data[1:]:  # skip the first row
+        if LSOA.objects.filter(lsoa_code=row[0], year=2011).exists():
+            lsoa = LSOA.objects.filter(lsoa_code=row[0], year=2011).get()
 
-            progress_bar(
-                iteration=count, total=32844, prefix="Progress", suffix="Complete"
+            EnglishIndexMultipleDeprivation.objects.create(
+                imd_rank=int(float(row[4])),
+                imd_decile=int(float(row[5])),
+                income_rank=int(float(row[6])),
+                income_decile=int(float(row[7])),
+                employment_rank=int(float(row[8])),
+                employment_decile=int(float(row[9])),
+                education_skills_training_rank=int(float(row[10])),
+                education_skills_training_decile=int(float(row[11])),
+                health_deprivation_disability_rank=int(float(row[12])),
+                health_deprivation_disability_decile=int(float(row[13])),
+                crime_rank=int(float(row[14])),
+                crime_decile=int(float(row[15])),
+                barriers_to_housing_services_rank=int(float(row[16])),
+                barriers_to_housing_services_decile=int(float(row[17])),
+                living_environment_rank=int(float(row[18])),
+                living_environment_decile=int(float(row[19])),
+                lsoa=lsoa,
             )
-            # print(
-            #     f"Added {count} records of English deprivation domains (ranks and deciles)",
-            #     end="\r",
-            # )  # 32844
+            count += 1
 
     print(
         f"{BOLD}Complete.{END} {count} IMD records with domains added (ranks and deciles)\n"
@@ -205,6 +227,13 @@ def update_english_imd_data_with_subdomains():
         print(G + "- Adding sub-domains of deprivation to LSOAs" + W)
         data = list(csv.reader(f, delimiter=","))
         count = 0
+
+        if (
+            EnglishIndexMultipleDeprivation.objects.first().children_young_people_sub_domain_rank
+            is not None
+        ):
+            print("Subdomains already added. Skipping...")
+            return
 
         for row in data[1:]:
             lsoa = LSOA.objects.get(lsoa_code=row[0])
@@ -223,11 +252,6 @@ def update_english_imd_data_with_subdomains():
                 outdoors_sub_domain_decile=int(float(row[21])),
             )
             count += 1
-
-            progress_bar(
-                iteration=count, total=32844, prefix="Progress", suffix="Complete"
-            )
-            # print(f"Updated {count} LSOAs with subdomains.", end="\r")
     print(
         f"{BOLD}Complete.{END} Added {count} subdomains of deprivation 2019 to LSOAs\n",
     )
@@ -244,6 +268,9 @@ def update_english_imd_data_with_supplementary_indices():
         )
         data = list(csv.reader(f, delimiter=","))
         count = 0
+        if EnglishIndexMultipleDeprivation.objects.first().idaci_rank is not None:
+            print("Supplementary English indices already added. Skipping...")
+            return
 
         for row in data[1:]:
             lsoa = LSOA.objects.get(lsoa_code=row[0])
@@ -254,10 +281,6 @@ def update_english_imd_data_with_supplementary_indices():
                 idaopi_decile=int(float(row[9])),
             )
             count += 1
-            progress_bar(
-                iteration=count, total=32844, prefix="Progress", suffix="Complete"
-            )
-            # print(f"Updated {count} LSOAs with IDACI and IDAOPI data...", end="\r")
     print(
         f"{BOLD}Complete.{END} Added {count} supplementary indices (IDACI and IDAOPI) of deprivation 2019 to LSOAs\n"
     )
@@ -271,33 +294,32 @@ def update_english_imd_data_with_scores():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in data[1:]:
-            lsoa = LSOA.objects.get(lsoa_code=row[0])
-            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa).update(
-                imd_score=Decimal(row[4]),
-                income_score=Decimal(row[5]),
-                employment_score=Decimal(row[6]),
-                education_skills_training_score=Decimal(row[7]),
-                health_deprivation_disability_score=Decimal(row[8]),
-                crime_score=Decimal(row[9]),
-                barriers_to_housing_services_score=Decimal(row[10]),
-                living_environment_score=Decimal(row[11]),
-                idaci_score=Decimal(row[12]),
-                idaopi_score=Decimal(row[13]),
-                children_young_people_sub_domain_score=Decimal(row[14]),
-                adult_skills_sub_domain_score=Decimal(row[15]),
-                geographical_barriers_sub_domain_score=Decimal(row[16]),
-                wider_barriers_sub_domain_score=Decimal(row[17]),
-                indoors_sub_domain_score=Decimal(row[18]),
-                outdoors_sub_domain_score=Decimal(row[19]),
-            )
-            count += 1
-            progress_bar(
-                iteration=count, total=32844, prefix="Progress", suffix="Complete"
-            )
-            # print(
-            #     f"Updated {count} indices of deprivation 2019 with scores...", end="\r"
-            # )
+    if EnglishIndexMultipleDeprivation.objects.all()[0].imd_score is not None:
+        print("IMD scores already exist for England. Skipping...")
+        return
+
+    for row in data[1:]:
+        lsoa = LSOA.objects.get(lsoa_code=row[0])
+        EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa).update(
+            imd_score=Decimal(row[4]),
+            income_score=Decimal(row[5]),
+            employment_score=Decimal(row[6]),
+            education_skills_training_score=Decimal(row[7]),
+            health_deprivation_disability_score=Decimal(row[8]),
+            crime_score=Decimal(row[9]),
+            barriers_to_housing_services_score=Decimal(row[10]),
+            living_environment_score=Decimal(row[11]),
+            idaci_score=Decimal(row[12]),
+            idaopi_score=Decimal(row[13]),
+            children_young_people_sub_domain_score=Decimal(row[14]),
+            adult_skills_sub_domain_score=Decimal(row[15]),
+            geographical_barriers_sub_domain_score=Decimal(row[16]),
+            wider_barriers_sub_domain_score=Decimal(row[17]),
+            indoors_sub_domain_score=Decimal(row[18]),
+            outdoors_sub_domain_score=Decimal(row[19]),
+        )
+        count += 1
+
     print(f"{BOLD}Complete.{END} Added {count} English scores of deprivation 2019\n")
 
 
@@ -310,6 +332,13 @@ def update_english_imd_data_with_transformed_scores():
         print(G + "- Adding English transformed scores of deprivation to LSOAs" + W)
         data = list(csv.reader(f, delimiter=","))
         count = 0
+
+        if (
+            EnglishIndexMultipleDeprivation.objects.first().income_score_exponentially_transformed
+            is not None
+        ):
+            print("English transformed scores already added. Skipping...")
+            return
 
         for row in data[1:]:
             lsoa = LSOA.objects.get(lsoa_code=row[0])
@@ -329,13 +358,6 @@ def update_english_imd_data_with_transformed_scores():
                 living_environment_score_exponentially_transformed=Decimal(row[10]),
             )
             count += 1
-            progress_bar(
-                iteration=count, total=32844, prefix="Progress", suffix="Complete"
-            )
-            # print(
-            #     f"Updated {count} records with transformed scores of deprivation 2019...",
-            #     end="\r",
-            # )
     print(
         f"{BOLD}Complete.{END} Added {count} English transformed scores of deprivation 2019\n"
     )
@@ -354,6 +376,10 @@ def add_scottish_data_zones_and_local_authorities():
         lad_count = 0
         dz_count = 0
 
+        if DataZone.objects.all().count() == len(data[:1]):
+            print(f"Data zones already seeded. Skipping...")
+            return
+
         for row in data[1:]:
             local_authority, created = LocalAuthority.objects.get_or_create(
                 local_authority_district_code=row[6],
@@ -365,19 +391,19 @@ def add_scottish_data_zones_and_local_authorities():
                 lad_count += 1
 
             data_zone, created = DataZone.objects.get_or_create(
-                data_zone_code=row[0],
-                data_zone_name=row[1],
+                code=row[0],
+                name=row[1],
                 year=2011,
                 local_authority=local_authority,
             )
 
             if created:
                 dz_count += 1
+                # progress_bar()
             print(
                 f"Added {lad_count} Scottish Local Authorities and {dz_count} data zones...",
                 end="\r",
             )
-            # progress_bar(current=dz_count, total=6976, bar_length=40)
     print(
         f"{BOLD}Complete.{END} Added {lad_count} Scottish Local Authorities and {dz_count} data zones...\n",
     )
@@ -423,7 +449,6 @@ def add_lad_access_to_outdoor_space():
             local_authority_district_code=row[4]
         )
         if GreenSpace.objects.filter(local_authority=local_authority).exists():
-            print("Greenspace data already available for this Local Authority")
             pass
         else:
             GreenSpace.objects.create(
@@ -454,10 +479,6 @@ def add_lad_access_to_outdoor_space():
             )
 
             count += 1
-            progress_bar(
-                iteration=count, total=371, prefix="Progress", suffix="Complete"
-            )
-            # print(f"Created {count} Local Authority green space records...", end="\r")
     print(f"{BOLD}Complete.{END} Added {count} Local Authority green space records.\n")
 
 
@@ -465,122 +486,125 @@ def add_welsh_2019_domains_and_ranks_to_existing_2019_lsoas():
     """
     import Welsh domains and ranks 2019 data
     """
-    if (
-        WelshIndexMultipleDeprivation.objects.exists()
-        and WelshIndexMultipleDeprivation.objects.count() == 1909
-    ):
-        print(R + "Welsh indices already present. Skipping..." + W)
-        return
-
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_WALES_DEPRIVATION_DOMAINS_RANKS}"
     with open(path, "r") as f:
         print(G + "- Adding Welsh IMD ranks/quantiles" + W)
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for record in data[1:]:
-            lsoa = LSOA.objects.get(lsoa_code=record[0])
-            WelshIndexMultipleDeprivation.objects.create(
-                imd_rank=int(record[3]),
-                imd_quartile=quantile_for_rank(
-                    rank=int(record[3]), quantile="quartile"
-                ),
-                imd_quintile=quantile_for_rank(
-                    rank=int(record[3]), quantile="quintile"
-                ),
-                imd_decile=quantile_for_rank(rank=int(record[3]), quantile="decile"),
-                imd_score=None,
-                income_rank=int(record[4]),
-                income_quartile=quantile_for_rank(
-                    rank=int(record[4]), quantile="quartile"
-                ),
-                income_quintile=quantile_for_rank(
-                    rank=int(record[4]), quantile="quintile"
-                ),
-                income_decile=quantile_for_rank(rank=int(record[4]), quantile="decile"),
-                income_score=None,
-                employment_rank=int(record[5]),
-                employment_quartile=quantile_for_rank(
-                    rank=int(record[5]), quantile="quartile"
-                ),
-                employment_quintile=quantile_for_rank(
-                    rank=int(record[5]), quantile="quintile"
-                ),
-                employment_decile=quantile_for_rank(
-                    rank=int(record[5]), quantile="decile"
-                ),
-                employment_score=None,
-                health_rank=int(record[6]),
-                health_quartile=quantile_for_rank(
-                    rank=int(record[6]), quantile="quartile"
-                ),
-                health_quintile=quantile_for_rank(
-                    rank=int(record[6]), quantile="quintile"
-                ),
-                health_decile=quantile_for_rank(rank=int(record[6]), quantile="decile"),
-                health_score=None,
-                education_rank=int(record[7]),
-                education_quartile=quantile_for_rank(
-                    rank=int(record[7]), quantile="quartile"
-                ),
-                education_quintile=quantile_for_rank(
-                    rank=int(record[7]), quantile="quintile"
-                ),
-                education_decile=quantile_for_rank(
-                    rank=int(record[7]), quantile="decile"
-                ),
-                education_score=None,
-                access_to_services_rank=int(record[8]),
-                access_to_services_quartile=quantile_for_rank(
-                    rank=int(record[8]), quantile="quartile"
-                ),
-                access_to_services_quintile=quantile_for_rank(
-                    rank=int(record[8]), quantile="quintile"
-                ),
-                access_to_services_decile=quantile_for_rank(
-                    rank=int(record[8]), quantile="decile"
-                ),
-                access_to_services_score=None,
-                housing_rank=int(record[9]),
-                housing_quartile=quantile_for_rank(
-                    rank=int(record[9]), quantile="quartile"
-                ),
-                housing_quintile=quantile_for_rank(
-                    rank=int(record[9]), quantile="quintile"
-                ),
-                housing_decile=quantile_for_rank(
-                    rank=int(record[9]), quantile="decile"
-                ),
-                housing_score=None,
-                community_safety_rank=int(record[10]),
-                community_safety_quartile=quantile_for_rank(
-                    rank=int(record[10]), quantile="quartile"
-                ),
-                community_safety_quintile=quantile_for_rank(
-                    rank=int(record[10]), quantile="quintile"
-                ),
-                community_safety_decile=quantile_for_rank(
-                    rank=int(record[10]), quantile="decile"
-                ),
-                community_safety_score=None,
-                physical_environment_rank=int(record[11]),
-                physical_environment_quartile=quantile_for_rank(
-                    rank=int(record[11]), quantile="quartile"
-                ),
-                physical_environment_quintile=quantile_for_rank(
-                    rank=int(record[11]), quantile="quintile"
-                ),
-                physical_environment_decile=quantile_for_rank(
-                    rank=int(record[11]), quantile="decile"
-                ),
-                physical_environment_score=None,
-                lsoa=lsoa,
-                year=2019,
-            )
-            progress_bar(
-                iteration=count, total=1909, prefix="Progress", suffix="Complete"
-            )
-            count += 1
+    if (
+        WelshIndexMultipleDeprivation.objects.exists()
+        and WelshIndexMultipleDeprivation.objects.count() == len(data[1:])  # 1909
+    ):
+        print(R + "Welsh indices already present. Skipping..." + W)
+        return
+
+    for record in data[1:]:
+        lsoa = LSOA.objects.get(lsoa_code=record[0])
+        WelshIndexMultipleDeprivation.objects.create(
+            imd_rank=int(record[3]),
+            imd_quartile=quantile_for_rank(
+                rank=int(record[3]), requested_quantile=4, country="wales"
+            )["data_quantile"],
+            imd_quintile=quantile_for_rank(
+                rank=int(record[3]), requested_quantile=5, country="wales"
+            )["data_quantile"],
+            imd_decile=quantile_for_rank(
+                rank=int(record[3]), requested_quantile=10, country="wales"
+            )["data_quantile"],
+            imd_score=None,
+            income_rank=int(record[4]),
+            income_quartile=quantile_for_rank(
+                rank=int(record[4]), requested_quantile=4, country="wales"
+            )["data_quantile"],
+            income_quintile=quantile_for_rank(
+                rank=int(record[4]), requested_quantile=5, country="wales"
+            )["data_quantile"],
+            income_decile=quantile_for_rank(
+                rank=int(record[4]), requested_quantile=10, country="wales"
+            )["data_quantile"],
+            income_score=None,
+            employment_rank=int(record[5]),
+            employment_quartile=quantile_for_rank(
+                rank=int(record[5]), requested_quantile=4, country="wales"
+            )["data_quantile"],
+            employment_quintile=quantile_for_rank(
+                rank=int(record[5]), requested_quantile=5, country="wales"
+            )["data_quantile"],
+            employment_decile=quantile_for_rank(
+                rank=int(record[5]), requested_quantile=10, country="wales"
+            )["data_quantile"],
+            employment_score=None,
+            health_rank=int(record[6]),
+            health_quartile=quantile_for_rank(
+                rank=int(record[6]), requested_quantile=4, country="wales"
+            )["data_quantile"],
+            health_quintile=quantile_for_rank(
+                rank=int(record[6]), requested_quantile=5, country="wales"
+            )["data_quantile"],
+            health_decile=quantile_for_rank(
+                rank=int(record[6]), requested_quantile=10, country="wales"
+            )["data_quantile"],
+            health_score=None,
+            education_rank=int(record[7]),
+            education_quartile=quantile_for_rank(
+                rank=int(record[7]), requested_quantile=4, country="wales"
+            )["data_quantile"],
+            education_quintile=quantile_for_rank(
+                rank=int(record[7]), requested_quantile=5, country="wales"
+            )["data_quantile"],
+            education_decile=quantile_for_rank(
+                rank=int(record[7]), requested_quantile=10, country="wales"
+            )["data_quantile"],
+            education_score=None,
+            access_to_services_rank=int(record[8]),
+            access_to_services_quartile=quantile_for_rank(
+                rank=int(record[8]), requested_quantile=4, country="wales"
+            )["data_quantile"],
+            access_to_services_quintile=quantile_for_rank(
+                rank=int(record[8]), requested_quantile=5, country="wales"
+            )["data_quantile"],
+            access_to_services_decile=quantile_for_rank(
+                rank=int(record[8]), requested_quantile=10, country="wales"
+            )["data_quantile"],
+            access_to_services_score=None,
+            housing_rank=int(record[9]),
+            housing_quartile=quantile_for_rank(
+                rank=int(record[9]), requested_quantile=4, country="wales"
+            )["data_quantile"],
+            housing_quintile=quantile_for_rank(
+                rank=int(record[9]), requested_quantile=5, country="wales"
+            )["data_quantile"],
+            housing_decile=quantile_for_rank(
+                rank=int(record[9]), requested_quantile=10, country="wales"
+            )["data_quantile"],
+            housing_score=None,
+            community_safety_rank=int(record[10]),
+            community_safety_quartile=quantile_for_rank(
+                rank=int(record[10]), requested_quantile=4, country="wales"
+            )["data_quantile"],
+            community_safety_quintile=quantile_for_rank(
+                rank=int(record[10]), requested_quantile=5, country="wales"
+            )["data_quantile"],
+            community_safety_decile=quantile_for_rank(
+                rank=int(record[10]), requested_quantile=10, country="wales"
+            )["data_quantile"],
+            community_safety_score=None,
+            physical_environment_rank=int(record[11]),
+            physical_environment_quartile=quantile_for_rank(
+                rank=int(record[11]), requested_quantile=4, country="wales"
+            )["data_quantile"],
+            physical_environment_quintile=quantile_for_rank(
+                rank=int(record[11]), requested_quantile=5, country="wales"
+            )["data_quantile"],
+            physical_environment_decile=quantile_for_rank(
+                rank=int(record[11]), requested_quantile=10, country="wales"
+            )["data_quantile"],
+            physical_environment_score=None,
+            lsoa=lsoa,
+            year=2019,
+        )
+        count += 1
     print(
         f"{BOLD}Complete.{END} Added {count} Welsh IMD ranks/quantiles.\n"
     )  # should be 1909
@@ -595,6 +619,10 @@ def add_welsh_2019_scores_to_existing_2019_lsoas():
         print(G + "- Adding Welsh IMD scores" + W)
         data = list(csv.reader(f, delimiter=","))
         count = 0
+        # with alive_bar(len(data[1:])) as progress_bar:
+        if WelshIndexMultipleDeprivation.objects.first().imd_score is not None:
+            print("Welsh IMDs already seeded. Skipping...")
+            return
 
         for record in data[1:]:
             lsoa = LSOA.objects.get(lsoa_code=record[0])
@@ -611,166 +639,49 @@ def add_welsh_2019_scores_to_existing_2019_lsoas():
                 lsoa=lsoa,
                 year=2019,
             )
-            progress_bar(
-                iteration=count, total=1909, prefix="Progress", suffix="Complete"
-            )
             count += 1
     print(f"{BOLD}Complete.{END} Added {count} Welsh IMD scores.\n")  # should be 1909
 
 
 def add_northern_ireland_soas_and_deprivation_domains_with_ranks():
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{NORTHERN_IRELAND_SOAS_AND_IMD_RANKS}"
+    with open(path, "r") as f:
+        print(
+            G
+            + "- Adding Northern Ireland 2001 SOAs and 2017 deprivation domains and ranks...\n"
+            + W
+        )
+        data = list(csv.reader(f, delimiter=","))
 
-    if SOA.objects.exists() and SOA.objects.all().count() == 891:
+    imd_counter = 0
+    if SOA.objects.exists() and SOA.objects.all().count() == len(data[1:891]):  # 890
         print(R + "Northern Ireland SOAs already added. Skipping..." + W)
         pass
     else:
-        imd_counter = 0
+        for row in data[1:891]:
+            soa = SOA.objects.create(soa_code=row[2], soa_name=row[3], year=2001)
 
-        with open(path, "r") as f:
-            print(
-                G
-                + "- Adding Northern Ireland 2001 SOAs and 2017 deprivation domains and ranks...\n"
-                + W
+            NorthernIrelandIndexMultipleDeprivation.objects.create(
+                year=2017,
+                imd_rank=row[4],
+                income_rank=row[5],
+                employment_rank=row[6],
+                health_deprivation_and_disability_rank=row[7],
+                education_skills_and_training_rank=row[8],
+                access_to_services_rank=row[9],
+                living_environment_rank=row[10],
+                crime_and_disorder_rank=row[11],
+                soa=soa,
             )
-            data = list(csv.reader(f, delimiter=","))
-            for row in data[1:891]:
-                soa = SOA.objects.create(soa_code=row[2], soa_name=row[3], year=2001)
-
-                NorthernIrelandIndexMultipleDeprivation.objects.create(
-                    year=2017,
-                    imd_rank=row[4],
-                    income_rank=row[5],
-                    employment_rank=row[6],
-                    health_deprivation_and_disability_rank=row[7],
-                    education_skills_and_training_rank=row[8],
-                    access_to_services_rank=row[9],
-                    living_environment_rank=row[10],
-                    crime_and_disorder_rank=row[11],
-                    soa=soa,
-                )
-
-                progress_bar(
-                    iteration=imd_counter,
-                    total=891,
-                    prefix="Progress",
-                    suffix="Complete",
-                )
-                imd_counter += 1
+            imd_counter += 1
     print(
         f"{BOLD}Complete.{END} {imd_counter} Northern Ireland SOAs and IMD domains and ranks added."
         + W
     )
 
 
-def calculated_quantile_for_rank(rank, total_records, quantile_type):
-    """
-    Return a quantile against a rank and a total
-    Params:
-    rank: integer - represents rank in a list of records
-    total_records: integer - represents the total number of records
-    quantile_type: integer - the number of equally sized groups the records are divided into
-    """
-    quantile_names = [
-        "median",
-        "tertile",
-        "quartile",
-        "quintile",
-        "sextile",
-        "septile",
-        "octile",
-        "decile",
-        "duodecile",
-        "hexadecile",
-        "vigintile",
-    ]
-
-    tile_size = floor(total_records / quantile_type)
-    if tile_size <= rank:
-        return 1
-    else:
-        return floor(rank / tile_size)
-
-
-def quantile_for_rank(rank, quantile=Literal["quartile", "quintile", "decile"]):
-    """
-    returns a quantile for a rank in WIMD data
-
-    WIMD 2019 Rank	Decile
-            1-191	    1
-            192-382	    2
-            383-573	    3
-            574-764	    4
-            765-955	    5
-            956-1146	6
-            1147-1337	7
-            1338-1528	8
-            1529-1719	9
-            1720-1909	10
-    WIMD 2019 Rank	Quintile
-            1-382	    1
-            383-764	    2
-            765-1146	3
-            1147-1528	4
-            1529-1909	5
-    WIMD 2019 Rank	Quartile
-            1-478	    1
-            479-955	    2
-            956-1432	3
-            1433-1909	4
-    """
-    if (
-        (quantile == "quartile" and rank <= 478)
-        or (rank <= 191 and quantile == "decile")
-        or (rank <= 382 and quantile == "quintile")
-    ):
-        return 1
-    elif (
-        (quantile == "quartile" and rank <= 955)
-        or (rank <= 382 and quantile == "decile")
-        or (rank <= 764 and quantile == "quintile")
-    ):
-        return 2
-    elif (
-        (quantile == "quartile" and rank <= 1432)
-        or (rank <= 573 and quantile == "decile")
-        or (rank <= 1146 and quantile == "quintile")
-    ):
-        return 3
-    elif (
-        (quantile == "quartile" and rank <= 1909)
-        or (rank <= 764 and quantile == "decile")
-        or (rank <= 1528 and quantile == "quintile")
-    ):
-        return 4
-    elif (rank <= 955 and quantile == "decile") or (
-        rank <= 1909 and quantile == "quintile"
-    ):
-        return 5
-    elif rank <= 1146 and quantile == "decile":
-        return 6
-    elif rank <= 1337 and quantile == "decile":
-        return 7
-    elif rank <= 1528 and quantile == "decile":
-        return 8
-    elif rank <= 1719 and quantile == "decile":
-        return 9
-    elif rank <= 1909 and quantile == "decile":
-        return 10
-    else:
-        raise ValueError(f"Incorrect rank {rank} passed for {quantile}")
-
-
 def add_scottish_deprivation_ranks_and_domains_to_2011_datazones():
     # import domains of deprivation data
-
-    if (
-        ScottishIndexMultipleDeprivation.objects.exists()
-        and ScottishIndexMultipleDeprivation.objects.count() == 6976
-    ):
-        print(R + "Scottish indices already exist! Skipping..." + W)
-        return
-
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_SCOTLAND_RANKS}"
     with open(path, "r") as f:
         print(
@@ -781,69 +692,37 @@ def add_scottish_deprivation_ranks_and_domains_to_2011_datazones():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in data[1:]:  # skip the first row
-            if DataZone.objects.filter(data_zone_code=row[0], year=2011).exists():
-                data_zone = DataZone.objects.filter(
-                    data_zone_code=row[0], year=2011
-                ).get()
+    if (
+        ScottishIndexMultipleDeprivation.objects.exists()
+        and ScottishIndexMultipleDeprivation.objects.count() == len(data[:1])  # 6976
+    ):
+        print(R + "Scottish indices already exist! Skipping..." + W)
+        return
 
-                ScottishIndexMultipleDeprivation.objects.create(
-                    imd_rank=row[2],
-                    version=2,
-                    income_rank=round(float(row[6])),
-                    employment_rank=round(float(row[7])),
-                    education_rank=round(float(row[8])),
-                    health_rank=round(float(row[9])),
-                    access_rank=round(float(row[10])),
-                    crime_rank=round(float(row[11])),
-                    housing_rank=round(float(row[12])),
-                    data_zone=data_zone,
-                    year=2020,
-                )
-                count += 1
+    for row in data[1:]:  # skip the first row
+        if DataZone.objects.filter(code=row[0], year=2011).exists():
+            data_zone = DataZone.objects.filter(code=row[0], year=2011).get()
 
-            progress_bar(
-                iteration=count, total=6976, prefix="Progress", suffix="Complete"
+            ScottishIndexMultipleDeprivation.objects.create(
+                imd_rank=row[2],
+                version=2,
+                income_rank=round(float(row[6])),
+                employment_rank=round(float(row[7])),
+                education_rank=round(float(row[8])),
+                health_rank=round(float(row[9])),
+                access_rank=round(float(row[10])),
+                crime_rank=round(float(row[11])),
+                housing_rank=round(float(row[12])),
+                data_zone=data_zone,
+                year=2020,
             )
-            # print(
-            #     f"Added {count} records of English deprivation domains (ranks and deciles)",
-            #     end="\r",
-            # )  # 32844
+            count += 1
+        else:
+            print(f"{row[0]} does not exist in the datazone table.\n")
 
     print(
         f"{BOLD}Complete.{END} {count} Scottish IMD records with domains added (ranks).\n"
     )
-
-
-def progress_bar(
-    iteration,
-    total,
-    prefix="",
-    suffix="",
-    decimals=1,
-    length=100,
-    fill="█",
-    printEnd="\r",
-):
-    """
-    Call in a loop to create terminal progress bar
-    @params:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : positive number of decimals in percent complete (Int)
-        length      - Optional  : character length of bar (Int)
-        fill        - Optional  : bar fill character (Str)
-        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
-    """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength = int(length * iteration // total)
-    bar = fill * filledLength + "-" * (length - filledLength)
-    print(f"\r{prefix} |{bar}| {percent}% {suffix}", end=printEnd)
-    # Print New Line on Complete
-    if iteration == total:
-        print()
 
 
 def image():
