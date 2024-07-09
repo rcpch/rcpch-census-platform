@@ -51,7 +51,6 @@ from .serializers import (
 from .general_functions import (
     lsoa_for_postcode,
     regions_for_postcode,
-    is_valid_postcode,
 )
 
 
@@ -353,45 +352,44 @@ class UKIndexMultipleDeprivationView(APIView):
         """
         post_code = self.request.query_params.get("postcode", None)
         if post_code:
-            if is_valid_postcode(postcode=post_code):
-                lsoa_object = lsoa_for_postcode(postcode=post_code)
+            lsoa_object = lsoa_for_postcode(postcode=post_code)
 
-                if lsoa_object["lsoa"]:
-                    lsoa_code = lsoa_object["lsoa"]
-                    if lsoa_object["country"] == "England":
-                        lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-                        imd = EnglishIndexMultipleDeprivation.objects.filter(
-                            lsoa=lsoa
-                        ).get()
-                        response = self.english_serializer_class(
-                            instance=imd, context={"request": request}
-                        )
-                    elif lsoa_object["country"] == "Wales":
-                        lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-                        imd = WelshIndexMultipleDeprivation.objects.filter(
-                            lsoa=lsoa
-                        ).get()
-                        response = self.welsh_serializer_class(
-                            instance=imd, context={"request": request}
-                        )
-                    elif lsoa_object["country"] == "Scotland":
-                        lsoa = DataZone.objects.filter(data_zone_code=lsoa_code).get()
-                        imd = ScottishIndexMultipleDeprivation.objects.filter(
-                            data_zone=lsoa
-                        ).get()
-                        response = self.scottish_serializer_class(
-                            instance=imd, context={"request": request}
-                        )
-                    elif lsoa_object["country"] == "Northern Ireland":
-                        lsoa = SOA.objects.filter(soa_code=lsoa_code).get()
-                        imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
-                            soa=lsoa
-                        ).get()
-                        response = self.northern_ireland_serializer_class(
-                            instance=imd, context={"request": request}
-                        )
-                    else:
-                        raise ParseError("No valid country supplied.", code=400)
+            if lsoa_object["lsoa"]:
+                lsoa_code = lsoa_object["lsoa"]
+                if lsoa_object["country"] == "England":
+                    lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
+                    imd = EnglishIndexMultipleDeprivation.objects.filter(
+                        lsoa=lsoa
+                    ).get()
+                    response = self.english_serializer_class(
+                        instance=imd, context={"request": request}
+                    )
+                elif lsoa_object["country"] == "Wales":
+                    lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
+                    imd = WelshIndexMultipleDeprivation.objects.filter(
+                        lsoa=lsoa
+                    ).get()
+                    response = self.welsh_serializer_class(
+                        instance=imd, context={"request": request}
+                    )
+                elif lsoa_object["country"] == "Scotland":
+                    lsoa = DataZone.objects.filter(data_zone_code=lsoa_code).get()
+                    imd = ScottishIndexMultipleDeprivation.objects.filter(
+                        data_zone=lsoa
+                    ).get()
+                    response = self.scottish_serializer_class(
+                        instance=imd, context={"request": request}
+                    )
+                elif lsoa_object["country"] == "Northern Ireland":
+                    lsoa = SOA.objects.filter(soa_code=lsoa_code).get()
+                    imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
+                        soa=lsoa
+                    ).get()
+                    response = self.northern_ireland_serializer_class(
+                        instance=imd, context={"request": request}
+                    )
+                else:
+                    raise ParseError("No valid country supplied.", code=400)
             else:
                 # postcode not valid
                 raise ParseError("Invalid postcode supplied.", code=400)
@@ -468,56 +466,55 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
         post_code = self.request.query_params.get("postcode", None)
         requested_quantile = self.request.query_params.get("quantile", None)
         if post_code:
-            if is_valid_postcode(postcode=post_code):
-                lsoa_object = lsoa_for_postcode(postcode=post_code)
-                if lsoa_object["lsoa"]:
-                    lsoa_code = lsoa_object["lsoa"]
-                    if lsoa_object["country"] == "England":
-                        lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-                        imd = EnglishIndexMultipleDeprivation.objects.filter(
-                            lsoa=lsoa
-                        ).get()
-                        data = quantile_for_rank(
-                            rank=imd.imd_rank,
-                            requested_quantile=requested_quantile,
-                            country="england",
-                        )
-                        response = Response({"result": data})
-                    elif lsoa_object["country"] == "Wales":
-                        lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-                        imd = WelshIndexMultipleDeprivation.objects.filter(
-                            lsoa=lsoa
-                        ).get()
-                        data = quantile_for_rank(
-                            rank=imd.imd_rank,
-                            requested_quantile=requested_quantile,
-                            country="wales",
-                        )
-                        response = Response({"result": data})
-                    elif lsoa_object["country"] == "Scotland":
-                        lsoa = DataZone.objects.filter(data_zone_code=lsoa_code).get()
-                        imd = ScottishIndexMultipleDeprivation.objects.filter(
-                            data_zone=lsoa
-                        ).get()
-                        data = quantile_for_rank(
-                            rank=imd.imd_rank,
-                            requested_quantile=requested_quantile,
-                            country="scotland",
-                        )
-                        response = Response({"result": data})
-                    elif lsoa_object["country"] == "Northern Ireland":
-                        lsoa = SOA.objects.filter(soa_code=lsoa_code).get()
-                        imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
-                            soa=lsoa
-                        ).get()
-                        data = quantile_for_rank(
-                            rank=imd.imd_rank,
-                            requested_quantile=requested_quantile,
-                            country="northern_ireland",
-                        )
-                        response = Response({"result": data})
-                    else:
-                        raise ParseError("No valid country supplied.", code=400)
+            lsoa_object = lsoa_for_postcode(postcode=post_code)
+            if lsoa_object["lsoa"]:
+                lsoa_code = lsoa_object["lsoa"]
+                if lsoa_object["country"] == "England":
+                    lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
+                    imd = EnglishIndexMultipleDeprivation.objects.filter(
+                        lsoa=lsoa
+                    ).get()
+                    data = quantile_for_rank(
+                        rank=imd.imd_rank,
+                        requested_quantile=requested_quantile,
+                        country="england",
+                    )
+                    response = Response({"result": data})
+                elif lsoa_object["country"] == "Wales":
+                    lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
+                    imd = WelshIndexMultipleDeprivation.objects.filter(
+                        lsoa=lsoa
+                    ).get()
+                    data = quantile_for_rank(
+                        rank=imd.imd_rank,
+                        requested_quantile=requested_quantile,
+                        country="wales",
+                    )
+                    response = Response({"result": data})
+                elif lsoa_object["country"] == "Scotland":
+                    lsoa = DataZone.objects.filter(data_zone_code=lsoa_code).get()
+                    imd = ScottishIndexMultipleDeprivation.objects.filter(
+                        data_zone=lsoa
+                    ).get()
+                    data = quantile_for_rank(
+                        rank=imd.imd_rank,
+                        requested_quantile=requested_quantile,
+                        country="scotland",
+                    )
+                    response = Response({"result": data})
+                elif lsoa_object["country"] == "Northern Ireland":
+                    lsoa = SOA.objects.filter(soa_code=lsoa_code).get()
+                    imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
+                        soa=lsoa
+                    ).get()
+                    data = quantile_for_rank(
+                        rank=imd.imd_rank,
+                        requested_quantile=requested_quantile,
+                        country="northern_ireland",
+                    )
+                    response = Response({"result": data})
+                else:
+                    raise ParseError("No valid country supplied.", code=400)
             else:
                 # postcode not valid
                 raise ParseError("Invalid postcode supplied.", code=400)
