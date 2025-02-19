@@ -136,7 +136,7 @@ There are 10 routes that accept GET requests, all of which return lists that can
 
 example:
 SW1A 1AA (Buckingham Palace):
-```http://localhost:8000/rcpch-census-platform/api/v1/indices_of_multiple_deprivation/?postcode=SW11AA```
+```http://localhost:8000/rcpch-census-platform/api/v1/indices_of_multiple_deprivation/?postcode=SW1A1AA```
 
 ```json
 HTTP 200 OK
