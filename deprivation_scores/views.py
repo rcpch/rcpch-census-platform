@@ -353,7 +353,8 @@ class UKIndexMultipleDeprivationView(APIView):
         """
         post_code = self.request.query_params.get("postcode", None)
         if post_code:
-            lsoa_object = lsoa_for_postcode(postcode=post_code)
+            if not (lsoa_object := lsoa_for_postcode(postcode=post_code)):
+                raise ParseError("Invalid postcode supplied.", code=400)
 
             if lsoa_object["lsoa"]:
                 lsoa_code = lsoa_object["lsoa"]
