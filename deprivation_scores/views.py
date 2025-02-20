@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from rest_framework import (
     viewsets,
     serializers,  # serializers here required for drf-spectacular @extend_schema
@@ -130,13 +131,13 @@ class LSOAViewSet(viewsets.ReadOnlyModelViewSet):
 class SOAViewSet(viewsets.ReadOnlyModelViewSet):
     """
     This endpoint returns a list of SOAs in Northern Ireland.
-    
+
     Filter Parameters:
 
     `year`
-    
+
     `soa_code`
-    
+
     `soa_name`
 
     If none are passed, a list is returned.
@@ -168,13 +169,13 @@ class GreenSpaceViewSet(viewsets.ReadOnlyModelViewSet):
 class DataZoneViewSet(viewsets.ReadOnlyModelViewSet):
     """
     This endpoint returns a list of all Scottish data zones (2011) and their associated local authority district.
-    
+
     Filter Parameters:
 
     `year`
-    
+
     `data_zone_code`
-    
+
     `data_zone_name`
 
     If none are passed, a list is returned.
@@ -209,7 +210,7 @@ class EnglishIndexMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 class WelshMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     This endpoint returns a list of Welsh LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).
-    
+
     Filter Parameters:
 
     `lsoa_code`
@@ -229,7 +230,7 @@ class WelshMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 class ScottishMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     This endpoint returns a list of Scottish data zones with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2017).
-    
+
     Filter Parameters:
 
     `data_zone_code`
@@ -257,9 +258,7 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     If none are passed, a list is returned.
     """
 
-    queryset = NorthernIrelandIndexMultipleDeprivation.objects.all().order_by(
-        "-imd_rank"
-    )
+    queryset = NorthernIrelandIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
     serializer_class = NorthernIrelandIndexMultipleDeprivationSerializer
     filterset_class = NorthernIrelandIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
@@ -294,8 +293,16 @@ class PostcodeView(APIView):
         """
         postcode = request.query_params.get("postcode")
         if postcode:
-            if not (response := regions_for_postcode(postcode=postcode)):
-                raise ParseError(detail="Invalid postcode supplied.")
+
+            data = regions_for_postcode(postcode=postcode)
+            status = data["status"]
+
+            response = data["response"]
+            if status == "error":
+                raise ParseError(response, code=400)
+            elif status == "terminated_postcode":
+                return Response(response, status=HTTPStatus.GONE)
+
             return Response(response)
         else:
             raise ParseError(detail="Postcode cannot be blank")
@@ -305,9 +312,7 @@ class UKIndexMultipleDeprivationView(APIView):
     english_serializer_class = EnglishIndexMultipleDeprivationSerializer
     welsh_serializer_class = WelshIndexMultipleDeprivationSerializer
     scottish_serializer_class = ScottishIndexMultipleDeprivationSerializer
-    northern_ireland_serializer_class = (
-        NorthernIrelandIndexMultipleDeprivationSerializer
-    )
+    northern_ireland_serializer_class = NorthernIrelandIndexMultipleDeprivationSerializer
 
     @extend_schema(
         parameters=[
@@ -353,40 +358,39 @@ class UKIndexMultipleDeprivationView(APIView):
         """
         post_code = self.request.query_params.get("postcode", None)
         if post_code:
-            if not (lsoa_object := lsoa_for_postcode(postcode=post_code)):
-                raise ParseError("Invalid postcode supplied.", code=400)
+            data = lsoa_for_postcode(postcode=post_code)
+            status = data["status"]
+            response = data["response"]
+            if status == "error":
+                raise ParseError(response, code=400)
+            elif status == "terminated_postcode":
+                return Response(response, status=HTTPStatus.GONE)
+
+            lsoa_object = response
 
             if lsoa_object["lsoa"]:
                 lsoa_code = lsoa_object["lsoa"]
                 if lsoa_object["country"] == "England":
                     lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-                    imd = EnglishIndexMultipleDeprivation.objects.filter(
-                        lsoa=lsoa
-                    ).get()
+                    imd = EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
                     response = self.english_serializer_class(
                         instance=imd, context={"request": request}
                     )
                 elif lsoa_object["country"] == "Wales":
                     lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-                    imd = WelshIndexMultipleDeprivation.objects.filter(
-                        lsoa=lsoa
-                    ).get()
+                    imd = WelshIndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
                     response = self.welsh_serializer_class(
                         instance=imd, context={"request": request}
                     )
                 elif lsoa_object["country"] == "Scotland":
                     lsoa = DataZone.objects.filter(data_zone_code=lsoa_code).get()
-                    imd = ScottishIndexMultipleDeprivation.objects.filter(
-                        data_zone=lsoa
-                    ).get()
+                    imd = ScottishIndexMultipleDeprivation.objects.filter(data_zone=lsoa).get()
                     response = self.scottish_serializer_class(
                         instance=imd, context={"request": request}
                     )
                 elif lsoa_object["country"] == "Northern Ireland":
                     lsoa = SOA.objects.filter(soa_code=lsoa_code).get()
-                    imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
-                        soa=lsoa
-                    ).get()
+                    imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(soa=lsoa).get()
                     response = self.northern_ireland_serializer_class(
                         instance=imd, context={"request": request}
                     )
@@ -468,15 +472,23 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
         post_code = self.request.query_params.get("postcode", None)
         requested_quantile = self.request.query_params.get("quantile", None)
         if post_code:
-            if not (lsoa_object := lsoa_for_postcode(postcode=post_code)):
-                raise ParseError("Invalid postcode supplied.", code=400)
+
+            data = lsoa_for_postcode(postcode=post_code)
+
+            status = data["status"]
+            response = data["response"]
+            if status == "error":
+                raise ParseError(response, code=400)
+            elif status == "terminated_postcode":
+                return Response(response, status=HTTPStatus.GONE)
+
+            lsoa_object = response
+
             if lsoa_object["lsoa"]:
                 lsoa_code = lsoa_object["lsoa"]
                 if lsoa_object["country"] == "England":
                     lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-                    imd = EnglishIndexMultipleDeprivation.objects.filter(
-                        lsoa=lsoa
-                    ).get()
+                    imd = EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
                     data = quantile_for_rank(
                         rank=imd.imd_rank,
                         requested_quantile=requested_quantile,
@@ -485,9 +497,7 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                     response = Response({"result": data})
                 elif lsoa_object["country"] == "Wales":
                     lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-                    imd = WelshIndexMultipleDeprivation.objects.filter(
-                        lsoa=lsoa
-                    ).get()
+                    imd = WelshIndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
                     data = quantile_for_rank(
                         rank=imd.imd_rank,
                         requested_quantile=requested_quantile,
@@ -496,9 +506,7 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                     response = Response({"result": data})
                 elif lsoa_object["country"] == "Scotland":
                     lsoa = DataZone.objects.filter(data_zone_code=lsoa_code).get()
-                    imd = ScottishIndexMultipleDeprivation.objects.filter(
-                        data_zone=lsoa
-                    ).get()
+                    imd = ScottishIndexMultipleDeprivation.objects.filter(data_zone=lsoa).get()
                     data = quantile_for_rank(
                         rank=imd.imd_rank,
                         requested_quantile=requested_quantile,
@@ -507,9 +515,7 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                     response = Response({"result": data})
                 elif lsoa_object["country"] == "Northern Ireland":
                     lsoa = SOA.objects.filter(soa_code=lsoa_code).get()
-                    imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
-                        soa=lsoa
-                    ).get()
+                    imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(soa=lsoa).get()
                     data = quantile_for_rank(
                         rank=imd.imd_rank,
                         requested_quantile=requested_quantile,
