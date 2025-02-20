@@ -69,7 +69,7 @@ def lsoa_for_postcode(postcode):
     data = get_postcode_data(postcode)
     if data["status"] != "success":
         return data
-    
+
     data = data["response"]
     country = data["result"]["country"]
     lsoa = data["result"]["codes"]["lsoa"]
@@ -83,12 +83,3 @@ def lsoa_for_postcode(postcode):
 def regions_for_postcode(postcode):
     data = get_postcode_data(postcode)
     return data
-
-
-def local_authority_district_code_for_postcode(postcode):
-    serialised = get_postcode_data(postcode)
-    if serialised["status"] != "success":
-        return serialised
-
-    lad = serialised["result"]["codes"]["admin_district"]
-    return lad
