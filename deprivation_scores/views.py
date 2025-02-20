@@ -294,7 +294,8 @@ class PostcodeView(APIView):
         """
         postcode = request.query_params.get("postcode")
         if postcode:
-            response = regions_for_postcode(postcode=postcode)
+            if not (response := regions_for_postcode(postcode=postcode)):
+                raise ParseError(detail="Invalid postcode supplied.")
             return Response(response)
         else:
             raise ParseError(detail="Postcode cannot be blank")
@@ -466,7 +467,8 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
         post_code = self.request.query_params.get("postcode", None)
         requested_quantile = self.request.query_params.get("quantile", None)
         if post_code:
-            lsoa_object = lsoa_for_postcode(postcode=post_code)
+            if not (lsoa_object := lsoa_for_postcode(postcode=post_code)):
+                raise ParseError("Invalid postcode supplied.", code=400)
             if lsoa_object["lsoa"]:
                 lsoa_code = lsoa_object["lsoa"]
                 if lsoa_object["country"] == "England":
