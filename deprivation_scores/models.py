@@ -558,7 +558,6 @@ class NorthernIrelandIndexMultipleDeprivation(models.Model):
     crime_and_disorder_rank = models.IntegerField()
     soa = models.ForeignKey(to=SOA, on_delete=models.PROTECT)
 
-Python
 
 from django.db import models
 
@@ -600,7 +599,7 @@ class PopulationDensity(models.Model):
     ethnic_white_2011 = models.FloatField(blank=True, null=True)
     ethnic_mixed_2011 = models.FloatField(blank=True, null=True)
     ethnic_asian_2011 = models.FloatField(blank=True, null=True)
-    ethnic_black_african_caribbean_ = models.FloatField(blank=True, null=True)
+    ethnic_black_african_caribbean = models.FloatField(blank=True, null=True)
     ethnic_other_2011 = models.FloatField(blank=True, null=True)
     population_2011_1000s = models.FloatField(blank=True, null=True)
     nr_area_ha = models.FloatField(blank=True, null=True)

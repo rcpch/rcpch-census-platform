@@ -1,6 +1,6 @@
 # Base Docker image Official Python 3.11
-FROM python:3.11
- 
+FROM python:3.12
+
 # Set 'build-time' environment variables  
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
