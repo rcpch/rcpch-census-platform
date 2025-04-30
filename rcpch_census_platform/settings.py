@@ -23,6 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 settings_dir = os.path.dirname(__file__)
 PROJECT_ROOT = os.path.abspath(os.path.dirname(settings_dir))
 IMD_DATA_FILES_FOLDER = os.path.join(PROJECT_ROOT, "deprivation_scores/imd_data")
+POPULATION_DENSITIES_FOLDER = os.path.join(PROJECT_ROOT, "deprivation_scores/population_densities")
 
 
 # Quick-start development settings - unsuitable for production
