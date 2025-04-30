@@ -43,6 +43,9 @@ IMD_WALES_DEPRIVATION_SCORES = "wimd-2019-index-and-domain-scores-by-small-area.
 IMD_SCOTLAND_RANKS = "SIMD+2020v2.csv"
 NORTHERN_IRELAND_SOAS_AND_IMD_RANKS = "NIMDM17_SOAresults.csv"
 
+POPULATION_DENSITIES = "Access_to_Natural_Green_Space_Inequalities__(LSOA).csv"
+
+
 W = "\033[0m"  # white (normal)
 R = "\033[31m"  # red
 G = "\033[32m"  # green
@@ -814,7 +817,124 @@ def add_scottish_deprivation_ranks_and_domains_to_2011_datazones():
         f"{BOLD}Complete.{END} {count} Scottish IMD records with domains added (ranks).\n"
     )
 
+def update_population_densities():
+    """
+    Update population densities for LSOAs, MSOAs, LADs and Wards
 
+    Thanks to the remarkable alex.gilroy@theriverstrust for this resource
+    """
+    if PopulationDensity.objects.exists() and PopulationDensity.objects.all().count() == LSAO.objects.count():
+        print(R + "Population densities already added. Skipping..." + W)
+        return
+
+    path = f"{settings.POPULATION_DENSITIES_FOLDER}/{POPULATION_DENSITIES}"
+    with open(path, "r") as f:
+        print(
+            G
+            + "- Population density stats to England LSOAs, MSOAs, LADs and Wards\n"
+            + W
+        )
+        data = list(csv.reader(f, delimiter=","))
+        count = 0
+
+        for row in data[1:]:  # skip the first row
+            lsoa11cd = row['lsoa11cd']
+            if LSOA.objects.filter(lsoa_code=lsoa11cd).exists():
+                lsoa = LSOA.objects.filter(lsoa_code=lsoa11cd).get()
+                msoa = None
+                if MSOA.objects.filter(msoa_code=row["msoa_code"]).exists():
+                    msoa = MSOA.objects.filter(msoa_code=row["msoa_code"]).get()
+                ward = None
+                if WARD.objects.filter(ward_code=row["ward_code"]).exists():
+                    ward = WARD.objects.filter(ward_code=row["ward_code"]).get()
+                local_authority = None
+                if LocalAuthority.objects.filter(
+                    local_authority_district_code=row["localauthority_district_code"]
+                ).exists():
+                    local_authority = LocalAuthority.objects.filter(
+                        local_authority_district_code=row["localauthority_district_code"]
+                    ).get()
+
+                PopulationDensity.objects.create(
+                    lsoa=lsoa,
+                    msoa=msoa,
+                    ward=ward,
+                    local_authority=local_authority,
+                    year=2024,
+                    perc_buff200=perc_buff200,
+                    perc_buff300=perc_buff300,
+                    perc_buff1k=perc_buff1k,
+                    perc_buff2k=perc_buff2k,
+                    perc_buff5k=perc_buff5k,
+                    perc_buff10k=perc_buff10k,
+                    imd_decile=imd_decile,
+                    population_density_2011=population_density_2011,
+                    population_2011=population_2011,
+                    buff200_popdens_deficit=buff200_popdens_deficit,
+                    buff300_popdens_deficit=buff300_popdens_deficit,
+                    buff1k_popdens_deficit=buff1k_popdens_deficit,
+                    buff2k_popdens_deficit=buff2k_popdens_deficit,
+                    buff5k_popdens_deficit=buff5k_popdens_deficit,
+                    buff10k_popdens_deficit=buff10k_popdens_deficit,
+                    buff200_imd_deficit=buff200_imd_deficit,
+                    buff300_imd_deficit=buff300_imd_deficit,
+                    buff1k_imd_deficit=buff1k_imd_deficit,
+                    buff2k_imd_deficit=buff2k_imd_deficit,
+                    buff5k_imd_deficit=buff5k_imd_deficit,
+                    buff10k_imd_deficit=buff10k_imd_deficit,
+                    ag_area_ha=ag_area_ha,
+                    index_multiple_deprivation_2019=index_multiple_deprivation_2019,
+                    population_estimate2018=population_estimate2018,
+                    population_growth_2011_2018=population_growth_2011_2018,
+                    ethnic_white_2011=ethnic_white_2011,
+                    ethnic_mixed_2011=ethnic_mixed_2011,
+                    ethnic_asian_2011=ethnic_asian_2011,
+                    ethnic_black_african_caribbean_=ethnic_black_african_caribbean_,
+                    ethnic_other_2011=ethnic_other_2011,
+                    population_2011_1000s=population_2011_1000s,
+                    nr_area_ha=nr_area_ha,
+                    nr_percentage=nr_percentage,
+                    ruc_category=ruc_category,
+                    ruc11=ruc11,
+                    lnr_area_ha=lnr_area_ha,
+                    residentialaddress_count=residentialaddress_count,
+                    pg_area=pg_area,
+                    pg_area_per1kpeople=pg_area_per1kpeople,
+                    perc_osmmgs=perc_osmmgs,
+                    pgarea_resaddress_ratio=pgarea_resaddress_ratio,
+                    accessiblewoodland_ha=accessiblewoodland_ha,
+                    mean_manmade_percentage=mean_manmade_percentage,
+                    cohort_age_0_to_4=cohort_age_0_to_4,
+                    cohort_age_5_to_7=cohort_age_5_to_7,
+                    cohort_age_8_to_9=cohort_age_8_to_9,
+                    cohort_age_10_to_14=cohort_age_10_to_14,
+                    cohort_age_15=cohort_age_15,
+                    cohort_age_16_to_17=cohort_age_16_to_17,
+                    cohort_age_18_to_19=cohort_age_18_to_19,
+                    cohort_age_20_to_24=cohort_age_20_to_24,
+                    cohort_age_25_to_29=cohort_age_25_to_29,
+                    cohort_age_30_to_44=cohort_age_30_to_44,
+                    cohort_age_45_to_59=cohort_age_45_to_59,
+                    cohort_age_60_to_64=cohort_age_60_to_64,
+                    cohort_age_65_to_74=cohort_age_65_to_74,
+                    cohort_age_75_to_84=cohort_age_75_to_84,
+                    cohort_age_85_to_89=cohort_age_85_to_89,
+                    cohort_age_90_and_over=cohort_age_90_and_over,
+                    perc_close2home=perc_close2home,
+                    popn_close2home=popn_close2home,
+                    cohort_children=cohort_children,
+                    cohort_olderpeople=cohort_olderpeople,
+                    perc_pop_close2home=perc_pop_close2home,
+                    popn_children_close2home=popn_children_close2home,
+                    popn_olderpeople_close2home=popn_olderpeople_close2home,
+                    imd_reversed=imd_reversed,
+                    ag_area_ha_per_person=ag_area_ha_per_person
+                )
+                count += 1
+
+            progress_bar(
+                iteration=count, total=len(data)-1, prefix="Progress", suffix="Complete"
+            )
 def progress_bar(
     iteration,
     total,
