@@ -280,6 +280,7 @@ class PopulationDensityViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = PopulationDensity.objects.all()
     serializer_class = PopulationDensitySerializer
     filter_backends = [DjangoFilterBackend]
+    filterset_fields = ["lsoa__lsoa_code"]
 
 
 # custom views / endpoints

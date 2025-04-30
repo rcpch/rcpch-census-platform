@@ -8,7 +8,6 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from ...models import (
     LSOA,
-    MSOA,
     LocalAuthority,
     Ward,
     GreenSpace,
@@ -628,9 +627,9 @@ def add_welsh_2019_scores_to_existing_2019_lsoas():
 def add_northern_ireland_soas_and_deprivation_domains_with_ranks():
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{NORTHERN_IRELAND_SOAS_AND_IMD_RANKS}"
 
-    if SOA.objects.exists() and SOA.objects.all().count() >= 891:
+    if NorthernIrelandIndexMultipleDeprivation.objects.exists() and NorthernIrelandIndexMultipleDeprivation.objects.all().count() >= SOA.objects.all().count(): #891
         print(R + "Northern Ireland SOAs already added. Skipping..." + W)
-        pass
+        return
     else:
         imd_counter = 0
 
@@ -854,105 +853,97 @@ def update_population_densities():
             return
 
         for i, row in enumerate(data[1:], start=1):  # Iterate starting from the second row (index 1)
-            lsoa11cd = row[0]  # Access the first element (index 0) which is 'lsoa11cd'
+            lsoa11cd = row[1]  # Access the first element (index 1) which is 'lsoa11cd'
+            lsoa = None
             if LSOA.objects.filter(lsoa_code=lsoa11cd).exists():
                 lsoa = LSOA.objects.filter(lsoa_code=lsoa11cd).get()
+            if lsoa is None:
+                print(f"LSOA with code {lsoa11cd} not found. Skipping row {i}.")
+                continue
 
-                msoa_code_index = 1 # Index for msoa_code
-                msoa = None
-                if MSOA.objects.filter(msoa_code=row[msoa_code_index]).exists():
-                    msoa = MSOA.objects.filter(msoa_code=row[msoa_code_index]).get()
-
-                ward_code_index = 2 # Index for ward_code
-                ward = None
-                if WARD.objects.filter(ward_code=row[ward_code_index]).exists():
-                    ward = WARD.objects.filter(ward_code=row[ward_code_index]).get()
-
-                local_authority_district_code_index = 3 # Index for localauthority_district_code
-                local_authority = None
-                if LocalAuthority.objects.filter(
+            local_authority_district_code_index = 4 # Index for localauthority_district_code
+            local_authority = None
+            if LocalAuthority.objects.filter(
+                local_authority_district_code=row[local_authority_district_code_index]
+            ).exists():
+                local_authority = LocalAuthority.objects.filter(
                     local_authority_district_code=row[local_authority_district_code_index]
-                ).exists():
-                    local_authority = LocalAuthority.objects.filter(
-                        local_authority_district_code=row[local_authority_district_code_index]
-                    ).get()
+                ).get()
                 # Directly use integer indices to access the values from the row.
                 # Assuming the order of values in 'row' matches the order
                 # in which you create the PopulationDensity object.
                 PopulationDensity.objects.create(
                     lsoa=lsoa,
-                    msoa=msoa,
-                    ward=ward,
-                    local_authority=local_authority,
+                    local_authority_district=local_authority,
                     year=2024,
-                    perc_buff200=row[4],
-                    perc_buff300=row[5],
-                    perc_buff1k=row[6],
-                    perc_buff2k=row[7],
-                    perc_buff5k=row[8],
-                    perc_buff10k=row[9],
-                    imd_decile=row[10],
-                    population_density_2011=row[11],
-                    population_2011=row[12],
-                    buff200_popdens_deficit=row[13],
-                    buff300_popdens_deficit=row[14],
-                    buff1k_popdens_deficit=row[15],
-                    buff2k_popdens_deficit=row[16],
-                    buff5k_popdens_deficit=row[17],
-                    buff10k_popdens_deficit=row[18],
-                    buff200_imd_deficit=row[19],
-                    buff300_imd_deficit=row[20],
-                    buff1k_imd_deficit=row[21],
-                    buff2k_imd_deficit=row[22],
-                    buff5k_imd_deficit=row[23],
-                    buff10k_imd_deficit=row[24],
-                    ag_area_ha=row[25],
-                    index_multiple_deprivation_2019=row[26],
-                    population_estimate2018=row[27],
-                    population_growth_2011_2018=row[28],
-                    ethnic_white_2011=row[29],
-                    ethnic_mixed_2011=row[30],
-                    ethnic_asian_2011=row[31],
-                    ethnic_black_african_caribbean=row[32],
-                    ethnic_other_2011=row[33],
-                    population_2011_1000s=row[34],
-                    nr_area_ha=row[35],
-                    nr_percentage=row[36],
-                    ruc_category=row[37],
-                    ruc11=row[38],
-                    lnr_area_ha=row[39],
-                    residentialaddress_count=row[40],
-                    pg_area=row[41],
-                    pg_area_per1kpeople=row[42],
-                    perc_osmmgs=row[43],
-                    pgarea_resaddress_ratio=row[44],
-                    accessiblewoodland_ha=row[45],
-                    mean_manmade_percentage=row[46],
-                    cohort_age_0_to_4=row[47],
-                    cohort_age_5_to_7=row[48],
-                    cohort_age_8_to_9=row[49],
-                    cohort_age_10_to_14=row[50],
-                    cohort_age_15=row[51],
-                    cohort_age_16_to_17=row[52],
-                    cohort_age_18_to_19=row[53],
-                    cohort_age_20_to_24=row[54],
-                    cohort_age_25_to_29=row[55],
-                    cohort_age_30_to_44=row[56],
-                    cohort_age_45_to_59=row[57],
-                    cohort_age_60_to_64=row[58],
-                    cohort_age_65_to_74=row[59],
-                    cohort_age_75_to_84=row[60],
-                    cohort_age_85_to_89=row[61],
-                    cohort_age_90_and_over=row[62],
-                    perc_close2home=row[63],
-                    popn_close2home=row[64],
-                    cohort_children=row[65],
-                    cohort_olderpeople=row[66],
-                    perc_pop_close2home=row[67],
-                    popn_children_close2home=row[68],
-                    popn_olderpeople_close2home=row[69],
-                    imd_reversed=row[70],
-                    ag_area_ha_per_person=row[71],
+                    perc_buff200=row[8] if row[8] else None,
+                    perc_buff300=row[9] if row[9] else None,
+                    perc_buff1k=row[10] if row[10] else None,
+                    perc_buff2k=row[11] if row[11] else None,
+                    perc_buff5k=row[12] if row[12] else None,
+                    perc_buff10k=row[13] if row[13] else None,
+                    imd_decile=row[14] if row[14] else None,
+                    population_density_2011=row[15] if row[15] else None,
+                    population_2011=row[16] if row[16] else None,
+                    buff200_popdens_deficit=row[17] if row[17] else None,
+                    buff300_popdens_deficit=row[18] if row[18] else None,
+                    buff1k_popdens_deficit=row[19] if row[19] else None,
+                    buff2k_popdens_deficit=row[20] if row[20] else None,
+                    buff5k_popdens_deficit=row[21] if row[21] else None,
+                    buff10k_popdens_deficit=row[22] if row[22] else None,
+                    buff200_imd_deficit=row[23] if row[23] else None,
+                    buff300_imd_deficit=row[24] if row[24] else None,
+                    buff1k_imd_deficit=row[25] if row[25] else None,
+                    buff2k_imd_deficit=row[26] if row[26] else None,
+                    buff5k_imd_deficit=row[27] if row[27] else None,
+                    buff10k_imd_deficit=row[28] if row[28] else None,
+                    ag_area_ha=row[29] if row[29] else None,
+                    index_multiple_deprivation_2019=row[30] if row[30] else None,
+                    population_estimate2018=row[31] if row[31] else None,
+                    population_growth_2011_2018=row[32] if row[32] else None,
+                    ethnic_white_2011=row[33] if row[33] else None,
+                    ethnic_mixed_2011=row[34] if row[34] else None,
+                    ethnic_asian_2011=row[35] if row[35] else None,
+                    ethnic_black_african_caribbean=row[36] if row[36] else None,
+                    ethnic_other_2011=row[37] if row[37] else None,
+                    population_2011_1000s=row[38] if row[38] else None,
+                    nr_area_ha=row[39] if row[39] else None,
+                    nr_percentage=row[40] if row[40] else None,
+                    ruc_category=row[41] if row[41] else None,
+                    ruc11=row[42] if row[42] else None,
+                    lnr_area_ha=row[43] if row[43] else None,
+                    residentialaddress_count=row[44] if row[44] else None,
+                    pg_area=row[45] if row[45] else None,
+                    pg_area_per1kpeople=row[46] if row[46] else None,
+                    perc_osmmgs=row[47] if row[47] else None,
+                    pgarea_resaddress_ratio=row[48] if row[48] else None,
+                    accessiblewoodland_ha=row[49] if row[49] else None,
+                    mean_manmade_percentage=row[50] if row[50] else None,
+                    cohort_age_0_to_4=row[51] if row[51] else None,
+                    cohort_age_5_to_7=row[52] if row[52] else None,
+                    cohort_age_8_to_9=row[53] if row[53] else None,
+                    cohort_age_10_to_14=row[54] if row[54] else None,
+                    cohort_age_15=row[55] if row[55] else None,
+                    cohort_age_16_to_17=row[56] if row[56] else None,
+                    cohort_age_18_to_19=row[57] if row[57] else None,
+                    cohort_age_20_to_24=row[58] if row[58] else None,
+                    cohort_age_25_to_29=row[59] if row[59] else None,
+                    cohort_age_30_to_44=row[60] if row[60] else None,
+                    cohort_age_45_to_59=row[61] if row[61] else None,
+                    cohort_age_60_to_64=row[62] if row[62] else None,
+                    cohort_age_65_to_74=row[63] if row[63] else None,
+                    cohort_age_75_to_84=row[64] if row[64] else None,
+                    cohort_age_85_to_89=row[65] if row[65] else None,
+                    cohort_age_90_and_over=row[66] if row[66] else None,
+                    perc_close2home=row[67] if row[67] else None,
+                    popn_close2home=row[68] if row[68] else None,
+                    cohort_children=row[69] if row[69] else None,
+                    cohort_olderpeople=row[70] if row[70] else None,
+                    perc_pop_close2home=row[71] if row[71] else None,
+                    popn_children_close2home=row[72] if row[72] else None,
+                    popn_olderpeople_close2home=row[73] if row[73] else None,
+                    imd_reversed=row[74] if row[74] else None,
+                    ag_area_ha_per_person=row[75] if row[75] else None,
                 )
                 count += 1
                 progress_bar(iteration=i, total=count, prefix="Progress", suffix="Complete")
@@ -965,7 +956,7 @@ def progress_bar(
     decimals=1,
     length=100,
     fill="█",
-    printEnd="\r",
+    printEnd="",  # <--- CHANGE THIS: Default to empty string instead of "\r"
 ):
     """
     Call in a loop to create terminal progress bar
@@ -977,15 +968,26 @@ def progress_bar(
         decimals    - Optional  : positive number of decimals in percent complete (Int)
         length      - Optional  : character length of bar (Int)
         fill        - Optional  : bar fill character (Str)
-        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+        printEnd    - Optional  : end character (e.g. "\r", "\r\n"). Default "" for inline update. (Str)
     """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength = int(length * iteration // total)
+    # Avoid division by zero if total is 0
+    if total == 0:
+        percent = "{0:.{1}f}".format(0.0, decimals) # Display 0%
+        filledLength = 0
+    else:
+        # Ensure iteration doesn't exceed total for display calculation
+        iteration = min(iteration, total)
+        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+        filledLength = int(length * iteration // total)
+
     bar = fill * filledLength + "-" * (length - filledLength)
+    # The initial '\r' moves the cursor to the beginning of the line.
+    # 'end=printEnd' (now defaulting to "") prevents adding a newline.
     print(f"\r{prefix} |{bar}| {percent}% {suffix}", end=printEnd)
-    # Print New Line on Complete
+
+    # Print New Line on Complete - this part is correct
     if iteration == total:
-        print()
+        print(flush=True) # Moves to the next line after completion
 
 
 def image():
