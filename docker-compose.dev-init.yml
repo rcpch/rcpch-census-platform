@@ -3,10 +3,9 @@
 # migrates the database and seeds the database
 # YOU ONLY NEED TO USE THIS COMPOSE FILE THE FIRST TIME
 
-version: '3.9'
+version: "3.12"
 
 services:
-
   # web container - runs the django app
   web:
     build: .
@@ -37,7 +36,7 @@ services:
     # ensures that docker compose always displays log output
     tty: true
     stdin_open: true
-            
+
   # db container - runs postgres
   db:
     image: postgres:latest
