@@ -32,6 +32,7 @@ services:
             python manage.py seed --mode='add_welsh_imds' &&
             python manage.py seed --mode='add_scottish_imds' &&
             python manage.py seed --mode='add_northern_ireland_imds' &&
+            python manage.py seed --mode=add_population_densities &&
             python manage.py runserver 0.0.0.0:8001"
     # ensures that docker compose always displays log output
     tty: true
