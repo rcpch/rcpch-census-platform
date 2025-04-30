@@ -474,7 +474,7 @@ def add_welsh_2019_domains_and_ranks_to_existing_2019_lsoas():
     """
     if (
         WelshIndexMultipleDeprivation.objects.exists()
-        and WelshIndexMultipleDeprivation.objects.count() == 1909
+        and WelshIndexMultipleDeprivation.objects.count() >= 1909
     ):
         print(R + "Welsh indices already present. Skipping..." + W)
         return
@@ -628,7 +628,7 @@ def add_welsh_2019_scores_to_existing_2019_lsoas():
 def add_northern_ireland_soas_and_deprivation_domains_with_ranks():
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{NORTHERN_IRELAND_SOAS_AND_IMD_RANKS}"
 
-    if SOA.objects.exists() and SOA.objects.all().count() == 891:
+    if SOA.objects.exists() and SOA.objects.all().count() >= 891:
         print(R + "Northern Ireland SOAs already added. Skipping..." + W)
         pass
     else:

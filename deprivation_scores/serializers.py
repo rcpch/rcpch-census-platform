@@ -12,6 +12,8 @@ from .models import (
     WelshIndexMultipleDeprivation,
     ScottishIndexMultipleDeprivation,
     NorthernIrelandIndexMultipleDeprivation,
+    PopulationDensity,
+    Ward,
 )
 
 
@@ -493,3 +495,10 @@ class NorthernIrelandIndexMultipleDeprivationSerializer(
 
     def get_type(self, obj) -> str:
         return "English"
+
+class PopulationDensitySerializer(serializers.Serializer):
+    
+
+    class Meta:
+        model = PopulationDensity
+        fields ="__all__"
