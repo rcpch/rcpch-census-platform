@@ -496,9 +496,20 @@ class NorthernIrelandIndexMultipleDeprivationSerializer(
     def get_type(self, obj) -> str:
         return "English"
 
-class PopulationDensitySerializer(serializers.Serializer):
-    
+class NestedLSOASerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LSOA
+        fields = [
+            "lsoa_code",
+            "lsoa_name",
+        ]
+
+
+class PopulationDensitySerializer(serializers.ModelSerializer):
+    lsoa = NestedLSOASerializer(read_only=True)
+    local_authority = LocalAuthorityDistrictSerializer(read_only=True)
 
     class Meta:
         model = PopulationDensity
         fields ="__all__"
+        depth = 1
