@@ -5,4 +5,5 @@
 
 # starts all docker compose services
 mkdir datadb
+echo "✨ Running RCPCH Census Platform docker 🛠️"
 docker compose -f docker-compose.dev-init.yml up
