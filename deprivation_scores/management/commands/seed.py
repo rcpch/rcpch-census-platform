@@ -947,6 +947,9 @@ def update_population_densities():
                 )
                 count += 1
                 progress_bar(iteration=i, total=count, prefix="Progress", suffix="Complete")
+        print(
+            f"{BOLD}Complete.{END} {count} Population Density records by LSOA stored.\n"
+        )
 
 def progress_bar(
     iteration,

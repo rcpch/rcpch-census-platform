@@ -12,6 +12,7 @@ python manage.py seed --mode='add_english_imds'
 python manage.py seed --mode='add_welsh_imds'
 python manage.py seed --mode='add_scottish_imds'
 python manage.py seed --mode='add_northern_ireland_imds'
+python manage.py seed --mode='add_population_densities'
 python manage.py create_dev_users
 
 # Start the Django server
