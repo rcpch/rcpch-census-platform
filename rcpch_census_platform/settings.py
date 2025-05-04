@@ -25,6 +25,10 @@ PROJECT_ROOT = os.path.abspath(os.path.dirname(settings_dir))
 IMD_DATA_FILES_FOLDER = os.path.join(PROJECT_ROOT, "deprivation_scores/imd_data")
 POPULATION_DENSITIES_FOLDER = os.path.join(PROJECT_ROOT, "deprivation_scores/population_densities")
 
+# Postcodes.io API settings
+POSTCODES_IO_API_URL = os.getenv("POSTCODES_IO_API_URL")
+POSTCODES_IO_API_KEY = os.getenv("POSTCODES_IO_API_KEY")
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
