@@ -3,10 +3,9 @@
 # migrates the database and seeds the database
 # YOU ONLY NEED TO USE THIS COMPOSE FILE THE FIRST TIME
 
-version: '3.9'
+version: "3.12"
 
 services:
-
   # web container - runs the django app
   web:
     build: .
@@ -28,16 +27,12 @@ services:
     command: >
       sh -c "python -u manage.py collectstatic --noinput &&
             python -u manage.py migrate &&
-            python manage.py seed --mode='add_organisational_areas' &&
-            python manage.py seed --mode='add_english_imds' &&
-            python manage.py seed --mode='add_welsh_imds' &&
-            python manage.py seed --mode='add_scottish_imds' &&
-            python manage.py seed --mode='add_northern_ireland_imds' &&
+            python manage.py seed --mode='__all__' &&
             python manage.py runserver 0.0.0.0:8001"
     # ensures that docker compose always displays log output
     tty: true
     stdin_open: true
-            
+
   # db container - runs postgres
   db:
     image: postgres:latest

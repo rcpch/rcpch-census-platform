@@ -10,6 +10,7 @@ from .views import (
     WelshMultipleDeprivationViewSet,
     ScottishMultipleDeprivationViewSet,
     NorthernIrelandMultipleDeprivationViewSet,
+    PopulationDensityViewSet,
     PostcodeView,
     UKIndexMultipleDeprivationView,
     UKIndexMultipleDeprivationQuantileView,
@@ -37,6 +38,12 @@ router.register(
 router.register(
     r"northern_ireland_indices_of_multiple_deprivation",
     viewset=NorthernIrelandMultipleDeprivationViewSet,
+)
+
+router.register(
+    f"uk_population_density",
+    viewset=PopulationDensityViewSet,
+    basename="uk_population_density",
 )
 
 drf_routes = [

@@ -36,6 +36,7 @@ from .models import (
     WelshIndexMultipleDeprivation,
     ScottishIndexMultipleDeprivation,
     NorthernIrelandIndexMultipleDeprivation,
+    PopulationDensity,
 )
 from .serializers import (
     LocalAuthorityDistrictSerializer,
@@ -47,6 +48,7 @@ from .serializers import (
     WelshIndexMultipleDeprivationSerializer,
     ScottishIndexMultipleDeprivationSerializer,
     NorthernIrelandIndexMultipleDeprivationSerializer,
+    PopulationDensitySerializer,
 )
 from .general_functions import (
     lsoa_for_postcode,
@@ -262,6 +264,21 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     )
     serializer_class = NorthernIrelandIndexMultipleDeprivationSerializer
     filterset_class = NorthernIrelandIndexMultipleDeprivationFilter
+    filter_backends = [DjangoFilterBackend]
+
+class PopulationDensityViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    This endpoint returns a list of all LSOAs with the associated population density (2019).
+
+    Filter Parameters:
+
+    `lsoa_code`
+
+    If none are passed, a list is returned.
+    """
+
+    queryset = PopulationDensity.objects.all()
+    serializer_class = PopulationDensitySerializer
     filter_backends = [DjangoFilterBackend]
 
 
