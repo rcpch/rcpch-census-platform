@@ -1,12 +1,14 @@
 import requests
-from pprint import pprint
+from django.conf import settings
 
 
 def lsoa_for_postcode(postcode):
     postcode = postcode.replace(" ", "")
-
-    url = "https://api.postcodes.io/postcodes/" + postcode
-    response = requests.get(url=url)
+    response = requests.get(
+        url=f"{settings.POSTCODES_IO_API_URL}/postcodes/{postcode}",
+        headers={"Ocp-Apim-Subscription-Key": settings.POSTCODES_IO_API_KEY},
+        timeout=10,  # times out after 10 seconds
+    )
 
     if response.status_code == 404:
         print("Could not get LSOA from postcode.")
@@ -21,8 +23,11 @@ def lsoa_for_postcode(postcode):
 def regions_for_postcode(postcode):
     postcode = postcode.replace(" ", "")
 
-    url = "https://api.postcodes.io/postcodes/" + postcode
-    response = requests.get(url=url)
+    response = requests.get(
+        url=f"{settings.POSTCODES_IO_API_URL}/postcodes/{postcode}",
+        headers={"Ocp-Apim-Subscription-Key": settings.POSTCODES_IO_API_KEY},
+        timeout=10,  # times out after 10 seconds
+    )
 
     if response.status_code == 404:
         print("Could not get LSOA from postcode.")
@@ -36,8 +41,11 @@ def regions_for_postcode(postcode):
 def local_authority_district_code_for_postcode(postcode):
     postcode = postcode.replace(" ", "")
 
-    url = "https://api.postcodes.io/postcodes/" + postcode
-    response = requests.get(url=url)
+    response = requests.get(
+        url=f"{settings.POSTCODES_IO_API_URL}/postcodes/{postcode}",
+        headers={"Ocp-Apim-Subscription-Key": settings.POSTCODES_IO_API_KEY},
+        timeout=10,  # times out after 10 seconds
+    )
 
     if response.status_code == 404:
         print("Could not get LSOA from postcode.")
