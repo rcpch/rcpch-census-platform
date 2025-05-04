@@ -34,6 +34,8 @@ These do not always fit within the output areas, and boundaries can change.
 
 There is a better explainer [here](https://ocsi.uk/2019/03/18/lsoas-leps-and-lookups-a-beginners-guide-to-statistical-geographies/)
 
+Within this repository, on 2011 LSOA boundaries and identifiers are included, as well as 2019 Local Authorities. There are more recent 2021 LSOA boundaries, but there are no indices of multiple deprivation associated with these.
+
 Within healthcare, there are several other important organisational boundaries.
 
 Integrated Care Boards were introduced on 1st July 2022, taking over from Sustainability and Transformation Partnerships (STPs) and 106 Clinical Commissioning Groups (CCGs) as the top-level organisational units for planning and commissioning health and social care. Commissioning now is controlled by the 42 ICBs (and ICPs or integrated care partnerships). Other hierarchies include providers (such as NHS Trusts, Mental Health Trusts, GP surgeries, pharmacies, ambulance services etc) and Primary Care Networks (PCNs).
@@ -52,8 +54,8 @@ Indices of Multiple Deprivation (IMDs) are not standardised across the devolved 
 | barriers to housing and services | housing               | crime             | living environment                |
 | living environment               | community safety      | housing           | crime and disorder                |
 |                                  | physical environment  |                   |                                   |
-| *32844 LSOAs*                    | *1909 LSOAs*          | *6976 Data Zones* | *890 SOAs*                        |
-| *2019 data*                      | *2019 data*           | *2020 data*       | *2017 data*                       |
+| *32844 LSOAs (2019 data)*                    | *1909 LSOAs (2019 data)*          | *6976 Data Zones (2020 data)* | *890 SOAs (2017 data)*                        |
+| *33755 LSOAs (2021 data)*                    | *1917 LSOAs (2021 data)*          |  |                         |
 
 In England, there are also subdomains for education (children and young people and adult skills), barriers to housing and services (geographical barriers and wider barriers) and living environment (indoors and outdoors).
 
@@ -72,11 +74,7 @@ Written in python 3.11 and django-rest-framework. We recommend using `pyenv` or 
 4. ```python manage.py createsuperuser --username username --email username@email.com```
 5. ```python manage.py makemigrations```
 6. ```python manage.py migrate```
-7. ```python manage.py seed --mode='add_organisational_areas'```
-8. ```python manage.py seed --mode='add_english_imds'```
-9. ```python manage.py seed --mode='add_welsh_imds'```
-10. ```python manage.py seed --mode='add_scottish_imds'```
-11. ```python manage.py seed --mode='add_northern_ireland_imds'```
+7. ```python manage.py seed --mode='__all__'```
 
 This latter step will take several minutes as it populates the database with all the census and deprivation data. If successful, it should yield the following message:
 > ![alt rcpch-census-db](static/images/census_db_screenshot.png?raw=true)
@@ -89,17 +87,31 @@ The final step is to run the server:
 <!-- the below needs a rewrite to include 'docker compose exec web' in front of all the commands -->
 1. clone the repo
 2. ```cd rcpch_census_platform```
-3. ```s/docker-init```
-4. ```python manage.py seed --mode='add_organisational_areas'```
-5. ```python manage.py seed --mode='add_english_imds'```
-6. ```python manage.py seed --mode='add_welsh_imds'```
-7. ```python manage.py seed --mode='add_scottish_imds'```
-8. ```python manage.py seed --mode='add_northern_ireland_imds'```
-9. grab the token from the console within the docker > ![alt drf_token](static/images/census_db_token.png)
-10. Add the token to your header when making an api call (```-H 'Authorization: *******'``` in curl statement for example). If you are using Postman, use the OAUTH2 Authorization header, and the key 'Token'.
+3. ```s/up```
+4. grab the token from the console within the docker > ![alt drf_token](static/images/census_db_token.png)
+5.  Add the token to your header when making an api call (```-H 'Authorization: *******'``` in curl statement for example). If you are using Postman, use the OAUTH2 Authorization header, and the key 'Token'.
 
 If you navigate to the base url```http://localhost:8001/rcpch-census-platform/api/v1/``` and login, it should be possible then to view the data. Alternatively, add the token to Postman.
 
+### Other Command Line functions
+
+The seeding process should skip for each model that has the correct number of rows.
+
+These are:
+
+| Model | Number of Rows | Notes | 
+|----|----|----|
+| LSOA | 34753 | LSOA should have 34753 (32844 in England, 1909 in wales) rows. |
+| DataZone | 6976 | DataZone should have 6976 rows. |
+| LocalAuthority | 371 | LocalAuthority should have 371 (317 in England, 22 in Wales, 32 is Scotland) rows (the 11 Northern Irish Local Authorities are not included here). |
+| PopulationDensity | 32844 | PopulationDensity should have 32058 rows. |
+| GreenSpace | 371 | GreenSpace should have 371 rows. |
+| SOA | 890 | SOA should have 890 rows. |
+| WelshIndexMultipleDeprivation | 1909 | WelshIndexMultipleDeprivation should have 1909 rows. |
+| NorthernIrelandIndexMultipleDeprivation | 890 | NorthernIrelandIndexMultipleDeprivation should have 890 rows. |
+| ScottishIndexMultipleDeprivation | 6976 | ScottishIndexMultipleDeprivation should have 6976 rows. |
+
+`python manage.py seed --mode test_table_totals`
 
 <!-- TODO: #14 #13 remove all references to auth, logins, or tokens in the census engine readme -->
 

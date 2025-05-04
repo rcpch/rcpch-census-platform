@@ -1,0 +1,7 @@
+#!/bin/bash -e
+
+# copy of s/start-dev with -Xfrozen_modules=off flag for debugpy to work
+echo "✨ Running up-debug 🛠️"
+mkdir datadb
+echo "✨ Running RCPCH Census Platform docker 🛠️"
+docker compose -f docker-compose.dev-init.yml up
