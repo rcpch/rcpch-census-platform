@@ -564,9 +564,6 @@ from django.db import models
 class PopulationDensity(models.Model):
     
     lsoa = models.ForeignKey(LSOA, on_delete=models.CASCADE)
-    local_authority_district = models.ForeignKey(
-        LocalAuthority, on_delete=models.CASCADE
-    )
     year = models.IntegerField()
     
     perc_buff200 = models.FloatField(blank=True, null=True)

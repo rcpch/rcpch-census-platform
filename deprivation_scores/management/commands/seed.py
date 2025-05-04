@@ -111,6 +111,9 @@ class Command(BaseCommand):
             add_northern_ireland_soas_and_deprivation_domains_with_ranks()
             self.stdout.write("\n" + B + "Adding population densities..." + W + "\n")
             update_population_densities()
+            test_table_totals()
+        elif options["mode"] == "test_table_totals":
+            test_table_totals()
         else:
             self.stdout.write("No options supplied...")
         self.stdout.write(image())
@@ -165,6 +168,19 @@ def add_lsoas_2011_wards_2019_to_LADS_2019():
         sys.stdout.write(
             BOLD+"\n🔥 Complete." + END + final + W + '\n'
         )
+        try:
+            assert lsoa_counter == 34753
+        except AssertionError:
+            sys.stdout.write(
+                "\n" + R + f"😬 Expected 34753 lsoa records, but got {lsoa_counter}." + W + "\n"
+            )
+        try:
+            assert lad_counter == 339
+        except AssertionError:
+            sys.stdout.write(
+                "\n" + R + f"😬 Expected 339 lad records, but got {lad_counter}." + W + "\n"
+            )
+            pass
 
 
 def add_english_deprivation_scores_and_domains_to_2011_lsoas():
@@ -217,7 +233,13 @@ def add_english_deprivation_scores_and_domains_to_2011_lsoas():
     sys.stdout.write(
          "\n" + BOLD + "🔥 Complete."  + END + final
     )
-
+    try:
+        assert count == 32844
+    except AssertionError:
+        sys.stdout.write(
+            "\n" + R + f"😬 Expected 32844 records, but got {count}." + W + "\n"
+        )
+        pass
 
 def update_english_imd_data_with_subdomains():
     # import subdomains of deprivation data
@@ -258,6 +280,13 @@ def update_english_imd_data_with_subdomains():
     sys.stdout.write(
         "\n" + BOLD + "🔥 Complete." + END + final
     )
+    try:
+        assert count == 32844
+    except AssertionError:
+        sys.stdout.write(
+            "\n" + R + f"😬 Expected 32844 records, but got {count}." + W + "\n"
+        )
+        pass
 
 
 def update_english_imd_data_with_supplementary_indices():
@@ -293,6 +322,13 @@ def update_english_imd_data_with_supplementary_indices():
     sys.stdout.write(
         BOLD+"\n🔥 Complete." + END + final
     )
+    try:
+        assert count == 32844
+    except AssertionError:
+        sys.stdout.write(
+            "\n" + R + f"😬 Expected 32844 records, but got {count}." + W + "\n"
+        )
+        pass
 
 
 def update_english_imd_data_with_scores():
@@ -335,6 +371,13 @@ def update_english_imd_data_with_scores():
             ) # should be 32844
     final = f" Added {count} English scores of deprivation 2019\n"
     sys.stdout.write("\n" + BOLD+"🔥 Complete."+END + final)
+    try:
+        assert count == 32844
+    except AssertionError:
+        sys.stdout.write(
+            "\n" + R + f"😬 Expected 32844 records, but got {count}." + W + "\n"
+        )
+        pass
 
 
 def update_english_imd_data_with_transformed_scores():
@@ -372,6 +415,13 @@ def update_english_imd_data_with_transformed_scores():
     sys.stdout.write(
         BOLD+"\n🔥 Complete." + END + final
     )
+    try:
+        assert count == 32844
+    except AssertionError:
+        sys.stdout.write(
+            "\n" + R + f"😬 Expected 32844 records, but got {count}." + W + "\n"
+        )
+        pass
 
 
 def add_scottish_data_zones_and_local_authorities():
@@ -413,6 +463,19 @@ def add_scottish_data_zones_and_local_authorities():
     sys.stdout.write(
         BOLD + "\n🔥 Complete." + END + final
     )
+    try:
+        assert dz_count ==6976
+    except AssertionError:
+        sys.stdout.write(
+            "\n" + R + f"😬 Expected 6976 data zone records, but got {dz_count}." + W + "\n"
+        )
+    try:
+        assert lad_count == 32
+    except AssertionError:
+        sys.stdout.write(
+            "\n" + R + f"😬 Expected 32 lad records, but got {lad_count}." + W + "\n"
+        )
+        pass
 
 
 def add_2015_population_denominators():
@@ -442,6 +505,12 @@ def add_2015_population_denominators():
             count += 1
     final = f" Added {count} 2015 population denominators to LSOAs\n"
     sys.stdout.write(BOLD + "\n🔥 Complete." + END + final)
+    try:
+        assert count == 32844
+    except AssertionError:
+        sys.stdout.write(
+            "\n" + R + f"😬 Expected 32844 records, but got {count}." + W + "\n"
+        )
 
 
 def add_lad_access_to_outdoor_space():
@@ -501,6 +570,13 @@ def add_lad_access_to_outdoor_space():
                 ) # should be 371
     final = f" Added {count} Local Authority green space records.\n"     
     sys.stdout.write(BOLD + "\n🔥 Complete."+END+ final)
+    try:
+        assert count == 371
+    except AssertionError:
+        sys.stdout.write(
+            "\n" + R + f"😬 Expected 371 records, but got {count}." + W + "\n"
+        )
+        pass
 
 
 def add_welsh_2019_domains_and_ranks_to_existing_2019_lsoas():
@@ -518,7 +594,7 @@ def add_welsh_2019_domains_and_ranks_to_existing_2019_lsoas():
     with open(path, "r") as f:
         sys.stdout.write("\n"+G + "📎 - Adding Welsh IMD ranks/quantiles" + W + '\n')
         data = list(csv.reader(f, delimiter=","))
-        data_length = len(data) - 1
+        data_length = len(data) - 2
         count = 0
         for record in data[1:]:  # skip the first row
             try:
@@ -633,6 +709,13 @@ def add_welsh_2019_domains_and_ranks_to_existing_2019_lsoas():
     sys.stdout.write(
         BOLD + "\n🔥 Complete."+END+final
     )  # should be 1909
+    try:
+        assert count == 1909
+    except AssertionError:
+        sys.stdout.write(
+            "\n" + R + f"😬 Expected 1909 records, but got {count}." + W + "\n"
+        )
+        pass
 
 
 def add_welsh_2019_scores_to_existing_2019_lsoas():
@@ -643,7 +726,7 @@ def add_welsh_2019_scores_to_existing_2019_lsoas():
     with open(path, "r") as f:
         sys.stdout.write(G + "\n📎 - Adding Welsh IMD scores" + W + '\n')
         data = list(csv.reader(f, delimiter=","))
-        data_length = len(data) - 1  # exclude header row
+        data_length = len(data) - 2  # exclude header row and extra row at the end
         count = 0
 
         for record in data[1:]:  # skip the first row
@@ -673,6 +756,13 @@ def add_welsh_2019_scores_to_existing_2019_lsoas():
             count += 1
     final = f" Added {count} Welsh IMD scores.\n"
     sys.stdout.write(BOLD+"\n🔥 Complete."+END+final)  # should be 1909
+    try:
+        assert count == 1909
+    except AssertionError:
+        sys.stdout.write(
+            "\n" + R + f"😬 Expected 1909 records, but got {count}." + W + "\n"
+        )
+        pass
 
 
 def add_northern_ireland_soas_and_deprivation_domains_with_ranks():
@@ -689,7 +779,7 @@ def add_northern_ireland_soas_and_deprivation_domains_with_ranks():
         )
         with open(path, "r") as f:
             data = list(csv.reader(f, delimiter=","))
-            for row in data[2:891]:  # skip the first row: run up to to 891
+            for row in data[1:891]:  # skip the first row: run up to to 890
                 soa, created = SOA.objects.update_or_create(soa_code=row[2], soa_name=row[3], year=2001)
 
                 NorthernIrelandIndexMultipleDeprivation.objects.update_or_create(
@@ -708,7 +798,7 @@ def add_northern_ireland_soas_and_deprivation_domains_with_ranks():
                 imd_counter += 1
                 progress_bar(
                     iteration=imd_counter,
-                    total=891, # should be 891
+                    total=890, # should be 890
                     prefix="Progress",
                     suffix="Complete",
                 )
@@ -717,6 +807,13 @@ def add_northern_ireland_soas_and_deprivation_domains_with_ranks():
         "\n" + BOLD + "🔥 Complete."+END+final
         + W + "\n"
     )
+    try:
+        assert imd_counter == 890
+    except AssertionError:
+        sys.stdout.write(
+            "\n" + R + f"😬 Expected 890 records, but got {imd_counter}." + W + "\n"
+        )
+        pass
 
 
 def calculated_quantile_for_rank(rank, total_records, quantile_type):
@@ -861,11 +958,18 @@ def add_scottish_deprivation_ranks_and_domains_to_2011_datazones():
                 progress_bar(
                     iteration=count, total=data_length, prefix="Progress", suffix="Complete"
                 ) #should be 6976
-
+    
     final = f" {count} Scottish IMD records with domains added (ranks).\n"
     sys.stdout.write(
         BOLD+"\n🔥 Complete."+ END+ final + W + '\n'
     )
+    try:
+        assert count == 6976
+    except AssertionError:
+        sys.stdout.write(
+            "\n" + R + f"😬 Expected 6976 records, but got {count}." + W + "\n"
+        )
+        pass
 
 def update_population_densities():
     """
@@ -882,7 +986,9 @@ def update_population_densities():
 
     Thanks to the remarkable alex.gilroy@theriverstrust for this resource
     """
-
+    if PopulationDensity.objects.exists() and PopulationDensity.objects.all().count() >= 32058:
+        sys.stdout.write("\n" + R + "⏭️ Population density data already added. Skipping..." + W + '\n') # should be 32058
+        return
 
     count = 0
 
@@ -893,12 +999,6 @@ def update_population_densities():
         )
         data = list(csv.reader(f, delimiter=","))
         total_rows =  len(data) - 1
-        print(f"Total rows: {total_rows}")
-        print(f"Total rows in PopulationDensity: {PopulationDensity.objects.all().count()}")
-        print(f"Total rows in LSOA: {LSOA.objects.all().count()}")
-        if PopulationDensity.objects.exists() and PopulationDensity.objects.all().count() ==total_rows:
-            sys.stdout.write("\n" + R + "⏭️ Population density data already added. Skipping..." + W + '\n')
-            return
 
         for row in data[1:]:  # Iterate starting from the second row (index 1)
             lsoa11cd = row[1]  # Access the first element (index 1) which is 'lsoa11cd'
@@ -906,100 +1006,133 @@ def update_population_densities():
             if LSOA.objects.filter(lsoa_code=lsoa11cd).exists():
                 lsoa = LSOA.objects.filter(lsoa_code=lsoa11cd).get()
             if lsoa is None:
-                error = f"\nLSOA with code {lsoa11cd} not found. Skipping row {i}.\n"
+                error = "\n"+ R + f"⏭️ LSOA with code {lsoa11cd} not found. Skipping row...." + W + "\n"
                 sys.stderr.write(error)
                 continue
 
-            local_authority_district_code_index = 4 # Index for localauthority_district_code
-            local_authority = None
-            if LocalAuthority.objects.filter(
-                local_authority_district_code=row[local_authority_district_code_index]
-            ).exists():
-                local_authority = LocalAuthority.objects.filter(
-                    local_authority_district_code=row[local_authority_district_code_index]
-                ).get()
-                # Directly use integer indices to access the values from the row.
-                # Assuming the order of values in 'row' matches the order
-                # in which you create the PopulationDensity object.
-                PopulationDensity.objects.create(
-                    lsoa=lsoa,
-                    local_authority_district=local_authority,
-                    year=2024,
-                    perc_buff200=row[8] if row[8] else None,
-                    perc_buff300=row[9] if row[9] else None,
-                    perc_buff1k=row[10] if row[10] else None,
-                    perc_buff2k=row[11] if row[11] else None,
-                    perc_buff5k=row[12] if row[12] else None,
-                    perc_buff10k=row[13] if row[13] else None,
-                    imd_decile=row[14] if row[14] else None,
-                    population_density_2011=row[15] if row[15] else None,
-                    population_2011=row[16] if row[16] else None,
-                    buff200_popdens_deficit=row[17] if row[17] else None,
-                    buff300_popdens_deficit=row[18] if row[18] else None,
-                    buff1k_popdens_deficit=row[19] if row[19] else None,
-                    buff2k_popdens_deficit=row[20] if row[20] else None,
-                    buff5k_popdens_deficit=row[21] if row[21] else None,
-                    buff10k_popdens_deficit=row[22] if row[22] else None,
-                    buff200_imd_deficit=row[23] if row[23] else None,
-                    buff300_imd_deficit=row[24] if row[24] else None,
-                    buff1k_imd_deficit=row[25] if row[25] else None,
-                    buff2k_imd_deficit=row[26] if row[26] else None,
-                    buff5k_imd_deficit=row[27] if row[27] else None,
-                    buff10k_imd_deficit=row[28] if row[28] else None,
-                    ag_area_ha=row[29] if row[29] else None,
-                    index_multiple_deprivation_2019=row[30] if row[30] else None,
-                    population_estimate2018=row[31] if row[31] else None,
-                    population_growth_2011_2018=row[32] if row[32] else None,
-                    ethnic_white_2011=row[33] if row[33] else None,
-                    ethnic_mixed_2011=row[34] if row[34] else None,
-                    ethnic_asian_2011=row[35] if row[35] else None,
-                    ethnic_black_african_caribbean=row[36] if row[36] else None,
-                    ethnic_other_2011=row[37] if row[37] else None,
-                    population_2011_1000s=row[38] if row[38] else None,
-                    nr_area_ha=row[39] if row[39] else None,
-                    nr_percentage=row[40] if row[40] else None,
-                    ruc_category=row[41] if row[41] else None,
-                    ruc11=row[42] if row[42] else None,
-                    lnr_area_ha=row[43] if row[43] else None,
-                    residentialaddress_count=row[44] if row[44] else None,
-                    pg_area=row[45] if row[45] else None,
-                    pg_area_per1kpeople=row[46] if row[46] else None,
-                    perc_osmmgs=row[47] if row[47] else None,
-                    pgarea_resaddress_ratio=row[48] if row[48] else None,
-                    accessiblewoodland_ha=row[49] if row[49] else None,
-                    mean_manmade_percentage=row[50] if row[50] else None,
-                    cohort_age_0_to_4=row[51] if row[51] else None,
-                    cohort_age_5_to_7=row[52] if row[52] else None,
-                    cohort_age_8_to_9=row[53] if row[53] else None,
-                    cohort_age_10_to_14=row[54] if row[54] else None,
-                    cohort_age_15=row[55] if row[55] else None,
-                    cohort_age_16_to_17=row[56] if row[56] else None,
-                    cohort_age_18_to_19=row[57] if row[57] else None,
-                    cohort_age_20_to_24=row[58] if row[58] else None,
-                    cohort_age_25_to_29=row[59] if row[59] else None,
-                    cohort_age_30_to_44=row[60] if row[60] else None,
-                    cohort_age_45_to_59=row[61] if row[61] else None,
-                    cohort_age_60_to_64=row[62] if row[62] else None,
-                    cohort_age_65_to_74=row[63] if row[63] else None,
-                    cohort_age_75_to_84=row[64] if row[64] else None,
-                    cohort_age_85_to_89=row[65] if row[65] else None,
-                    cohort_age_90_and_over=row[66] if row[66] else None,
-                    perc_close2home=row[67] if row[67] else None,
-                    popn_close2home=row[68] if row[68] else None,
-                    cohort_children=row[69] if row[69] else None,
-                    cohort_olderpeople=row[70] if row[70] else None,
-                    perc_pop_close2home=row[71] if row[71] else None,
-                    popn_children_close2home=row[72] if row[72] else None,
-                    popn_olderpeople_close2home=row[73] if row[73] else None,
-                    imd_reversed=row[74] if row[74] else None,
-                    ag_area_ha_per_person=row[75] if row[75] else None,
-                )
-                count += 1
-                progress_bar(iteration=count, total=total_rows, prefix="Progress", suffix="Complete")
+            # list_of_inactive_lads = [
+            #     "E06000028", # Bournemouth
+            #     "E06000029", # Poole
+            #     "E07000048", # Christchurch
+            #     "E07000049", # East Dorset
+            #     "E07000050", # North Dorset
+            #     "E07000051", # Purbeck
+            #     "E07000052", # West Dorset
+            #     "E07000053", # Weymouth and Portland
+            #     "E07000190", # Taunton Deane
+            #     "E07000191", # West Somerset
+            #     "E07000201", # Forest Heath
+            #     "E07000204", # St Edmundsbury
+            #     "E07000205", # Suffolk Coastal
+            #     "E07000206", # Waveney
+            # ]
+            # if str(row[4]).strip() in list_of_inactive_lads:
+            #     # Skip the row if the local authority district code is in the list of inactive LAs
+            #     continue
+
+            # local_authority_district_code_index = 4 # Index for localauthority_district_code
+            # local_authority = None
+            # if LocalAuthority.objects.filter(
+            #     local_authority_district_code=row[local_authority_district_code_index]
+            # ).exists():
+            #     local_authority = LocalAuthority.objects.filter(
+            #         local_authority_district_code=row[local_authority_district_code_index]
+            #     ).get()
+            # if local_authority is None:
+            #     error = "\n"+ R + f"⏭️ Local Authority with code {row[local_authority_district_code_index]} not found. Skipping row ..." + W + "\n"
+            #     sys.stderr.write(error)
+            #     continue
+            PopulationDensity.objects.update_or_create(
+                lsoa=lsoa,
+                # local_authority_district=local_authority,
+                 defaults={
+                     'year':2024,
+                    'perc_buff200':row[8] if row[8] else None,
+                    'perc_buff300':row[9] if row[9] else None,
+                    'perc_buff1k':row[10] if row[10] else None,
+                    'perc_buff2k':row[11] if row[11] else None,
+                    'perc_buff5k':row[12] if row[12] else None,
+                    'perc_buff10k':row[13] if row[13] else None,
+                    'imd_decile':row[14] if row[14] else None,
+                    'population_density_2011':row[15] if row[15] else None,
+                    'population_2011':row[16] if row[16] else None,
+                    'buff200_popdens_deficit':row[17] if row[17] else None,
+                    'buff300_popdens_deficit':row[18] if row[18] else None,
+                    'buff1k_popdens_deficit':row[19] if row[19] else None,
+                    'buff2k_popdens_deficit':row[20] if row[20] else None,
+                    'buff5k_popdens_deficit':row[21] if row[21] else None,
+                    'buff10k_popdens_deficit':row[22] if row[22] else None,
+                    'buff200_imd_deficit':row[23] if row[23] else None,
+                    'buff300_imd_deficit':row[24] if row[24] else None,
+                    'buff1k_imd_deficit':row[25] if row[25] else None,
+                    'buff2k_imd_deficit':row[26] if row[26] else None,
+                    'buff5k_imd_deficit':row[27] if row[27] else None,
+                    'buff10k_imd_deficit':row[28] if row[28] else None,
+                    'ag_area_ha':row[29] if row[29] else None,
+                    'index_multiple_deprivation_2019':row[30] if row[30] else None,
+                    'population_estimate2018':row[31] if row[31] else None,
+                    'population_growth_2011_2018':row[32] if row[32] else None,
+                    'ethnic_white_2011':row[33] if row[33] else None,
+                    'ethnic_mixed_2011':row[34] if row[34] else None,
+                    'ethnic_asian_2011':row[35] if row[35] else None,
+                    'ethnic_black_african_caribbean':row[36] if row[36] else None,
+                    'ethnic_other_2011':row[37] if row[37] else None,
+                    'population_2011_1000s':row[38] if row[38] else None,
+                    'nr_area_ha':row[39] if row[39] else None,
+                    'nr_percentage':row[40] if row[40] else None,
+                    'ruc_category':row[41] if row[41] else None,
+                    'ruc11':row[42] if row[42] else None,
+                    'lnr_area_ha':row[43] if row[43] else None,
+                    'residentialaddress_count':row[44] if row[44] else None,
+                    'pg_area':row[45] if row[45] else None,
+                    'pg_area_per1kpeople':row[46] if row[46] else None,
+                    'perc_osmmgs':row[47] if row[47] else None,
+                    'pgarea_resaddress_ratio':row[48] if row[48] else None,
+                    'accessiblewoodland_ha':row[49] if row[49] else None,
+                    'mean_manmade_percentage':row[50] if row[50] else None,
+                    'cohort_age_0_to_4':row[51] if row[51] else None,
+                    'cohort_age_5_to_7':row[52] if row[52] else None,
+                    'cohort_age_8_to_9':row[53] if row[53] else None,
+                    'cohort_age_10_to_14':row[54] if row[54] else None,
+                    'cohort_age_15':row[55] if row[55] else None,
+                    'cohort_age_16_to_17':row[56] if row[56] else None,
+                    'cohort_age_18_to_19':row[57] if row[57] else None,
+                    'cohort_age_20_to_24':row[58] if row[58] else None,
+                    'cohort_age_25_to_29':row[59] if row[59] else None,
+                    'cohort_age_30_to_44':row[60] if row[60] else None,
+                    'cohort_age_45_to_59':row[61] if row[61] else None,
+                    'cohort_age_60_to_64':row[62] if row[62] else None,
+                    'cohort_age_65_to_74':row[63] if row[63] else None,
+                    'cohort_age_75_to_84':row[64] if row[64] else None,
+                    'cohort_age_85_to_89':row[65] if row[65] else None,
+                    'cohort_age_90_and_over':row[66] if row[66] else None,
+                    'perc_close2home':row[67] if row[67] else None,
+                    'popn_close2home':row[68] if row[68] else None,
+                    'cohort_children':row[69] if row[69] else None,
+                    'cohort_olderpeople':row[70] if row[70] else None,
+                    'perc_pop_close2home':row[71] if row[71] else None,
+                    'popn_children_close2home':row[72] if row[72] else None,
+                    'popn_olderpeople_close2home':row[73] if row[73] else None,
+                    'imd_reversed':row[74] if row[74] else None,
+                    'ag_area_ha_per_person':row[75] if row[75] else None
+                }
+            )
+            
+            count += 1
+            progress_bar(iteration=count, total=total_rows, prefix="Progress", suffix="Complete")
+        
         final = f" {count} Population Density records by LSOA stored.\n"
         sys.stdout.write(
             "\n" + BOLD + "🔥 Complete."+ END+ final
         )
+        try:
+            # Check if the count matches the expected number of records
+            assert count == 32844
+        except AssertionError:
+            sys.stdout.write(
+                "\n" + R + f"😬 Expected 32844 records, but got {count}." + W + "\n"
+            )
+            pass
 
 def progress_bar(iteration, total, prefix="", suffix="", decimals=1, length=50, fill="█"):
     """
@@ -1020,6 +1153,82 @@ def progress_bar(iteration, total, prefix="", suffix="", decimals=1, length=50, 
     if iteration == total:
         sys.stdout.write("\n")
 
+
+def test_table_totals():
+    """
+    Test the total number of records in each table
+    """
+    sys.stdout.write(
+        "\n" + G + "📎 - Testing table totals..." + W + "\n"
+    )
+    # Check if the count matches the expected number of records
+    normal_vals = [
+        {
+            "model": LSOA,
+            "count": LSOA.objects.count(),
+            "expected": 34753,
+            "message": "LSOA should have 34753 (32844 in England, 1909 in wales) rows.",
+        },
+        {
+            "model": DataZone,
+            "count": DataZone.objects.count(),
+            "expected": 6976,
+            "message": "DataZone should have 6976 rows.",
+        },
+        {
+            "model": LocalAuthority,
+            "count": LocalAuthority.objects.count(),
+            "expected": 371,
+            "message": "LocalAuthority should have 371 (317 in England, 22 in Wales, 32 is Scotland) rows (the 11 Northern Irish Local Authorities are not included here). ",
+        },
+        {
+            "model": PopulationDensity,
+            "count": PopulationDensity.objects.count(),
+            "expected": 32844,
+            "message": "PopulationDensity should have 32844 rows.",
+        },
+        {
+            "model": GreenSpace,
+            "count": GreenSpace.objects.count(),
+            "expected": 371,
+            "message": "GreenSpace should have 371 rows.",
+        },
+        {
+            "model": SOA,
+            "count": SOA.objects.count(),
+            "expected": 890,
+            "message": "SOA should have 890 rows.",
+        },
+        {
+            "model": WelshIndexMultipleDeprivation,
+            "count": WelshIndexMultipleDeprivation.objects.count(),
+            "expected": 1909,
+            "message": "WelshIndexMultipleDeprivation should have 1909 rows.",
+        },
+        {
+            "model": NorthernIrelandIndexMultipleDeprivation,
+            "count": NorthernIrelandIndexMultipleDeprivation.objects.count(),
+            "expected": 890,
+            "message": "NorthernIrelandIndexMultipleDeprivation should have 890 rows.",
+        },
+        {
+            "model": ScottishIndexMultipleDeprivation,
+            "count": ScottishIndexMultipleDeprivation.objects.count(),
+            "expected": 6976,
+            "message": "ScottishIndexMultipleDeprivation should have 6976 rows.",
+        },
+    ]
+    for val in normal_vals:
+        try:
+            assert val["count"] == val["expected"]
+        except AssertionError:
+            sys.stdout.write(
+                "\n" + R + f"😬 {val['message']} But got {val['count']}." + W + "\n"
+            )
+            continue
+        sys.stdout.write(
+            W + f"✅ {val['model'].__name__} has {val['count']} records." + W + "\n"
+        )
 
 def image():
     return """
@@ -1044,5 +1253,3 @@ def image():
                                        RCPCH Census Platform 2022
 
                 """
-
-
