@@ -1010,38 +1010,6 @@ def update_population_densities():
                 sys.stderr.write(error)
                 continue
 
-            # list_of_inactive_lads = [
-            #     "E06000028", # Bournemouth
-            #     "E06000029", # Poole
-            #     "E07000048", # Christchurch
-            #     "E07000049", # East Dorset
-            #     "E07000050", # North Dorset
-            #     "E07000051", # Purbeck
-            #     "E07000052", # West Dorset
-            #     "E07000053", # Weymouth and Portland
-            #     "E07000190", # Taunton Deane
-            #     "E07000191", # West Somerset
-            #     "E07000201", # Forest Heath
-            #     "E07000204", # St Edmundsbury
-            #     "E07000205", # Suffolk Coastal
-            #     "E07000206", # Waveney
-            # ]
-            # if str(row[4]).strip() in list_of_inactive_lads:
-            #     # Skip the row if the local authority district code is in the list of inactive LAs
-            #     continue
-
-            # local_authority_district_code_index = 4 # Index for localauthority_district_code
-            # local_authority = None
-            # if LocalAuthority.objects.filter(
-            #     local_authority_district_code=row[local_authority_district_code_index]
-            # ).exists():
-            #     local_authority = LocalAuthority.objects.filter(
-            #         local_authority_district_code=row[local_authority_district_code_index]
-            #     ).get()
-            # if local_authority is None:
-            #     error = "\n"+ R + f"⏭️ Local Authority with code {row[local_authority_district_code_index]} not found. Skipping row ..." + W + "\n"
-            #     sys.stderr.write(error)
-            #     continue
             PopulationDensity.objects.update_or_create(
                 lsoa=lsoa,
                 # local_authority_district=local_authority,
