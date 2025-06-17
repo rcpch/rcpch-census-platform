@@ -282,7 +282,7 @@ class PopulationDensityViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # custom views / endpoints
-class PostcodeView(APIView):
+class  PostcodeView(APIView):
     @extend_schema(
         parameters=[
             OpenApiParameter(
