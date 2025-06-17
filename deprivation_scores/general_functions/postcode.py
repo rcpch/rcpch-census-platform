@@ -1,16 +1,17 @@
 from typing import Literal, TypedDict
 import requests
-from pprint import pprint
+from django.conf import settings
 
 
 def get_postcode_info(postcode: str):
     # Clean
     postcode = postcode.replace(" ", "")
 
-    # Make response
-    postcodes_url = f"https://api.postcodes.io/postcodes/{postcode}"
     try:
-        response = requests.get(postcodes_url)
+        response = requests.get(
+            url=f"{settings.POSTCODES_IO_API_URL}/postcodes/{postcode}",
+            headers={"Ocp-Apim-Subscription-Key": settings.POSTCODES_IO_API_KEY}
+        )
         response.raise_for_status()
         return response.json()
     except requests.exceptions.HTTPError as err:
@@ -25,10 +26,11 @@ def get_terminated_postcode_info(postcode: str):
     # Clean
     postcode = postcode.replace(" ", "")
 
-    # Make response
-    terminated_postcodes_url = f"https://api.postcodes.io/terminated_postcodes/{postcode}"
     try:
-        response = requests.get(terminated_postcodes_url)
+        response = requests.get(
+            url=f"{settings.POSTCODES_IO_API_URL}/terminated_postcodes/{postcode}",
+            headers={"Ocp-Apim-Subscription-Key": settings.POSTCODES_IO_API_KEY}
+        )
         response.raise_for_status()
         print(f"Terminated postcode found: {postcode}")
         return response.json()
