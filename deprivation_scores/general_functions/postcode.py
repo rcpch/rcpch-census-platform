@@ -6,10 +6,10 @@ from django.conf import settings
 def get_postcode_info(postcode: str):
     # Clean
     postcode = postcode.replace(" ", "")
- 
+
     try:
         response = requests.get(
-            url=f"https://{settings.POSTCODES_IO_API_URL}/postcodes/{postcode}",
+            url=f"{settings.POSTCODES_IO_API_URL}/postcodes/{postcode}",
             headers={"Ocp-Apim-Subscription-Key": settings.POSTCODES_IO_API_KEY}
         )
         response.raise_for_status()
@@ -28,7 +28,7 @@ def get_terminated_postcode_info(postcode: str):
 
     try:
         response = requests.get(
-            url=f"https://{settings.POSTCODES_IO_API_URL}/terminated_postcodes/{postcode}",
+            url=f"{settings.POSTCODES_IO_API_URL}/terminated_postcodes/{postcode}",
             headers={"Ocp-Apim-Subscription-Key": settings.POSTCODES_IO_API_KEY}
         )
         response.raise_for_status()
