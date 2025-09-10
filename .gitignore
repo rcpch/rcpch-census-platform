@@ -123,3 +123,5 @@ staticfiles/
 # Docker and docker compose
 .pip_cache
 .data
+
+build_info.json

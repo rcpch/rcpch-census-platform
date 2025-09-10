@@ -1,0 +1,5 @@
+{
+  "checkpoints": {
+    "LIVE": { "url": "https://rcpch-census-engine.azurewebsites.net/", "overdue": "10M" }
+  }
+}

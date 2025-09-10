@@ -18,7 +18,26 @@ from .views import (
 
 from drf_spectacular.views import SpectacularJSONAPIView, SpectacularSwaggerView
 
-router = routers.DefaultRouter()
+from rcpch_census_platform.build_info import get_build_info
+
+
+class RouterWithBuildInfo(routers.DefaultRouter):
+    def get_api_root_view(self, *args, **kwargs):
+        view = super().get_api_root_view(*args, **kwargs)
+
+        def view_with_build_info(request, *args, **kwargs):
+            response = view(request, *args, **kwargs)
+            
+            build_info = get_build_info()
+            response.headers["X-Git-Revision"] = build_info.get("latest_git_commit", "[latest commit hash not found]")
+
+            return response
+
+        return view_with_build_info
+
+
+router = RouterWithBuildInfo()
+
 router.register(r"local_authority_districts", viewset=LocalAuthorityDistrictViewSet)
 router.register(r"england_wales_lower_layer_super_output_areas", viewset=LSOAViewSet)
 router.register(r"northern_ireland_small_output_areas", viewset=SOAViewSet)
