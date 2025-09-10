@@ -3,9 +3,7 @@
 This project is a python 3.11 / Django Rest Framework project providing UK census data, especially Index of Multiple Deprivation as a service.
 
 <p align="center">
-    <p align="center">
-    <img src='https://github.com/rcpch/rcpch-census-platform/blob/main/static/images/rcpch-logo-mobile.4d5b446caf9a.svg' alt='RCPCH Logo'>
-    </p>
+     <img src='https://raw.githubusercontent.com/rcpch/rcpch-census-platform/refs/heads/live/static/images/rcpch-logo-mobile.4d5b446caf9a.svg' alt='RCPCH Logo'>
 </p>
 
 ## Why is it needed?
