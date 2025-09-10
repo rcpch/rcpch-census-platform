@@ -29,6 +29,9 @@ jobs:
       
       - name: Install dependencies
         run: pip install -r requirements.txt
+      
+      - name: Burn in build info
+        run: s/get-build-info > build_info.json
         
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
       
