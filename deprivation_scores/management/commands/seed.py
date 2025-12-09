@@ -168,6 +168,40 @@ class Command(BaseCommand):
             self.stdout.write("\n" + B + "Adding population densities..." + W + "\n")
             update_population_densities()
             test_table_totals()
+        elif options["mode"] == "ci_test":
+            # Limited seed for CI testing - only seeds data needed for tests
+            self.stdout.write(
+                "\n" + B + "Seeding limited data for CI testing..." + W + "\n"
+            )
+            # Organisational areas (LSOAs, Data Zones, etc.)
+            self.stdout.write("\n" + B + "Adding organisational areas..." + W + "\n")
+            add_lsoas_2011_wards_2019_to_LADS_2019()
+            add_lsoas_2021_wards_2024_to_LADS_2024()
+            add_scottish_data_zones_and_local_authorities()
+            # English IMD data (2019 and 2025)
+            self.stdout.write(
+                "\n" + B + "Adding English IMD domains and scores..." + W + "\n"
+            )
+            add_english_deprivation_scores_and_domains_to_2011_lsoas()
+            update_english_imd_data_with_scores()
+            add_english_2025_deprivation_scores_and_domains_to_2021_lsoas()
+            update_english_2025_imd_data_with_scores()
+            # Welsh IMD data
+            self.stdout.write(
+                "\n" + B + "Adding Welsh 2019 IMDs to existing 2011 LSOAs" + W + "\n"
+            )
+            add_welsh_2019_domains_and_ranks_to_existing_2011_lsoas()
+            add_welsh_2019_scores_to_existing_2011_lsoas()
+            # Scottish IMD data
+            self.stdout.write(
+                "\n" + B + "Adding Scottish IMDs to existing Datazones" + W + "\n"
+            )
+            add_scottish_deprivation_ranks_and_domains_to_2011_datazones()
+            # Northern Ireland IMD data
+            self.stdout.write(
+                "\n" + B + "Adding Northern Ireland SOAs and IMDs" + W + "\n"
+            )
+            add_northern_ireland_soas_and_deprivation_domains_with_ranks()
         elif options["mode"] == "test_table_totals":
             test_table_totals()
         else:
