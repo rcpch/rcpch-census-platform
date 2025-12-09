@@ -23,7 +23,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 settings_dir = os.path.dirname(__file__)
 PROJECT_ROOT = os.path.abspath(os.path.dirname(settings_dir))
 IMD_DATA_FILES_FOLDER = os.path.join(PROJECT_ROOT, "deprivation_scores/imd_data")
-POPULATION_DENSITIES_FOLDER = os.path.join(PROJECT_ROOT, "deprivation_scores/population_densities")
+POPULATION_DENSITIES_FOLDER = os.path.join(
+    PROJECT_ROOT, "deprivation_scores/population_densities"
+)
 
 # Postcodes.io API settings
 POSTCODES_IO_API_URL = os.getenv("POSTCODES_IO_API_URL")
@@ -104,6 +106,7 @@ DATABASES = {
         "PASSWORD": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD"),
         "HOST": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST"),
         "PORT": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT"),
+        "ATOMIC_REQUESTS": False,
     }
 }
 
@@ -161,9 +164,9 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [],
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    'DEFAULT_RENDERER_CLASSES': [
-            'rest_framework.renderers.JSONRenderer',
-        ],
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
 }
 
 # drf-spectacular schema settings
