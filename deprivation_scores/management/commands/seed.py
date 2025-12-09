@@ -594,7 +594,7 @@ def add_english_2025_deprivation_scores_and_domains_to_2021_lsoas():
     if (
         EnglishIndexMultipleDeprivation.objects.filter(lsoa__year=2021).exists()
         and EnglishIndexMultipleDeprivation.objects.filter(lsoa__year=2021).count()
-        >= 33756
+        >= 33755
     ):
         sys.stdout.write(
             "\n" + R + "⏭️ English 2025 indices already exist! Skipping..." + W + "\n"
@@ -643,10 +643,10 @@ def add_english_2025_deprivation_scores_and_domains_to_2021_lsoas():
     final = f" {count} IMD 2025 records with domains added (ranks and deciles)\n"
     sys.stdout.write("\n" + BOLD + "🔥 Complete." + END + final)
     try:
-        assert count == 33756
+        assert count == 33755
     except AssertionError:
         sys.stdout.write(
-            "\n" + R + f"😬 Expected 33756 records, but got {count}." + W + "\n"
+            "\n" + R + f"😬 Expected 33755 records, but got {count}." + W + "\n"
         )
         pass
 
@@ -688,10 +688,10 @@ def update_english_2025_imd_data_with_subdomains():
     final = f" Added {count} subdomains of deprivation 2025 to LSOAs\n"
     sys.stdout.write("\n" + BOLD + "🔥 Complete." + END + final)
     try:
-        assert count == 33756
+        assert count == 33755
     except AssertionError:
         sys.stdout.write(
-            "\n" + R + f"😬 Expected 33756 records, but got {count}." + W + "\n"
+            "\n" + R + f"😬 Expected 33755 records, but got {count}." + W + "\n"
         )
         pass
 
@@ -732,10 +732,10 @@ def update_english_2025_imd_data_with_supplementary_indices():
     final = f" Added {count} supplementary indices (IDACI and IDAOPI) of deprivation 2025 to LSOAs\n"
     sys.stdout.write(BOLD + "\n🔥 Complete." + END + final)
     try:
-        assert count == 33756
+        assert count == 33755
     except AssertionError:
         sys.stdout.write(
-            "\n" + R + f"😬 Expected 33756 records, but got {count}." + W + "\n"
+            "\n" + R + f"😬 Expected 33755 records, but got {count}." + W + "\n"
         )
         pass
 
@@ -785,10 +785,10 @@ def update_english_2025_imd_data_with_scores():
     final = f" Added {count} English scores of deprivation 2025\n"
     sys.stdout.write("\n" + BOLD + "🔥 Complete." + END + final)
     try:
-        assert count == 33756
+        assert count == 33755
     except AssertionError:
         sys.stdout.write(
-            "\n" + R + f"😬 Expected 33756 records, but got {count}." + W + "\n"
+            "\n" + R + f"😬 Expected 33755 records, but got {count}." + W + "\n"
         )
         pass
 
@@ -835,10 +835,10 @@ def update_english_2025_imd_data_with_transformed_scores():
     final = f" Added {count} English transformed scores of deprivation 2025\n"
     sys.stdout.write(BOLD + "\n🔥 Complete." + END + final)
     try:
-        assert count == 33756
+        assert count == 33755
     except AssertionError:
         sys.stdout.write(
-            "\n" + R + f"😬 Expected 33756 records, but got {count}." + W + "\n"
+            "\n" + R + f"😬 Expected 33755 records, but got {count}." + W + "\n"
         )
         pass
 
@@ -1620,9 +1620,15 @@ def test_table_totals():
         },
         {
             "model": LocalAuthority,
-            "count": LocalAuthority.objects.filter(year=2021).count(),
-            "expected": 371,
-            "message": "2021 LocalAuthority should have 371 (317 in England, 22 in Wales, 32 is Scotland) rows (the 11 Northern Irish Local Authorities are not included here). ",
+            "count": LocalAuthority.objects.filter(year=2011).count(),
+            "expected": 32,
+            "message": "2011 LocalAuthority for Scotland should have 32 .",
+        },
+        {
+            "model": LocalAuthority,
+            "count": LocalAuthority.objects.filter(year=2019).count(),
+            "expected": 339,
+            "message": "2019 LocalAuthority for England and Wales should have 339 (317 in England, 22 in Wales) rows (the 11 Northern Irish Local Authorities are not included here). ",
         },
         {
             "model": LocalAuthority,
