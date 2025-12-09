@@ -9,5 +9,5 @@ drf-spectacular
 django-filter
 psycopg2-binary
 whitenoise
-
+tqdm
 # RCPCH imports
