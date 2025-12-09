@@ -260,10 +260,13 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     If none are passed, a list is returned.
     """
 
-    queryset = NorthernIrelandIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
+    queryset = NorthernIrelandIndexMultipleDeprivation.objects.all().order_by(
+        "-imd_rank"
+    )
     serializer_class = NorthernIrelandIndexMultipleDeprivationSerializer
     filterset_class = NorthernIrelandIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
+
 
 class PopulationDensityViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -282,7 +285,7 @@ class PopulationDensityViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # custom views / endpoints
-class  PostcodeView(APIView):
+class PostcodeView(APIView):
     @extend_schema(
         parameters=[
             OpenApiParameter(
@@ -329,7 +332,9 @@ class UKIndexMultipleDeprivationView(APIView):
     english_serializer_class = EnglishIndexMultipleDeprivationSerializer
     welsh_serializer_class = WelshIndexMultipleDeprivationSerializer
     scottish_serializer_class = ScottishIndexMultipleDeprivationSerializer
-    northern_ireland_serializer_class = NorthernIrelandIndexMultipleDeprivationSerializer
+    northern_ireland_serializer_class = (
+        NorthernIrelandIndexMultipleDeprivationSerializer
+    )
 
     @extend_schema(
         parameters=[
@@ -348,6 +353,24 @@ class UKIndexMultipleDeprivationView(APIView):
                         name="High Deprivation",
                         description="Example high deprivation postcode",
                         value="CO15 2DQ",
+                    ),
+                ],
+            ),
+            OpenApiParameter(
+                name="year",
+                description="Year of Index of Multiple Deprivation dataset to use",
+                required=False,
+                type=OpenApiTypes.INT,
+                examples=[
+                    OpenApiExample(
+                        name="2019",
+                        description="Use 2019 dataset for England and Wales",
+                        value=2019,
+                    ),
+                    OpenApiExample(
+                        name="2025",
+                        description="Use 2025 dataset for Scotland",
+                        value=2025,
                     ),
                 ],
             ),
@@ -374,6 +397,7 @@ class UKIndexMultipleDeprivationView(APIView):
 
         """
         post_code = self.request.query_params.get("postcode", None)
+        year = self.request.query_params.get("year", None)
         if post_code:
             data = lsoa_for_postcode(postcode=post_code)
             status = data["status"]
@@ -388,26 +412,59 @@ class UKIndexMultipleDeprivationView(APIView):
             if lsoa_object["lsoa"]:
                 lsoa_code = lsoa_object["lsoa"]
                 if lsoa_object["country"] == "England":
-                    lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-                    imd = EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
+                    if year is None:
+                        year = 2019
+                    if int(year) in [2019, 2025]:
+                        lsoa = LSOA.objects.filter(
+                            lsoa_code=lsoa_code, year=int(year)
+                        ).get()
+                        imd = EnglishIndexMultipleDeprivation.objects.filter(
+                            lsoa=lsoa, year=int(year)
+                        ).get()
+                    else:
+                        raise ParseError(
+                            "Year must be 2019 or 2025 for England.", code=400
+                        )
                     response = self.english_serializer_class(
                         instance=imd, context={"request": request}
                     )
                 elif lsoa_object["country"] == "Wales":
-                    lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-                    imd = WelshIndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
+                    if year is None:
+                        year = 2020
+                    if int(year) != 2020:
+                        raise ParseError("Year must be 2020 for Wales.", code=400)
+                    lsoa = LSOA.objects.filter(lsoa_code=lsoa_code, year=2011).get()
+                    imd = WelshIndexMultipleDeprivation.objects.filter(
+                        lsoa=lsoa, year=2020
+                    ).get()
                     response = self.welsh_serializer_class(
                         instance=imd, context={"request": request}
                     )
                 elif lsoa_object["country"] == "Scotland":
-                    lsoa = DataZone.objects.filter(data_zone_code=lsoa_code).get()
-                    imd = ScottishIndexMultipleDeprivation.objects.filter(data_zone=lsoa).get()
+                    if year is None:
+                        year = 20120
+                    if int(year) != 2020:
+                        raise ParseError("Year must be 2020 for Scotland.", code=400)
+                    lsoa = DataZone.objects.filter(
+                        data_zone_code=lsoa_code, year=2011
+                    ).get()
+                    imd = ScottishIndexMultipleDeprivation.objects.filter(
+                        data_zone=lsoa, year=2020
+                    ).get()
                     response = self.scottish_serializer_class(
                         instance=imd, context={"request": request}
                     )
                 elif lsoa_object["country"] == "Northern Ireland":
-                    lsoa = SOA.objects.filter(soa_code=lsoa_code).get()
-                    imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(soa=lsoa).get()
+                    if year is None:
+                        year = 2017
+                    if int(year) != 2017:
+                        raise ParseError(
+                            "Year must be 2017 for Northern Ireland.", code=400
+                        )
+                    lsoa = SOA.objects.filter(soa_code=lsoa_code, year=2001).get()
+                    imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
+                        soa=lsoa, year=2017
+                    ).get()
                     response = self.northern_ireland_serializer_class(
                         instance=imd, context={"request": request}
                     )
@@ -437,6 +494,24 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                 required=True,
                 type=OpenApiTypes.INT,  # Literal[2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20],
                 enum=[2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20],
+            ),
+            OpenApiParameter(
+                name="year",
+                description="Year of Index of Multiple Deprivation dataset to use",
+                required=False,
+                type=OpenApiTypes.INT,
+                examples=[
+                    OpenApiExample(
+                        name="2019",
+                        description="Use 2019 dataset for England and Wales",
+                        value=2019,
+                    ),
+                    OpenApiExample(
+                        name="2020",
+                        description="Use 2020 dataset for Scotland",
+                        value=2020,
+                    ),
+                ],
             ),
         ],
         responses={
@@ -485,9 +560,12 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
         `postcode`: string **[Mandatory]**
 
         `quantile`: integer **[Mandatory]**, one of [2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20]
+
+        `year`: integer **[Optional]**, year of the Index of Multiple Deprivation dataset to use
         """
         post_code = self.request.query_params.get("postcode", None)
         requested_quantile = self.request.query_params.get("quantile", None)
+        year = self.request.query_params.get("year", None)
         if post_code:
 
             data = lsoa_for_postcode(postcode=post_code)
@@ -504,17 +582,43 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
             if lsoa_object["lsoa"]:
                 lsoa_code = lsoa_object["lsoa"]
                 if lsoa_object["country"] == "England":
-                    lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-                    imd = EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
-                    data = quantile_for_rank(
-                        rank=imd.imd_rank,
-                        requested_quantile=requested_quantile,
-                        country="england",
-                    )
-                    response = Response({"result": data})
+                    if year is None:
+                        year = 2019
+                    if int(year) in [2019, 2025]:
+                        if int(year) == 2025:
+                            lsoa = LSOA.objects.filter(
+                                lsoa_code=lsoa_code, year=2021
+                            ).get()
+                        elif int(year) == 2019:
+                            lsoa = LSOA.objects.filter(
+                                lsoa_code=lsoa_code, year=2011
+                            ).get()
+                        else:
+                            raise ParseError(  # fallback, should not be hit
+                                "Year must be 2019 or 2025 for England.", code=400
+                            )
+                        imd = EnglishIndexMultipleDeprivation.objects.filter(
+                            lsoa=lsoa, year=year
+                        ).get()
+                        data = quantile_for_rank(
+                            rank=imd.imd_rank,
+                            requested_quantile=requested_quantile,
+                            country="england",
+                        )
+                        response = Response({"result": data})
+                    else:
+                        raise ParseError(
+                            "Year must be 2019 or 2025 for England.", code=400
+                        )
                 elif lsoa_object["country"] == "Wales":
-                    lsoa = LSOA.objects.filter(lsoa_code=lsoa_code).get()
-                    imd = WelshIndexMultipleDeprivation.objects.filter(lsoa=lsoa).get()
+                    if year is None:
+                        year = 2020
+                    if int(year) != 2020:
+                        raise ParseError("Year must be 2020 for Wales.", code=400)
+                    lsoa = LSOA.objects.filter(lsoa_code=lsoa_code, year=2011).get()
+                    imd = WelshIndexMultipleDeprivation.objects.filter(
+                        lsoa=lsoa, year=year
+                    ).get()
                     data = quantile_for_rank(
                         rank=imd.imd_rank,
                         requested_quantile=requested_quantile,
@@ -522,8 +626,16 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                     )
                     response = Response({"result": data})
                 elif lsoa_object["country"] == "Scotland":
-                    lsoa = DataZone.objects.filter(data_zone_code=lsoa_code).get()
-                    imd = ScottishIndexMultipleDeprivation.objects.filter(data_zone=lsoa).get()
+                    if year is None:
+                        year = 2020
+                    if int(year) != 2020:
+                        raise ParseError("Year must be 2020 for Scotland.", code=400)
+                    data_zone = DataZone.objects.filter(
+                        data_zone_code=lsoa_code, year=2011
+                    ).get()
+                    imd = ScottishIndexMultipleDeprivation.objects.filter(
+                        data_zone=data_zone, year=year
+                    ).get()
                     data = quantile_for_rank(
                         rank=imd.imd_rank,
                         requested_quantile=requested_quantile,
@@ -531,8 +643,16 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                     )
                     response = Response({"result": data})
                 elif lsoa_object["country"] == "Northern Ireland":
-                    lsoa = SOA.objects.filter(soa_code=lsoa_code).get()
-                    imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(soa=lsoa).get()
+                    if year is None:
+                        year = 2017
+                    if int(year) != 2017:
+                        raise ParseError(
+                            "Year must be 2017 for Northern Ireland.", code=400
+                        )
+                    soa = SOA.objects.filter(soa_code=lsoa_code, year=2001).get()
+                    imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
+                        soa=soa, year=year
+                    ).get()
                     data = quantile_for_rank(
                         rank=imd.imd_rank,
                         requested_quantile=requested_quantile,
