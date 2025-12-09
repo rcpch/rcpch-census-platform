@@ -178,4 +178,7 @@ SPECTACULAR_SETTINGS = {
     # OTHER SETTINGS
 }
 
-CSRF_TRUSTED_ORIGINS = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+# Django 4.0+ requires CSRF_TRUSTED_ORIGINS to have scheme prefixes
+# Filter out empty strings when env var is not set
+_csrf_origins = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "")
+CSRF_TRUSTED_ORIGINS = [origin for origin in _csrf_origins.split(",") if origin]
