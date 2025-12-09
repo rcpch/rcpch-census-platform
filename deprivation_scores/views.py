@@ -415,9 +415,18 @@ class UKIndexMultipleDeprivationView(APIView):
                     if year is None:
                         year = 2019
                     if int(year) in [2019, 2025]:
-                        lsoa = LSOA.objects.filter(
-                            lsoa_code=lsoa_code, year=int(year)
-                        ).get()
+                        if int(year) == 2025:
+                            lsoa = LSOA.objects.filter(
+                                lsoa_code=lsoa_code, year=2021
+                            ).get()
+                        elif int(year) == 2019:
+                            lsoa = LSOA.objects.filter(
+                                lsoa_code=lsoa_code, year=2011
+                            ).get()
+                        else:
+                            raise ParseError(  # fallback, should not be hit
+                                "Year must be 2019 or 2025 for England.", code=400
+                            )
                         imd = EnglishIndexMultipleDeprivation.objects.filter(
                             lsoa=lsoa, year=int(year)
                         ).get()
@@ -566,6 +575,25 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
         post_code = self.request.query_params.get("postcode", None)
         requested_quantile = self.request.query_params.get("quantile", None)
         year = self.request.query_params.get("year", None)
+
+        # Validate quantile parameter
+        if requested_quantile is None:
+            raise ParseError("Quantile parameter is required.", code=400)
+
+        valid_quantiles = [2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20]
+        try:
+            quantile_int = int(requested_quantile)
+            if quantile_int not in valid_quantiles:
+                raise ParseError(
+                    f"{requested_quantile} is not a valid quantile. Must be one of {valid_quantiles}.",
+                    code=400,
+                )
+        except (ValueError, TypeError):
+            raise ParseError(
+                f"{requested_quantile} is not a valid quantile. Must be one of {valid_quantiles}.",
+                code=400,
+            )
+
         if post_code:
 
             data = lsoa_for_postcode(postcode=post_code)
@@ -604,6 +632,7 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                             rank=imd.imd_rank,
                             requested_quantile=requested_quantile,
                             country="england",
+                            year=year,
                         )
                         response = Response({"result": data})
                     else:
@@ -623,6 +652,7 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                         rank=imd.imd_rank,
                         requested_quantile=requested_quantile,
                         country="wales",
+                        year=year,
                     )
                     response = Response({"result": data})
                 elif lsoa_object["country"] == "Scotland":
@@ -640,6 +670,7 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                         rank=imd.imd_rank,
                         requested_quantile=requested_quantile,
                         country="scotland",
+                        year=year,
                     )
                     response = Response({"result": data})
                 elif lsoa_object["country"] == "Northern Ireland":
@@ -657,6 +688,7 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                         rank=imd.imd_rank,
                         requested_quantile=requested_quantile,
                         country="northern_ireland",
+                        year=year,
                     )
                     response = Response({"result": data})
                 else:
