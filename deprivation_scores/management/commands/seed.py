@@ -186,12 +186,16 @@ def add_lsoas_2011_wards_2019_to_LADS_2019():
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{LSOA_2011_WARD_LAD_2019}"
 
     if (
-        LocalAuthority.objects.exists() and LocalAuthority.objects.all().count() >= 371
-    ) or (LSOA.objects.exists() and LSOA.objects.all().count() >= 34753):
+        LocalAuthority.objects.filter(year=2019).exists()
+        and LocalAuthority.objects.filter(year=2019).count() >= 339
+    ) or (
+        LSOA.objects.filter(year=2011).exists()
+        and LSOA.objects.filter(year=2011).count() >= 34753
+    ):
         sys.stdout.write(
             "\n"
             + R
-            + "Local Authorities and LSOAs already added. Skipping..."
+            + "2019 Local Authorities and 2011 LSOAs already added. Skipping..."
             + W
             + "\n"
         )
@@ -262,9 +266,12 @@ def add_lsoas_2021_wards_2024_to_LADS_2024():
     # import LSOA 2021/Ward & LAD 2024 boundaries
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{LSOA_2021_WARD_LAD_2024}"
     if (
-        LocalAuthority.objects.exists()
-        and LocalAuthority.objects.filter(year=2024).exists()
-    ) or (LSOA.objects.exists() and LSOA.objects.filter(year=2021).exists()):
+        LocalAuthority.objects.filter(year=2024).exists()
+        and LocalAuthority.objects.filter(year=2024).count() >= 318
+    ) or (
+        LSOA.objects.filter(year=2021).exists()
+        and LSOA.objects.filter(year=2021).count() >= 35672
+    ):
         sys.stdout.write(
             "\n"
             + R
@@ -344,11 +351,12 @@ def add_english_deprivation_scores_and_domains_to_2011_lsoas():
     # import domains of deprivation data
 
     if (
-        EnglishIndexMultipleDeprivation.objects.exists()
-        and EnglishIndexMultipleDeprivation.objects.count() >= 32844
+        EnglishIndexMultipleDeprivation.objects.filter(lsoa__year=2011).exists()
+        and EnglishIndexMultipleDeprivation.objects.filter(lsoa__year=2011).count()
+        >= 32844
     ):
         sys.stdout.write(
-            "\n" + R + "⏭️ English indices already exist! Skipping..." + W + "\n"
+            "\n" + R + "⏭️ English 2019 indices already exist! Skipping..." + W + "\n"
         )
         return
 
@@ -402,6 +410,18 @@ def add_english_deprivation_scores_and_domains_to_2011_lsoas():
 
 def update_english_imd_data_with_subdomains():
     # import subdomains of deprivation data
+    # Guard: check if subdomains already populated for 2019 data
+    if (
+        EnglishIndexMultipleDeprivation.objects.filter(
+            year=2019, children_young_people_sub_domain_rank__isnull=False
+        ).count()
+        >= 32844
+    ):
+        sys.stdout.write(
+            "\n" + R + "⏭️ English 2019 subdomains already exist! Skipping..." + W + "\n"
+        )
+        return
+
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_SUBDOMAINS_OF_DEPRIVATION}"
     sys.stdout.write(
         "\n" + G + "📎 - Adding sub-domains of deprivation to LSOAs" + W + "\n"
@@ -416,7 +436,7 @@ def update_english_imd_data_with_subdomains():
             except LSOA.DoesNotExist:
                 sys.stderr.write(R + f"⏭️ LSOA {row[0]} not found. Skipping..." + W)
                 continue
-            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa, year=2011).update(
+            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa, year=2019).update(
                 children_young_people_sub_domain_rank=int(float(row[6])),
                 children_young_people_sub_domain_decile=int(float(row[7])),
                 adult_skills_sub_domain_rank=int(float(row[8])),
@@ -445,6 +465,22 @@ def update_english_imd_data_with_subdomains():
 
 def update_english_imd_data_with_supplementary_indices():
     # import domains of deprivation data
+    # Guard: check if supplementary indices already populated for 2019 data
+    if (
+        EnglishIndexMultipleDeprivation.objects.filter(
+            year=2019, idaci_rank__isnull=False
+        ).count()
+        >= 32844
+    ):
+        sys.stdout.write(
+            "\n"
+            + R
+            + "⏭️ English 2019 supplementary indices already exist! Skipping..."
+            + W
+            + "\n"
+        )
+        return
+
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_SUPPLEMENTARY_INDICES_OF_DEPRIVATION}"
     with open(path, "r") as f:
         sys.stdout.write(
@@ -465,7 +501,7 @@ def update_english_imd_data_with_supplementary_indices():
                     R + f"⏭️ LSOA {row[0]} not found. Skipping..." + W + "\n"
                 )
                 continue
-            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa, year=2011).update(
+            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa, year=2019).update(
                 idaci_rank=int(float(row[6])),
                 idaci_decile=int(float(row[7])),
                 idaopi_rank=int(float(row[8])),
@@ -485,6 +521,18 @@ def update_english_imd_data_with_supplementary_indices():
 
 def update_english_imd_data_with_scores():
     # import domains of deprivation data
+    # Guard: check if scores already populated for 2019 data
+    if (
+        EnglishIndexMultipleDeprivation.objects.filter(
+            year=2019, income_score__isnull=False
+        ).count()
+        >= 32844
+    ):
+        sys.stdout.write(
+            "\n" + R + "⏭️ English 2019 scores already exist! Skipping..." + W + "\n"
+        )
+        return
+
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_SCORES_OF_DEPRIVATION}"
     with open(path, "r") as f:
         sys.stdout.write(
@@ -500,7 +548,7 @@ def update_english_imd_data_with_scores():
                     "\n" + R + f"⏭️ LSOA {row[0]} not found. Skipping..." + W + "\n"
                 )
                 continue
-            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa, year=2011).update(
+            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa, year=2019).update(
                 imd_score=Decimal(row[4]),
                 income_score=Decimal(row[5]),
                 employment_score=Decimal(row[6]),
@@ -533,6 +581,22 @@ def update_english_imd_data_with_scores():
 
 def update_english_imd_data_with_transformed_scores():
     # import domains of deprivation data
+    # Guard: check if transformed scores already populated for 2019 data
+    if (
+        EnglishIndexMultipleDeprivation.objects.filter(
+            year=2019, income_score_exponentially_transformed__isnull=False
+        ).count()
+        >= 32844
+    ):
+        sys.stdout.write(
+            "\n"
+            + R
+            + "⏭️ English 2019 transformed scores already exist! Skipping..."
+            + W
+            + "\n"
+        )
+        return
+
     path = (
         f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_TRANSFORMED_SCORES_OF_DEPRIVATION}"
     )
@@ -548,7 +612,7 @@ def update_english_imd_data_with_transformed_scores():
         count = 0
         for row in data[1:]:
             lsoa = LSOA.objects.get(lsoa_code=row[0], year=2011)
-            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa, year=2011).update(
+            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa, year=2019).update(
                 income_score_exponentially_transformed=Decimal(row[4]),
                 employment_score_exponentially_transformed=Decimal(row[5]),
                 education_skills_training_score_exponentially_transformed=Decimal(
@@ -646,6 +710,18 @@ def update_english_2025_imd_data_with_subdomains():
     """
     Import 2025 subdomains of deprivation data
     """
+    # Guard: check if subdomains already populated for 2025 data
+    if (
+        EnglishIndexMultipleDeprivation.objects.filter(
+            lsoa__year=2021, children_young_people_sub_domain_rank__isnull=False
+        ).count()
+        >= 33755
+    ):
+        sys.stdout.write(
+            "\n" + R + "⏭️ English 2025 subdomains already exist! Skipping..." + W + "\n"
+        )
+        return
+
     path = f"{settings.IMD_DATA_FILES_FOLDER}/2025/{IMD_2025_SUBDOMAINS_OF_DEPRIVATION}"
     sys.stdout.write(
         "\n" + G + "📎 - Adding 2025 sub-domains of deprivation to LSOAs" + W + "\n"
@@ -691,6 +767,22 @@ def update_english_2025_imd_data_with_supplementary_indices():
     """
     Import 2025 supplementary indices (IDACI and IDAOPI) data
     """
+    # Guard: check if supplementary indices already populated for 2025 data
+    if (
+        EnglishIndexMultipleDeprivation.objects.filter(
+            lsoa__year=2021, idaci_rank__isnull=False
+        ).count()
+        >= 33755
+    ):
+        sys.stdout.write(
+            "\n"
+            + R
+            + "⏭️ English 2025 supplementary indices already exist! Skipping..."
+            + W
+            + "\n"
+        )
+        return
+
     path = f"{settings.IMD_DATA_FILES_FOLDER}/2025/{IMD_2025_SUPPLEMENTARY_INDICES_OF_DEPRIVATION}"
     with open(path, "r", encoding="utf-8") as f:
         sys.stdout.write(
@@ -711,7 +803,7 @@ def update_english_2025_imd_data_with_supplementary_indices():
                     R + f"⏭️ LSOA {row[0]} not found. Skipping..." + W + "\n"
                 )
                 continue
-            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa).update(
+            EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa, year=2025).update(
                 idaci_rank=int(float(row[6])),
                 idaci_decile=int(float(row[7])),
                 idaopi_rank=int(float(row[8])),
@@ -733,6 +825,18 @@ def update_english_2025_imd_data_with_scores():
     """
     Import 2025 scores of deprivation data
     """
+    # Guard: check if scores already populated for 2025 data
+    if (
+        EnglishIndexMultipleDeprivation.objects.filter(
+            lsoa__year=2021, income_score__isnull=False
+        ).count()
+        >= 33755
+    ):
+        sys.stdout.write(
+            "\n" + R + "⏭️ English 2025 scores already exist! Skipping..." + W + "\n"
+        )
+        return
+
     path = f"{settings.IMD_DATA_FILES_FOLDER}/2025/{IMD_2025_SCORES_OF_DEPRIVATION}"
     with open(path, "r", encoding="utf-8") as f:
         sys.stdout.write(
@@ -786,6 +890,22 @@ def update_english_2025_imd_data_with_transformed_scores():
     """
     Import 2025 transformed scores of deprivation data
     """
+    # Guard: check if transformed scores already populated for 2025 data
+    if (
+        EnglishIndexMultipleDeprivation.objects.filter(
+            lsoa__year=2021, income_score_exponentially_transformed__isnull=False
+        ).count()
+        >= 33755
+    ):
+        sys.stdout.write(
+            "\n"
+            + R
+            + "⏭️ English 2025 transformed scores already exist! Skipping..."
+            + W
+            + "\n"
+        )
+        return
+
     path = f"{settings.IMD_DATA_FILES_FOLDER}/2025/{IMD_2025_TRANSFORMED_SCORES_OF_DEPRIVATION}"
     sys.stdout.write(
         "\n"
@@ -841,6 +961,15 @@ def add_scottish_data_zones_and_local_authorities():
     """
     Add data zones and scottish local authorities
     """
+    if (
+        DataZone.objects.filter(year=2011).exists()
+        and DataZone.objects.filter(year=2011).count() >= 6976
+    ):
+        sys.stdout.write(
+            R + "\n⏭️ Scottish 2011 Data Zones already added. Skipping..." + W + "\n"
+        )
+        return
+
     path = (
         f"{settings.IMD_DATA_FILES_FOLDER}/{SCOTTISH_DATA_ZONES_AND_LOCAL_AUTHORITIES}"
     )
@@ -903,11 +1032,14 @@ def add_scottish_deprivation_ranks_and_domains_to_2011_datazones():
     # import domains of deprivation data
 
     if (
-        ScottishIndexMultipleDeprivation.objects.exists()
-        and ScottishIndexMultipleDeprivation.objects.count() == 6976
+        ScottishIndexMultipleDeprivation.objects.filter(data_zone__year=2011).exists()
+        and ScottishIndexMultipleDeprivation.objects.filter(
+            data_zone__year=2011
+        ).count()
+        >= 6976
     ):
         sys.stdout.write(
-            R + "\n⏭️ Scottish indices already exist! Skipping..." + W + "\n"
+            R + "\n⏭️ Scottish 2020 indices already exist! Skipping..." + W + "\n"
         )
         return
 
@@ -965,10 +1097,12 @@ def add_welsh_2019_domains_and_ranks_to_existing_2011_lsoas():
     import Welsh domains and ranks 2019 data
     """
     if (
-        WelshIndexMultipleDeprivation.objects.exists()
-        and WelshIndexMultipleDeprivation.objects.count() >= 1909
+        WelshIndexMultipleDeprivation.objects.filter(year=2019).exists()
+        and WelshIndexMultipleDeprivation.objects.filter(year=2019).count() >= 1909
     ):
-        sys.stdout.write(R + "⏭️ Welsh indices already present. Skipping..." + W)
+        sys.stdout.write(
+            R + "\n⏭️ Welsh 2019 indices already present. Skipping..." + W + "\n"
+        )
         return
 
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_WALES_DEPRIVATION_DOMAINS_RANKS}"
@@ -1103,6 +1237,18 @@ def add_welsh_2019_scores_to_existing_2011_lsoas():
     """
     import Welsh IMD scores 2019 and add to existing ranks/imds
     """
+    # Guard: check if Welsh scores already populated
+    if (
+        WelshIndexMultipleDeprivation.objects.filter(
+            year=2019, income_score__isnull=False
+        ).count()
+        >= 1909
+    ):
+        sys.stdout.write(
+            "\n" + R + "⏭️ Welsh 2019 scores already exist! Skipping..." + W + "\n"
+        )
+        return
+
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_WALES_DEPRIVATION_SCORES}"
     with open(path, "r") as f:
         sys.stdout.write(G + "\n📎 - Adding Welsh IMD scores" + W + "\n")
@@ -1117,7 +1263,7 @@ def add_welsh_2019_scores_to_existing_2011_lsoas():
                     R + f"\n⏭️ LSOA {record[0]} not found. Skipping..." + W + "\n"
                 )
                 continue
-            WelshIndexMultipleDeprivation.objects.filter(lsoa=lsoa, year=2011).update(
+            WelshIndexMultipleDeprivation.objects.filter(lsoa=lsoa, year=2019).update(
                 imd_score=record[3],
                 income_score=record[4],
                 employment_score=record[5],
@@ -1151,12 +1297,16 @@ def add_northern_ireland_soas_and_deprivation_domains_with_ranks():
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{NORTHERN_IRELAND_SOAS_AND_IMD_RANKS}"
 
     if (
-        NorthernIrelandIndexMultipleDeprivation.objects.exists()
-        and NorthernIrelandIndexMultipleDeprivation.objects.all().count()
-        >= SOA.objects.all().count()
-    ):  # 891
+        NorthernIrelandIndexMultipleDeprivation.objects.filter(year=2017).exists()
+        and NorthernIrelandIndexMultipleDeprivation.objects.filter(year=2017).count()
+        >= 890
+    ):
         sys.stdout.write(
-            "\n" + R + "⏭️ Northern Ireland SOAs already added. Skipping..." + W + "\n"
+            "\n"
+            + R
+            + "⏭️ Northern Ireland 2017 IMD already added. Skipping..."
+            + W
+            + "\n"
         )
         return
     else:
@@ -1241,6 +1391,16 @@ def add_2015_population_denominators():
 
 def add_lad_access_to_outdoor_space():
     # import domains of deprivation data
+
+    if (
+        GreenSpace.objects.filter(year=2020).exists()
+        and GreenSpace.objects.filter(year=2020).count() >= 371
+    ):
+        sys.stdout.write(
+            "\n" + R + "⏭️ 2020 Green space data already added. Skipping..." + W + "\n"
+        )
+        return
+
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{ACCESS_TO_GREEN_SPACE}"
     sys.stdout.write(
         "\n"
@@ -1272,7 +1432,7 @@ def add_lad_access_to_outdoor_space():
                 )
                 continue
             if GreenSpace.objects.filter(
-                local_authority=local_authority, year=2011
+                local_authority=local_authority, year=2020
             ).exists():
                 final = f"⏭️ Green space data already available for {local_authority.local_authority_district_name}.\n"
                 sys.stdout.write(final)
