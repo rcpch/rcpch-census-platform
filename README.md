@@ -60,6 +60,46 @@ In England, there are also subdomains for education (children and young people a
 
 These domains are then weighted and contribute to the final index of multiple deprivation score. Based on the score in each LSOA, LSOAs are then ranked by deprivation score, and then split into quantiles (with the lower quantiles the most deprived). It is important to say that the rankings do not compare between countries - that is a given decile in one country is not the same as the same decile in another, and this is because the scores are not standardised across the UK, only across each nation. An attempt to do this has been made by [MySociety](https://github.com/mysociety/composite_uk_imd) who have published a Composite UK IMD which brings together all the datasets across the devolved nations. In the process, however, a lot of the detail is lost so whilst this allows the user to compare deprivation scores across countries, [it is not possible to compare the subdomains](https://github.com/mysociety/composite_uk_imd/issues/2). For our purposes, therefore, we will use the individual countries scores, but report these with an appropriate warning.
 
+### Datasets
+
+| Country | Denomination | Year | Count | Reference |
+|:--------|:-------------|:-----|------:|:----------|
+| England | LSOA | 2011 | 32,844 | |
+| England | LSOA | 2021 | 33,755 | |
+| Wales | LSOA | 2011 | 1,909 | |
+| Wales | LSOA | 2021 | 1,917 | |
+| Scotland | Data Zone | 2011 | 6,976 | |
+| Northern Ireland | SOA | 2001 | 890 | |
+| England | Local Authority District | 2019 | 317 | |
+| England | Local Authority District | 2024 | 296 | |
+| Wales | Local Authority District | 2019 | 22 | |
+| Wales | Local Authority District | 2024 | 22 | |
+| Scotland | Local Authority | 2011 | 32 | |
+| England | Ward | 2019 | 7,180 | |
+| England | Ward | 2024 | 7,461 | |
+| Wales | Ward | 2019 | 852 | |
+| Wales | Ward | 2024 | 881 | |
+| England | MSOA | 2011 | 6,791 | |
+| England | MSOA | 2021 | 6,856 | |
+| Wales | MSOA | 2011 | 410 | |
+| Wales | MSOA | 2021 | 416 | |
+| England | IMD | 2019 | 32,844 | |
+| England | IMD | 2025 | 33,755 | |
+| Wales | WIMD | 2019 | 1,909 | |
+| Scotland | SIMD | 2020 | 6,976 | |
+| Northern Ireland | NIMDM | 2017 | 890 | |
+| England, Wales, Scotland | Green Space | 2020 | 371 | |
+| England | Population Density | 2024 | 32,844 | |
+
+#### IMD Boundary Summary
+
+| Country | IMD Version | IMD Year | Small Area | Small Area Year | Local Authority | LA Year |
+|:--------|:------------|:---------|:-----------|:----------------|:----------------|:--------|
+| England | IoD | 2019 | LSOA | 2011 | LAD | 2019 |
+| England | IoD | 2025 | LSOA | 2021 | LAD | 2024 |
+| Wales | WIMD | 2019 | LSOA | 2011 | LAD | 2019 |
+| Scotland | SIMD | 2020 | Data Zone | 2011 | LA | 2011 |
+| Northern Ireland | NIMDM | 2017 | SOA | 2001 | - | - |
 
 ## Getting Started
 
