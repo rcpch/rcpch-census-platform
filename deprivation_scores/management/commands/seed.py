@@ -4,7 +4,6 @@ import sys
 import csv
 from decimal import Decimal
 from django.core.management.base import BaseCommand
-from tqdm import tqdm
 from django.conf import settings
 from ...models import (
     LSOA,
@@ -211,7 +210,7 @@ def add_lsoas_2011_wards_2019_to_LADS_2019():
             )
             data = list(csv.reader(f, delimiter=","))
 
-            for row in tqdm(data[1:], ascii=True, desc="Adding 2011 LSOAs & 2019 LADs"):
+            for row in data[1:]:
                 local_authority_district_2019, created = (
                     LocalAuthority.objects.get_or_create(
                         local_authority_district_code=row[5],
@@ -288,7 +287,7 @@ def add_lsoas_2021_wards_2024_to_LADS_2024():
             )
             data = list(csv.reader(f, delimiter=","))
 
-            for row in tqdm(data[1:], desc="Adding 2021 LSOAs & 2024 LADs"):
+            for row in data[1:]:
                 local_authority_district_2024, created = (
                     LocalAuthority.objects.get_or_create(
                         local_authority_district_code=row[6],
@@ -365,9 +364,7 @@ def add_english_deprivation_scores_and_domains_to_2011_lsoas():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in tqdm(
-            data[1:], ascii=True, desc="Adding 2019 English IMD domains"
-        ):  # skip the first row
+        for row in data[1:]:  # skip the first row
             if LSOA.objects.filter(lsoa_code=row[0], year=2011).exists():
                 lsoa = LSOA.objects.filter(lsoa_code=row[0], year=2011).get()
 
@@ -413,9 +410,7 @@ def update_english_imd_data_with_subdomains():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in tqdm(
-            data[1:], ascii=True, desc="Adding 2019 subdomains"
-        ):  # skip the first row
+        for row in data[1:]:  # skip the first row
             try:
                 lsoa = LSOA.objects.get(lsoa_code=row[0], year=2011)
             except LSOA.DoesNotExist:
@@ -462,9 +457,7 @@ def update_english_imd_data_with_supplementary_indices():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in tqdm(
-            data[1:], desc="Adding 2019 supplementary indices"
-        ):  # skip the first row
+        for row in data[1:]:  # skip the first row
             try:
                 lsoa = LSOA.objects.get(lsoa_code=row[0], year=2011)
             except LSOA.DoesNotExist:
@@ -499,7 +492,7 @@ def update_english_imd_data_with_scores():
         )
         data = list(csv.reader(f, delimiter=","))
         count = 0
-        for row in tqdm(data[1:], desc="Adding 2019 scores"):  # skip the first row
+        for row in data[1:]:  # skip the first row
             try:
                 lsoa = LSOA.objects.get(lsoa_code=row[0], year=2011)
             except LSOA.DoesNotExist:
@@ -553,7 +546,7 @@ def update_english_imd_data_with_transformed_scores():
     with open(path, "r") as f:
         data = list(csv.reader(f, delimiter=","))
         count = 0
-        for row in tqdm(data[1:], desc="Adding 2019 transformed scores"):
+        for row in data[1:]:
             lsoa = LSOA.objects.get(lsoa_code=row[0], year=2011)
             EnglishIndexMultipleDeprivation.objects.filter(lsoa=lsoa, year=2011).update(
                 income_score_exponentially_transformed=Decimal(row[4]),
@@ -613,9 +606,7 @@ def add_english_2025_deprivation_scores_and_domains_to_2021_lsoas():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in tqdm(
-            data[1:], desc="Adding 2025 English IMD domains"
-        ):  # skip the first row
+        for row in data[1:]:  # skip the first row
             if LSOA.objects.filter(lsoa_code=row[0], year=2021).exists():
                 lsoa = LSOA.objects.filter(lsoa_code=row[0], year=2021).get()
 
@@ -663,7 +654,7 @@ def update_english_2025_imd_data_with_subdomains():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in tqdm(data[1:], desc="Adding 2025 subdomains"):  # skip the first row
+        for row in data[1:]:  # skip the first row
             try:
                 lsoa = LSOA.objects.get(lsoa_code=row[0], year=2021)
             except LSOA.DoesNotExist:
@@ -712,9 +703,7 @@ def update_english_2025_imd_data_with_supplementary_indices():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in tqdm(
-            data[1:], desc="Adding 2025 supplementary indices"
-        ):  # skip the first row
+        for row in data[1:]:  # skip the first row
             try:
                 lsoa = LSOA.objects.get(lsoa_code=row[0], year=2021)
             except LSOA.DoesNotExist:
@@ -755,7 +744,7 @@ def update_english_2025_imd_data_with_scores():
         )
         data = list(csv.reader(f, delimiter=","))
         count = 0
-        for row in tqdm(data[1:], desc="Adding 2025 scores"):  # skip the first row
+        for row in data[1:]:  # skip the first row
             try:
                 lsoa = LSOA.objects.get(lsoa_code=row[0], year=2021)
             except LSOA.DoesNotExist:
@@ -808,7 +797,7 @@ def update_english_2025_imd_data_with_transformed_scores():
     with open(path, "r", encoding="utf-8") as f:
         data = list(csv.reader(f, delimiter=","))
         count = 0
-        for row in tqdm(data[1:], desc="Adding 2025 transformed scores"):
+        for row in data[1:]:
             try:
                 lsoa = LSOA.objects.get(lsoa_code=row[0], year=2021)
             except LSOA.DoesNotExist:
@@ -866,7 +855,7 @@ def add_scottish_data_zones_and_local_authorities():
         data = list(csv.reader(f, delimiter=","))
         lad_count = 0
         dz_count = 0
-        for row in tqdm(data[1:], desc="Adding Scottish Data Zones & LADs"):
+        for row in data[1:]:
             local_authority, created = LocalAuthority.objects.update_or_create(
                 local_authority_district_code=row[6],
                 year=2011,
@@ -934,9 +923,7 @@ def add_scottish_deprivation_ranks_and_domains_to_2011_datazones():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in tqdm(
-            data[1:], desc="Adding Scottish IMD ranks"
-        ):  # skip the first row
+        for row in data[1:]:  # skip the first row
             if DataZone.objects.filter(data_zone_code=row[0], year=2011).exists():
                 data_zone = DataZone.objects.filter(
                     data_zone_code=row[0], year=2011
@@ -989,9 +976,7 @@ def add_welsh_2019_domains_and_ranks_to_existing_2011_lsoas():
         sys.stdout.write("\n" + G + "📎 - Adding Welsh IMD ranks/quantiles" + W + "\n")
         data = list(csv.reader(f, delimiter=","))
         count = 0
-        for record in tqdm(
-            data[1:], desc="Adding Welsh IMD ranks"
-        ):  # skip the first row
+        for record in data[1:]:  # skip the first row
             try:
                 lsoa = LSOA.objects.get(lsoa_code=record[0], year=2011)
             except LSOA.DoesNotExist:
@@ -1124,9 +1109,7 @@ def add_welsh_2019_scores_to_existing_2011_lsoas():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for record in tqdm(
-            data[1:], desc="Adding Welsh IMD scores"
-        ):  # skip the first row
+        for record in data[1:]:  # skip the first row
             try:
                 lsoa = LSOA.objects.get(lsoa_code=record[0], year=2011)
             except LSOA.DoesNotExist:
@@ -1188,9 +1171,7 @@ def add_northern_ireland_soas_and_deprivation_domains_with_ranks():
         )
         with open(path, "r") as f:
             data = list(csv.reader(f, delimiter=","))
-            for row in tqdm(
-                data[1:891], desc="Adding NI SOAs & IMDs"
-            ):  # skip the first row: run up to to 890
+            for row in data[1:891]:  # skip the first row: run up to to 890
                 soa, created = SOA.objects.update_or_create(
                     soa_code=row[2], soa_name=row[3], year=2001
                 )
@@ -1238,9 +1219,7 @@ def add_2015_population_denominators():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in tqdm(
-            data[1:], desc="Adding 2015 population denominators"
-        ):  # skip the first row
+        for row in data[1:]:  # skip the first row
             LSOA.objects.filter(lsoa_code=row[0], year=2011).update(
                 total_population_mid_2015=int(float(row[4])),
                 dependent_children_mid_2015=int(float(row[5])),
@@ -1274,9 +1253,7 @@ def add_lad_access_to_outdoor_space():
         data = list(csv.reader(f, delimiter=","))
         count = 0
 
-        for row in tqdm(
-            data[2:], desc="Adding 2020 green space records"
-        ):  # header is on row 3
+        for row in data[2:]:  # header is on row 3
             la_code = row[4]
             # Scottish LAs were created with year=2011, English & Welsh with year=2019
             la_year = 2011 if la_code.startswith("S") else 2019
@@ -1383,9 +1360,7 @@ def update_population_densities():
         )
         data = list(csv.reader(f, delimiter=","))
 
-        for row in tqdm(
-            data[1:], desc="Adding population densities"
-        ):  # Iterate starting from the second row (index 1)
+        for row in data[1:]:  # Iterate starting from the second row (index 1)
             lsoa11cd = row[1]  # Access the first element (index 1) which is 'lsoa11cd'
             lsoa = None
             if LSOA.objects.filter(lsoa_code=lsoa11cd, year=2011).exists():
