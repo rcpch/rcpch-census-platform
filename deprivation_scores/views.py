@@ -439,19 +439,19 @@ class UKIndexMultipleDeprivationView(APIView):
                     )
                 elif lsoa_object["country"] == "Wales":
                     if year is None:
-                        year = 2020
-                    if int(year) != 2020:
-                        raise ParseError("Year must be 2020 for Wales.", code=400)
+                        year = 2019
+                    if int(year) != 2019:
+                        raise ParseError("Year must be 2019 for Wales.", code=400)
                     lsoa = LSOA.objects.filter(lsoa_code=lsoa_code, year=2011).get()
                     imd = WelshIndexMultipleDeprivation.objects.filter(
-                        lsoa=lsoa, year=2020
+                        lsoa=lsoa, year=2019
                     ).get()
                     response = self.welsh_serializer_class(
                         instance=imd, context={"request": request}
                     )
                 elif lsoa_object["country"] == "Scotland":
                     if year is None:
-                        year = 20120
+                        year = 2020
                     if int(year) != 2020:
                         raise ParseError("Year must be 2020 for Scotland.", code=400)
                     lsoa = DataZone.objects.filter(
@@ -641,9 +641,9 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                         )
                 elif lsoa_object["country"] == "Wales":
                     if year is None:
-                        year = 2020
-                    if int(year) != 2020:
-                        raise ParseError("Year must be 2020 for Wales.", code=400)
+                        year = 2019
+                    if int(year) != 2019:
+                        raise ParseError("Year must be 2019 for Wales.", code=400)
                     lsoa = LSOA.objects.filter(lsoa_code=lsoa_code, year=2011).get()
                     imd = WelshIndexMultipleDeprivation.objects.filter(
                         lsoa=lsoa, year=year
