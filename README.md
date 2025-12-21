@@ -121,6 +121,24 @@ This latter step will take several minutes as it populates the database with all
 The final step is to run the server:
 ```python manage.py runserver```
 
+## Tests — postcode mocking
+
+By default the test suite uses mocked responses for the external postcodes.io API so tests are fast and deterministic.
+
+- Default behavior: tests use the mock data in `tests/postcode_mock_data.py` (no environment variables required).
+- To run tests against the real postcodes.io API set the environment variable `REAL_POSTCODES_IO=1` or annotate a test with `@pytest.mark.real_postcodes_io`.
+- CI runs the seeding step and executes the full test-suite; mocking is enabled by default in the test runner, so CI will use the mocks unless overridden.
+
+If you need to regenerate the mocked responses, run `python scripts/capture_postcode_responses.py` and update `tests/postcode_mock_data.py`.
+
+To run the tests using the real postcodes API:
+
+`REAL_POSTCODES_IO=1 pytest -q`
+
+To run the tests without:
+
+`pytest -q`
+
 ### Docker Compose development install
 
 <!-- the below needs a rewrite to include 'docker compose exec web' in front of all the commands -->

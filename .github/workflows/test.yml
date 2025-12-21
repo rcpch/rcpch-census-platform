@@ -81,5 +81,4 @@ jobs:
                   DEBUG: "True"
                   DJANGO_ALLOWED_HOSTS: localhost
                   POSTCODES_IO_API_URL: https://api.postcodes.io
-                  MOCK_POSTCODES_IO: "1"
               run: python -m pytest tests/ -v --tb=short
