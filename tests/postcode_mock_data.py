@@ -586,7 +586,11 @@ MOCK_POSTCODE_RESPONSES = {
             "postcode": "TS18 3WH",
             "country": "England",
             "lsoa": "Stockton-on-Tees 045A",
-            "codes": {"lsoa": "E01012264", "lsoa11": "E01012264", "lsoa21": "E01035201"},
+            "codes": {
+                "lsoa": "E01012264",
+                "lsoa11": "E01012264",
+                "lsoa21": "E01035201",
+            },
         },
     },
     # Invalid postcodes for error testing
