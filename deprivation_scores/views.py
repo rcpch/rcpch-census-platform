@@ -2,6 +2,7 @@ from http import HTTPStatus
 from rest_framework import (
     viewsets,
     serializers,  # serializers here required for drf-spectacular @extend_schema
+    mixins,
 )
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView, Response
@@ -122,9 +123,9 @@ class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
     )
 )
 @extend_schema(request=LSOASerializer)
-class LSOAViewSet(viewsets.ReadOnlyModelViewSet):
+class LSOAViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
-    This endpoint returns a list of LSOAs in England and Wales.
+    This endpoint returns an LSOA against a given LSOA code.
     There are datasets for 2011 and 2021.
 
     Filter Parameters:
@@ -144,17 +145,6 @@ class LSOAViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ["lsoa_code", "lsoa_name", "year"]
     filter_backends = [DjangoFilterBackend]
     lookup_field = "lsoa_code"
-
-    def list(self, request, *args, **kwargs):
-        year = request.query_params.get("year")
-        if year is not None:
-            try:
-                year_int = int(year)
-            except (TypeError, ValueError):
-                raise ParseError("Year must be an integer.", code=400)
-            if year_int not in (2011, 2021):
-                raise ParseError("Year must be one of: 2011, 2021.", code=400)
-        return super().list(request, *args, **kwargs)
 
     def retrieve(self, request, *args, **kwargs):
         # accept code from query param or URL (lookup_field)
@@ -265,13 +255,31 @@ class DataZoneViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
-class EnglishIndexMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
+@extend_schema_view(
+    retrieve=extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="year",
+                description="Year of Index of Multiple Deprivation dataset to use (2019 or 2025) - defaults to 2019 if not supplied",
+                required=False,
+                type=OpenApiTypes.INT,
+            ),
+        ]
+    )
+)
+@extend_schema(
+    request=EnglishIndexMultipleDeprivationSerializer,
+)
+class EnglishIndexMultipleDeprivationViewSet(
+    mixins.RetrieveModelMixin, viewsets.GenericViewSet
+):
     """
-    This endpoint returns a list of all English LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).
+    This endpoint returns the extended English Index of Multiple Deprivation data for a given LSOA.
 
     Filter Parameters:
 
     `lsoa_code`
+    `year` (2019 or 2025 - defaults to 2019 if not supplied)
 
     If none are passed, a list is returned
     """
@@ -280,6 +288,34 @@ class EnglishIndexMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = EnglishIndexMultipleDeprivationSerializer
     filterset_class = EnglishIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
+    lookup_field = "lsoa_code"
+
+    def retrieve(self, request, *args, **kwargs):
+        lsoa_code = kwargs.get(self.lookup_field)
+        year = request.query_params.get("year")
+        if year is not None:
+            try:
+                year_int = int(year)
+            except (TypeError, ValueError):
+                raise ParseError("Year must be an integer.", code=400)
+            if year_int not in (2019, 2025):
+                raise ParseError("Year must be one of: 2019, 2025.", code=400)
+            qs = self.filter_queryset(self.get_queryset()).filter(
+                lsoa__lsoa_code=lsoa_code, year=year_int
+            )
+            instance = qs.first()
+        else:
+            year = 2019
+            qs = self.filter_queryset(self.get_queryset()).filter(
+                lsoa__lsoa_code=lsoa_code, year=year
+            )
+            instance = qs.first()
+
+        if not instance:
+            raise NotFound("LSOA not found for the supplied code/year.")
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 
 @extend_schema(
