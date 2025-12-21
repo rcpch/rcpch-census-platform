@@ -62,6 +62,14 @@ from .general_functions import (
 
 @extend_schema(
     request=LocalAuthorityDistrictSerializer,
+    parameters=[
+        OpenApiParameter(
+            name="year",
+            description="Year (must be one of 2011, 2019, or 2024)",
+            required=True,
+            type=OpenApiTypes.INT,
+        ),
+    ],
     responses={
         200: OpenApiResponse(
             response=OpenApiTypes.OBJECT,
@@ -81,7 +89,7 @@ from .general_functions import (
         ),
     },
 )
-class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
+class LocalAuthorityDistrictViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
     This endpoint returns a list of Local Authority Districts across England, Scotland and Wales.
     It contains datasets for:
@@ -97,7 +105,7 @@ class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
 
     `local_authority_district_name`
 
-    If none are passed, a list is returned.
+    The year parameter is mandatory.
 
     """
 
@@ -109,6 +117,17 @@ class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
         "year",
     ]
     filter_backends = [DjangoFilterBackend]
+
+    def list(self, request, *args, **kwargs):
+        year = request.query_params.get("year")
+        if year is not None:
+            try:
+                year_int = int(year)
+            except (TypeError, ValueError):
+                raise ParseError("Year must be an integer.", code=400)
+            if year_int not in (2011, 2019, 2024):
+                raise ParseError("Year must be one of: 2011, 2019, 2024.", code=400)
+        return super().list(request, *args, **kwargs)
 
 
 @extend_schema_view(
