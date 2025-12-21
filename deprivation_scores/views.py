@@ -5,11 +5,12 @@ from rest_framework import (
 )
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView, Response
-from rest_framework.exceptions import ParseError
+from rest_framework.exceptions import ParseError, NotFound
 from django_filters.rest_framework import DjangoFilterBackend
 
 from drf_spectacular.utils import (
     extend_schema,
+    extend_schema_view,
     OpenApiParameter,
     OpenApiExample,
     OpenApiResponse,
@@ -108,6 +109,18 @@ class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
+@extend_schema_view(
+    retrieve=extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="year",
+                description="Year (must be one of 2011 or 2021) - defaults to 2011 if not supplied",
+                required=False,
+                type=OpenApiTypes.INT,
+            ),
+        ]
+    )
+)
 @extend_schema(request=LSOASerializer)
 class LSOAViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -130,6 +143,53 @@ class LSOAViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = LSOASerializer
     filterset_fields = ["lsoa_code", "lsoa_name", "year"]
     filter_backends = [DjangoFilterBackend]
+    lookup_field = "lsoa_code"
+
+    def list(self, request, *args, **kwargs):
+        year = request.query_params.get("year")
+        if year is not None:
+            try:
+                year_int = int(year)
+            except (TypeError, ValueError):
+                raise ParseError("Year must be an integer.", code=400)
+            if year_int not in (2011, 2021):
+                raise ParseError("Year must be one of: 2011, 2021.", code=400)
+        return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        # accept code from query param or URL (lookup_field)
+        lsoa_code = request.query_params.get("lsoa_code") or kwargs.get(
+            self.lookup_field
+        )
+        if not lsoa_code:
+            return super().retrieve(request, *args, **kwargs)
+
+        year = request.query_params.get("year")
+        if year is not None:
+            try:
+                year_int = int(year)
+            except (TypeError, ValueError):
+                raise ParseError("Year must be an integer.", code=400)
+            if year_int not in (2011, 2021):
+                raise ParseError("Year must be one of: 2011, 2021.", code=400)
+            qs = self.filter_queryset(self.get_queryset()).filter(
+                lsoa_code=lsoa_code, year=year_int
+            )
+            instance = qs.first()
+        else:
+            year = 2011
+            qs = (
+                self.filter_queryset(self.get_queryset())
+                .filter(lsoa_code=lsoa_code, year=year)
+                .order_by("-year")
+            )
+            instance = qs.first()
+
+        if not instance:
+            raise NotFound("LSOA not found for the supplied code/year.")
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 
 @extend_schema(
@@ -154,6 +214,17 @@ class SOAViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = SOASerializer
     filterset_fields = ["year", "soa_code", "soa_name"]
     filter_backends = [DjangoFilterBackend]
+
+    def list(self, request, *args, **kwargs):
+        year = request.query_params.get("year")
+        if year is not None:
+            try:
+                year_int = int(year)
+            except (TypeError, ValueError):
+                raise ParseError("Year must be an integer.", code=400)
+            if year_int != 2001:
+                raise ParseError("Year must be one of: 2001.", code=400)
+        return super().list(request, *args, **kwargs)
 
 
 @extend_schema(
