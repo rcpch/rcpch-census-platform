@@ -70,22 +70,25 @@ def mock_postcodes_io(request):
     This allows CI to run tests against the real postcodes.io API while
     local development can optionally use mocks for faster iteration.
     """
-    # Check if mocking should be enabled
-    mock_enabled = os.environ.get("MOCK_POSTCODES_IO", "").lower() in (
+    # Default: use mocked postcodes.io responses for all tests.
+    # To opt out and hit the real API set the env var `REAL_POSTCODES_IO=1`
+    # or use the pytest marker `@pytest.mark.real_postcodes_io` on a test.
+    real_enabled = os.environ.get("REAL_POSTCODES_IO", "").lower() in (
         "1",
         "true",
         "yes",
     )
-    has_marker = request.node.get_closest_marker("mock_postcodes_io") is not None
+    has_real_marker = request.node.get_closest_marker("real_postcodes_io") is not None
 
-    if mock_enabled or has_marker:
+    if not (real_enabled or has_real_marker):
+        # Patch requests.get in the postcode helper so tests use mock data
         with patch(
             "deprivation_scores.general_functions.postcode.requests.get",
             side_effect=mock_requests_get,
         ):
             yield
     else:
-        # No mocking - use real postcodes.io API
+        # Opted out: use real postcodes.io API
         yield
 
 
