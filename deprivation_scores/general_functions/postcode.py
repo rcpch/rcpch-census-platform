@@ -1,6 +1,10 @@
 from typing import Literal, TypedDict
 import requests
 from django.conf import settings
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_postcode_info(postcode: str):
@@ -15,9 +19,9 @@ def get_postcode_info(postcode: str):
         response.raise_for_status()
         return response.json()
     except requests.exceptions.HTTPError as err:
-        print(f"HTTP ERROR: {err}")
+        logger.error(f"HTTP ERROR: {err}")
     except Exception as err:
-        print(f"Other error occurred: {err}")
+        logger.error(f"Other error occurred: {err}")
 
     return None
 
@@ -35,9 +39,9 @@ def get_terminated_postcode_info(postcode: str):
         print(f"Terminated postcode found: {postcode}")
         return response.json()
     except requests.exceptions.HTTPError as err:
-        print(f"HTTP ERROR: {err}")
+        logger.error(f"HTTP ERROR: {err}")
     except Exception as err:
-        print(f"Other error occurred: {err}")
+        logger.error(f"Other error occurred: {err}")
 
     return None
 
@@ -50,13 +54,13 @@ class LSOAPostcodeObject(TypedDict):
 def get_postcode_data(postcode: str) -> dict:
     if not (data := get_postcode_info(postcode)):
         # Try terminated postcode endpoint
-        print("Trying terminated postcode url...")
+        logger.info("Trying terminated postcode url...")
         if not (terminated_postcode_info := get_terminated_postcode_info(postcode)):
             return {
                 "status": "error",
                 "response": "Could not get LSOA from postcode.",
             }
-        print(f"Terminated postcode info: {terminated_postcode_info}")
+        logger.info(f"Terminated postcode info: {terminated_postcode_info}")
         return {
             "status": "terminated_postcode",
             "response": terminated_postcode_info.get("result"),
@@ -77,8 +81,16 @@ def lsoa_for_postcode(postcode, lsoa_year=None):
     :param postcode: Description
     :param lsoa_year: Description
     """
-    data = get_postcode_data(postcode)
+    try:
+        data = get_postcode_data(postcode)
+    except Exception as e:
+        logger.error(f"Error getting postcode data: {e}")
+        return {
+            "status": "error",
+            "response": "Could not get LSOA from postcode.",
+        }
     if data["status"] != "success":
+        logger.error(f"Error getting postcode data: {data}")
         return data
 
     data = data["response"]
