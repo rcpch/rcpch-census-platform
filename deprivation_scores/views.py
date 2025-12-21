@@ -80,7 +80,11 @@ from .general_functions import (
 )
 class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    This endpoint returns a list of Local Authority Districts (2019) across England, Scotland and Wales.
+    This endpoint returns a list of Local Authority Districts across England, Scotland and Wales.
+    It contains datasets for:
+    2011 - 32 Scotland,
+    2019 - 339 England and Wales (317 in England, 22 in Wales - the 11 Northern Irish Local Authorities are not included here)
+    2024 - 318 England and Wales
 
     Filter Parameters:
 
@@ -108,6 +112,7 @@ class LocalAuthorityDistrictViewSet(viewsets.ReadOnlyModelViewSet):
 class LSOAViewSet(viewsets.ReadOnlyModelViewSet):
     """
     This endpoint returns a list of LSOAs in England and Wales.
+    There are datasets for 2011 and 2021.
 
     Filter Parameters:
 
@@ -157,7 +162,7 @@ class SOAViewSet(viewsets.ReadOnlyModelViewSet):
 class GreenSpaceViewSet(viewsets.ReadOnlyModelViewSet):
     """
 
-    This endpoint returns a list of local authorities in the UK with data relating to green space and access to green space.
+    This endpoint returns data relating to green space and access to green space against 2019 Local Authority Districts.
 
     """
 
@@ -363,13 +368,23 @@ class UKIndexMultipleDeprivationView(APIView):
                 type=OpenApiTypes.INT,
                 examples=[
                     OpenApiExample(
+                        name="2017",
+                        description="Use 2017 dataset for Northern Ireland",
+                        value=2017,
+                    ),
+                    OpenApiExample(
                         name="2019",
                         description="Use 2019 dataset for England and Wales",
                         value=2019,
                     ),
                     OpenApiExample(
+                        name="2020",
+                        description="Use 2020 dataset for Scotland",
+                        value=2020,
+                    ),
+                    OpenApiExample(
                         name="2025",
-                        description="Use 2025 dataset for Scotland",
+                        description="Use 2025 dataset for England and Wales",
                         value=2025,
                     ),
                 ],
@@ -399,7 +414,9 @@ class UKIndexMultipleDeprivationView(APIView):
         post_code = self.request.query_params.get("postcode", None)
         year = self.request.query_params.get("year", None)
         if post_code:
-            data = lsoa_for_postcode(postcode=post_code)
+            data = lsoa_for_postcode(
+                postcode=post_code
+            )  # this returns either the lsoa, soa or data zone code depending on country, though the key is called lsoa. the response also includes the country
             status = data["status"]
             response = data["response"]
             if status == "error":
@@ -514,6 +531,11 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                         name="2019",
                         description="Use 2019 dataset for England and Wales",
                         value=2019,
+                    ),
+                    OpenApiExample(
+                        name="2025",
+                        description="Use 2025 dataset for England and Wales",
+                        value=2025,
                     ),
                     OpenApiExample(
                         name="2020",

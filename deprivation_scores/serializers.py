@@ -282,7 +282,7 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSeri
         ]
 
     def get_type(self, obj) -> str:
-        return "English"
+        return "England"
 
 
 @extend_schema_serializer(
@@ -337,7 +337,7 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSeri
                 "physical_environment_score": "0.6",
                 "lsoa": "{BASE_URL}/england_wales_lower_layer_super_output_areas/33054/",
                 "year": 2019,
-                "type": "English",
+                "type": "England",
             },
             response_only=True,
         )
@@ -400,7 +400,7 @@ class WelshIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerial
         ]
 
     def get_type(self, obj) -> str:
-        return "English"
+        return "Wales"
 
 
 @extend_schema_serializer(
@@ -419,7 +419,7 @@ class WelshIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerial
                 "crime_rank": 4664,
                 "housing_rank": 3248,
                 "data_zone": "{BASE_URL}/scotland_data_zones/1/",
-                "type": "English",
+                "type": "Scotland",
             },
             response_only=True,
         )
@@ -448,7 +448,7 @@ class ScottishIndexMultipleDeprivationSerializer(
         ]
 
     def get_type(self, obj) -> str:
-        return "English"
+        return "Scotland"
 
 
 @extend_schema_serializer(
@@ -496,6 +496,7 @@ class NorthernIrelandIndexMultipleDeprivationSerializer(
     def get_type(self, obj) -> str:
         return "English"
 
+
 class NestedLSOASerializer(serializers.ModelSerializer):
     class Meta:
         model = LSOA
@@ -511,5 +512,5 @@ class PopulationDensitySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PopulationDensity
-        fields ="__all__"
+        fields = "__all__"
         depth = 1

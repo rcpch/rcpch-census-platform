@@ -10,7 +10,7 @@ def get_postcode_info(postcode: str):
     try:
         response = requests.get(
             url=f"{settings.POSTCODES_IO_API_URL}/postcodes/{postcode}",
-            headers={"Ocp-Apim-Subscription-Key": settings.POSTCODES_IO_API_KEY}
+            headers={"Ocp-Apim-Subscription-Key": settings.POSTCODES_IO_API_KEY},
         )
         response.raise_for_status()
         return response.json()
@@ -29,7 +29,7 @@ def get_terminated_postcode_info(postcode: str):
     try:
         response = requests.get(
             url=f"{settings.POSTCODES_IO_API_URL}/terminated_postcodes/{postcode}",
-            headers={"Ocp-Apim-Subscription-Key": settings.POSTCODES_IO_API_KEY}
+            headers={"Ocp-Apim-Subscription-Key": settings.POSTCODES_IO_API_KEY},
         )
         response.raise_for_status()
         print(f"Terminated postcode found: {postcode}")
@@ -67,14 +67,26 @@ def get_postcode_data(postcode: str) -> dict:
     }
 
 
-def lsoa_for_postcode(postcode):
+def lsoa_for_postcode(postcode, year=2011):
     data = get_postcode_data(postcode)
     if data["status"] != "success":
         return data
 
     data = data["response"]
     country = data["result"]["country"]
-    lsoa = data["result"]["codes"]["lsoa"]
+    if country == "Northern Ireland":
+        lsoa = data["result"]["codes"][
+            "lsoa11"
+        ]  # this returns the 2011 Super Output Area for NI
+    elif country == "Scotland":
+        lsoa = data["result"]["codes"][
+            "lsoa11"
+        ]  # this returns the 2011 Data Zone for Scotland
+    else:  # England or Wales
+        if year == 2021:
+            lsoa = data["result"]["codes"]["lsoa21"]
+        else:  # year == 2011 for England and Wales
+            lsoa = data["result"]["codes"]["lsoa11"]
     response = {"lsoa": lsoa, "country": country}
     return {
         "status": "success",
