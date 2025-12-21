@@ -452,20 +452,23 @@ class NorthernIrelandMultipleDeprivationViewSet(
         return Response(serializer.data)
 
 
-class PopulationDensityViewSet(viewsets.ReadOnlyModelViewSet):
+@extend_schema(
+    request=PopulationDensitySerializer,
+)
+class PopulationDensityViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
-    This endpoint returns a list of all LSOAs with the associated population density (2019).
-
-    Filter Parameters:
-
-    `lsoa_code`
-
-    If none are passed, a list is returned.
+    This endpoint returns a the population density (2019) against a 2011 LSOA code.
     """
 
     queryset = PopulationDensity.objects.all()
     serializer_class = PopulationDensitySerializer
     filter_backends = [DjangoFilterBackend]
+    lookup_field = "lsoa__lsoa_code"
+    lookup_url_kwarg = "lsoa_code"
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs.filter(lsoa__year=2011)
 
 
 # custom views / endpoints

@@ -531,7 +531,6 @@ class NestedLSOASerializer(serializers.ModelSerializer):
 
 class PopulationDensitySerializer(serializers.ModelSerializer):
     lsoa = NestedLSOASerializer(read_only=True)
-    local_authority = LocalAuthorityDistrictSerializer(read_only=True)
 
     class Meta:
         model = PopulationDensity
