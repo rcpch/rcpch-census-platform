@@ -383,7 +383,9 @@ class ScottishMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 @extend_schema(
     request=NorthernIrelandIndexMultipleDeprivationSerializer,
 )
-class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
+class NorthernIrelandMultipleDeprivationViewSet(
+    mixins.RetrieveModelMixin, viewsets.GenericViewSet
+):
     """
     This endpoint returns a list of all Northern Ireland SOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2020).
 
@@ -400,6 +402,18 @@ class NorthernIrelandMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = NorthernIrelandIndexMultipleDeprivationSerializer
     filterset_class = NorthernIrelandIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
+    lookup_field = "soa_code"
+
+    def retrieve(self, request, *args, **kwargs):
+        soa_code = kwargs.get(self.lookup_field)
+        qs = self.filter_queryset(self.get_queryset()).filter(soa__soa_code=soa_code)
+        instance = qs.first()
+
+        if not instance:
+            raise NotFound("SOA not found for the supplied code.")
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 
 class PopulationDensityViewSet(viewsets.ReadOnlyModelViewSet):

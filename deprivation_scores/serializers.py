@@ -468,28 +468,27 @@ class ScottishIndexMultipleDeprivationSerializer(
 @extend_schema_serializer(
     examples=[
         OpenApiExample(
-            "/northern_ireland_indices_of_multiple_deprivation/1/",
+            "/northern_ireland_indices_of_multiple_deprivation/95WW23S1/",
             value={
-                "imd_rank": 516,
+                "imd_rank": 628,
                 "year": 2017,
-                "income_rank": 790,
-                "employment_rank": 888,
-                "health_deprivation_and_disability_rank": 890,
-                "education_skills_and_training_rank": 254,
-                "access_to_services_rank": 17,
-                "living_environment_rank": 75,
-                "crime_and_disorder_rank": 874,
-                "soa": "http://localhost:8001/northern_ireland_small_output_areas/1/",
-                "type": "English",
+                "income_rank": 661,
+                "employment_rank": 519,
+                "health_deprivation_and_disability_rank": 516,
+                "education_skills_and_training_rank": 463,
+                "access_to_services_rank": 537,
+                "living_environment_rank": 588,
+                "crime_and_disorder_rank": 242,
+                "soa": {"year": 2001, "soa_code": "95WW23S1", "soa_name": "Rostulla_1"},
+                "type": "Northern Ireland",
             },
             response_only=True,
         )
     ]
 )
-class NorthernIrelandIndexMultipleDeprivationSerializer(
-    serializers.HyperlinkedModelSerializer
-):
+class NorthernIrelandIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
+    soa = SOASerializer(read_only=True)
 
     class Meta:
         model = NorthernIrelandIndexMultipleDeprivation
