@@ -295,7 +295,7 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSeri
     def get_type(self, obj) -> str:
         return "England"
 
-    def get_year(self, obj):
+    def get_year(self, obj) -> int | None:
         # Prefer a year passed in the serializer context; fall back to any year on the object
         return self.context.get("year", getattr(obj, "year", None))
 

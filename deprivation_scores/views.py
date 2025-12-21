@@ -332,10 +332,11 @@ class EnglishIndexMultipleDeprivationViewSet(
     serializer_class = EnglishIndexMultipleDeprivationSerializer
     filterset_class = EnglishIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
-    lookup_field = "lsoa_code"
+    lookup_field = "lsoa__lsoa_code"
+    lookup_url_kwarg = "lsoa_code"
 
     def retrieve(self, request, *args, **kwargs):
-        lsoa_code = kwargs.get(self.lookup_field)
+        lsoa_code = kwargs.get(self.lookup_url_kwarg)
         year = request.query_params.get("year")
         if year is not None:
             try:
@@ -413,10 +414,11 @@ class ScottishMultipleDeprivationViewSet(
     serializer_class = ScottishIndexMultipleDeprivationSerializer
     filterset_class = ScottishIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
-    lookup_field = "data_zone_code"
+    lookup_field = "data_zone__data_zone_code"
+    lookup_url_kwarg = "data_zone_code"
 
     def retrieve(self, request, *args, **kwargs):
-        data_zone_code = kwargs.get(self.lookup_field)
+        data_zone_code = kwargs.get(self.lookup_url_kwarg)
         qs = self.filter_queryset(self.get_queryset()).filter(
             data_zone__data_zone_code=data_zone_code
         )
@@ -451,10 +453,11 @@ class NorthernIrelandMultipleDeprivationViewSet(
     serializer_class = NorthernIrelandIndexMultipleDeprivationSerializer
     filterset_class = NorthernIrelandIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
-    lookup_field = "soa_code"
+    lookup_field = "soa__soa_code"
+    lookup_url_kwarg = "soa_code"
 
     def retrieve(self, request, *args, **kwargs):
-        soa_code = kwargs.get(self.lookup_field)
+        soa_code = kwargs.get(self.lookup_url_kwarg)
         qs = self.filter_queryset(self.get_queryset()).filter(soa__soa_code=soa_code)
         instance = qs.first()
 
@@ -505,6 +508,44 @@ class PostcodeView(APIView):
                 ],
             ),
         ],
+        request=None,
+        responses={
+            200: OpenApiResponse(
+                response=OpenApiTypes.OBJECT,
+                description="Valid Response",
+                examples=[
+                    OpenApiExample(
+                        "/postcode?postcode=SW1A1AA",
+                        external_value="external value",
+                        value={
+                            "postcode": "SW1A 1AA",
+                            "quality": 1,
+                            "eastings": 530047,
+                            "northings": 179951,
+                            "country": "England",
+                            "nhs_ha": "London",
+                            "longitude": -0.141588,
+                            "latitude": 51.501009,
+                            "european_electoral_region": "London",
+                            "primary_care_trust": "Westminster",
+                            "region": "London",
+                            "lsoa": "Westminster 018A",
+                            "msoa": "Westminster 018",
+                            "incode": "1AA",
+                            "outcode": "SW1A",
+                            "parliamentary_constituency": "Cities of London and Westminster",
+                            "admin_district": "Westminster",
+                            "admin_county": None,
+                            "admin_ward": "St James's",
+                            "ced": None,
+                            "ccg": "NHS Central London (Westminster)",
+                            "nuts": "Westminster",
+                        },
+                        response_only=True,
+                    ),
+                ],
+            ),
+        },
     )
     def get(self, request):
         """
