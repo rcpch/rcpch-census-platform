@@ -434,17 +434,25 @@ class WelshIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerial
                 "access_rank": 4724,
                 "crime_rank": 4664,
                 "housing_rank": 3248,
-                "data_zone": "{BASE_URL}/scotland_data_zones/1/",
+                "data_zone": {
+                    "data_zone_code": "S01006506",
+                    "data_zone_name": "Culter - 01",
+                    "year": 2011,
+                    "local_authority": {
+                        "local_authority_district_code": "S12000033",
+                        "local_authority_district_name": "Aberdeen City",
+                        "year": 2011,
+                    },
+                },
                 "type": "Scotland",
             },
             response_only=True,
         )
     ]
 )
-class ScottishIndexMultipleDeprivationSerializer(
-    serializers.HyperlinkedModelSerializer
-):
+class ScottishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
+    data_zone = DataZoneSerializer(read_only=True)
 
     class Meta:
         model = ScottishIndexMultipleDeprivation

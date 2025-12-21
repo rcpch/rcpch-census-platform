@@ -385,21 +385,35 @@ class WelshMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
 @extend_schema(
     request=ScottishIndexMultipleDeprivationSerializer,
 )
-class ScottishMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
+class ScottishMultipleDeprivationViewSet(
+    mixins.RetrieveModelMixin, viewsets.GenericViewSet
+):
     """
-    This endpoint returns a list of Scottish data zones with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2017).
+    This endpoint returns the extended Scottish Index of Multiple Deprivation subscore ranks for all the associated deprivation domains (2017) for a given data zone.
 
     Filter Parameters:
 
     `data_zone_code`
-
-    If none are passed, a list is returned.
     """
 
     queryset = ScottishIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
     serializer_class = ScottishIndexMultipleDeprivationSerializer
     filterset_class = ScottishIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
+    lookup_field = "data_zone_code"
+
+    def retrieve(self, request, *args, **kwargs):
+        data_zone_code = kwargs.get(self.lookup_field)
+        qs = self.filter_queryset(self.get_queryset()).filter(
+            data_zone__data_zone_code=data_zone_code
+        )
+        instance = qs.first()
+
+        if not instance:
+            raise NotFound("Data Zone not found for the supplied code.")
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 
 @extend_schema(
