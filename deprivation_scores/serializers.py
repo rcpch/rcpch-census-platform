@@ -25,29 +25,26 @@ from .models import (
                 "lsoa_code": "E01012057",
                 "lsoa_name": "Middlesbrough 009E",
                 "year": 2011,
-                "total_population_mid_2015": "null",
-                "dependent_children_mid_2015": "null",
-                "population_16_59_mid_2015": "null",
-                "older_population_over_16_mid_2015": "null",
-                "working_age_population_over_18_mid_2015": "null",
             },
             response_only=True,
         )
     ]
 )
-class LSOASerializer(serializers.HyperlinkedModelSerializer):
+class LSOASerializer(serializers.ModelSerializer):
     class Meta:
         model = LSOA
         fields = [
             "lsoa_code",
             "lsoa_name",
             "year",
-            "total_population_mid_2015",
-            "dependent_children_mid_2015",
-            "population_16_59_mid_2015",
-            "older_population_over_16_mid_2015",
-            "working_age_population_over_18_mid_2015",
         ]
+        extra_kwargs = {
+            "url": {
+                "view_name": "england_wales_lower_layer_super_output_areas-detail",
+                "lookup_field": "lsoa_code",
+                "lookup_url_kwarg": "lsoa_code",
+            }
+        }
 
 
 class LocalAuthorityDistrictSerializer(serializers.HyperlinkedModelSerializer):
@@ -219,6 +216,10 @@ class SOASerializer(serializers.HyperlinkedModelSerializer):
 class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer):
     type = serializers.SerializerMethodField()
     year = serializers.SerializerMethodField()
+    lsoa = serializers.SlugRelatedField(
+        read_only=True,
+        slug_field="lsoa_code",
+    )
 
     class Meta:
         model = EnglishIndexMultipleDeprivation
@@ -278,8 +279,8 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSeri
             "idaopi_score",
             "idaopi_rank",
             "idaopi_decile",
-            "lsoa",
             "year",
+            "lsoa",
             "type",  # for PolymorphicProxySerializer
         ]
 
@@ -351,6 +352,7 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSeri
 )
 class WelshIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer):
     type = serializers.SerializerMethodField()
+    lsoa = serializers.SlugRelatedField(read_only=True, slug_field="lsoa_code")
 
     class Meta:
         model = WelshIndexMultipleDeprivation
