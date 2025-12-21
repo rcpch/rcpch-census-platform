@@ -365,21 +365,34 @@ class EnglishIndexMultipleDeprivationViewSet(
 @extend_schema(
     request=WelshIndexMultipleDeprivationSerializer,
 )
-class WelshMultipleDeprivationViewSet(viewsets.ReadOnlyModelViewSet):
+class WelshMultipleDeprivationViewSet(
+    mixins.RetrieveModelMixin, viewsets.GenericViewSet
+):
     """
-    This endpoint returns a list of Welsh LSOAs with the associated deprivation rank and quintiles, as well as the rank and quintile of all the associated deprivation domains (2019).
+    This endpoint returns the extended Welsh Index of Multiple Deprivation data for a given LSOA (2011).
 
-    Filter Parameters:
-
-    `lsoa_code`
-
-    If none are passed, a list is returned.
     """
 
     queryset = WelshIndexMultipleDeprivation.objects.all().order_by("-imd_rank")
     serializer_class = WelshIndexMultipleDeprivationSerializer
     filterset_class = WelshIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
+    lookup_field = "lsoa__lsoa_code"
+    lookup_url_kwarg = "lsoa_code"
+
+    def retrieve(self, request, *args, **kwargs):
+        lsoa_code = kwargs.get("lsoa_code")
+        print(lsoa_code)
+        qs = self.filter_queryset(self.get_queryset()).filter(
+            lsoa__lsoa_code=lsoa_code, lsoa__year=2011
+        )
+        instance = qs.first()
+
+        if not instance:
+            raise NotFound("LSOA not found for the supplied code.")
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 
 @extend_schema(
