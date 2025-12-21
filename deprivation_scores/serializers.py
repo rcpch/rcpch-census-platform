@@ -218,6 +218,7 @@ class SOASerializer(serializers.HyperlinkedModelSerializer):
 )
 class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer):
     type = serializers.SerializerMethodField()
+    year = serializers.SerializerMethodField()
 
     class Meta:
         model = EnglishIndexMultipleDeprivation
@@ -278,11 +279,16 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSeri
             "idaopi_rank",
             "idaopi_decile",
             "lsoa",
+            "year",
             "type",  # for PolymorphicProxySerializer
         ]
 
     def get_type(self, obj) -> str:
         return "England"
+
+    def get_year(self, obj):
+        # Prefer a year passed in the serializer context; fall back to any year on the object
+        return self.context.get("year", getattr(obj, "year", None))
 
 
 @extend_schema_serializer(
@@ -494,7 +500,7 @@ class NorthernIrelandIndexMultipleDeprivationSerializer(
         ]
 
     def get_type(self, obj) -> str:
-        return "English"
+        return "Northern Ireland"
 
 
 class NestedLSOASerializer(serializers.ModelSerializer):

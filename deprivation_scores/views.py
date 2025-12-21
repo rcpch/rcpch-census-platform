@@ -414,8 +414,17 @@ class UKIndexMultipleDeprivationView(APIView):
         post_code = self.request.query_params.get("postcode", None)
         year = self.request.query_params.get("year", None)
         if post_code:
+            if year:
+                if int(year) == 2025:
+                    lsoa_year = 2021
+                elif int(year) in [2019, 2017, 2020]:
+                    lsoa_year = 2011
+                else:
+                    raise ParseError("Invalid year supplied.", code=400)
+            else:
+                lsoa_year = 2011
             data = lsoa_for_postcode(
-                postcode=post_code
+                postcode=post_code, lsoa_year=lsoa_year
             )  # this returns either the lsoa, soa or data zone code depending on country, though the key is called lsoa. the response also includes the country
             status = data["status"]
             response = data["response"]
@@ -615,10 +624,19 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                 f"{requested_quantile} is not a valid quantile. Must be one of {valid_quantiles}.",
                 code=400,
             )
-
         if post_code:
-
-            data = lsoa_for_postcode(postcode=post_code)
+            if year:
+                if int(year) == 2025:
+                    lsoa_year = 2021
+                elif int(year) in [2019, 2017, 2020]:
+                    lsoa_year = 2011
+                else:
+                    raise ParseError("Invalid year supplied.", code=400)
+            else:
+                lsoa_year = 2011
+            data = lsoa_for_postcode(
+                postcode=post_code, lsoa_year=lsoa_year
+            )  # this returns either the lsoa, soa or data zone code depending on country, though the key is called lsoa. the response also includes the country
 
             status = data["status"]
             response = data["response"]
