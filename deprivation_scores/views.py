@@ -27,6 +27,7 @@ from .filter_sets import (
     WelshIndexMultipleDeprivationFilter,
     ScottishIndexMultipleDeprivationFilter,
     NorthernIrelandIndexMultipleDeprivationFilter,
+    GreenSpaceFilter,
 )
 
 from .models import (
@@ -220,15 +221,17 @@ class SOAViewSet(viewsets.ReadOnlyModelViewSet):
 @extend_schema(
     request=GreenSpaceSerializer,
 )
-class GreenSpaceViewSet(viewsets.ReadOnlyModelViewSet):
+class GreenSpaceViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
 
-    This endpoint returns data relating to green space and access to green space against 2019 Local Authority Districts.
-
+    This endpoint returns data relating to green space and access to green space against 2019 Local Authority Districts for England, Wales and Scotland.
+    The data includes total addresses, addresses with private outdoor space, percentage of addresses with private outdoor space and average size of private outdoor space.
     """
 
     queryset = GreenSpace.objects.all().order_by("-total_addresses_count")
     serializer_class = GreenSpaceSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = GreenSpaceFilter
 
 
 @extend_schema(

@@ -79,13 +79,19 @@ class LocalAuthorityDistrictSerializer(serializers.HyperlinkedModelSerializer):
                 "total_addresses_with_private_outdoor_space_count": 97611,
                 "total_percentage_addresses_with_private_outdoor_space": 17547060,
                 "total_average_size_private_outdoor_space": 0,
-                "local_authority": "{BASE_URL}/local_authority_districts/340/",
+                "local_authority": {
+                    "local_authority_district_code": "W06000011",
+                    "local_authority_district_name": "Swansea",
+                    "year": 2019,
+                },
             },
             response_only=True,
-        )
+        ),
     ]
 )
-class GreenSpaceSerializer(serializers.HyperlinkedModelSerializer):
+class GreenSpaceSerializer(serializers.ModelSerializer):
+    local_authority = LocalAuthorityDistrictSerializer(read_only=True)
+
     class Meta:
         model = GreenSpace
         # depth = 1
