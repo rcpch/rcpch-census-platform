@@ -65,5 +65,6 @@ def quantile_for_rank(
         "requested_quantile_name": QUANTILES.get(int(requested_quantile)),
         "data_quantile": math.floor(rank / quantile_limit) + 1,
         "country": country,
+        "year": year,
         "error": None,
     }

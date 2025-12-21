@@ -67,7 +67,16 @@ def get_postcode_data(postcode: str) -> dict:
     }
 
 
-def lsoa_for_postcode(postcode, year=2011):
+def lsoa_for_postcode(postcode, lsoa_year=None):
+    """
+    Returns LSOA/SOA/Data Zone for a given postcode
+    If country is England or Wales, returns LSOA for specified year (2011 or 2021)
+    If country is Scotland, returns Data Zone (2011)
+    If country is Northern Ireland, returns SOA (2011)
+
+    :param postcode: Description
+    :param lsoa_year: Description
+    """
     data = get_postcode_data(postcode)
     if data["status"] != "success":
         return data
@@ -77,17 +86,20 @@ def lsoa_for_postcode(postcode, year=2011):
     if country == "Northern Ireland":
         lsoa = data["result"]["codes"][
             "lsoa11"
-        ]  # this returns the 2011 Super Output Area for NI
+        ]  # this returns the 2001 Super Output Area for NI (though labelled lsoa11)
+        lsoa_year = 2001
     elif country == "Scotland":
         lsoa = data["result"]["codes"][
             "lsoa11"
         ]  # this returns the 2011 Data Zone for Scotland
+        lsoa_year = 2011
     else:  # England or Wales
-        if year == 2021:
+        if lsoa_year == 2021:
             lsoa = data["result"]["codes"]["lsoa21"]
         else:  # year == 2011 for England and Wales
             lsoa = data["result"]["codes"]["lsoa11"]
-    response = {"lsoa": lsoa, "country": country}
+            lsoa_year = 2011
+    response = {"lsoa": lsoa, "country": country, "lsoa_year": lsoa_year}
     return {
         "status": "success",
         "response": response,
