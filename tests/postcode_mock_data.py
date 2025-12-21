@@ -594,4 +594,21 @@ def get_mock_postcode_response(postcode: str) -> dict | None:
     """
     # Normalize postcode: remove spaces, uppercase
     normalized = postcode.replace(" ", "").upper()
-    return MOCK_POSTCODE_RESPONSES.get(normalized)
+    resp = MOCK_POSTCODE_RESPONSES.get(normalized)
+    # If we have a mocked response dict, ensure it contains the
+    # year-specific keys expected by production code: `lsoa11` and
+    # `lsoa21`. Older captured responses only included `lsoa`, which
+    # causes tests to fail when code looks up `codes['lsoa11']` or
+    # `codes['lsoa21']`.
+    if isinstance(resp, dict):
+        result = resp.get("result")
+        if isinstance(result, dict):
+            codes = result.get("codes")
+            if isinstance(codes, dict) and "lsoa" in codes:
+                # Populate missing year-specific keys with the same value
+                # so tests can simulate either 2011 or 2021 LSOA codes.
+                if "lsoa11" not in codes:
+                    codes["lsoa11"] = codes.get("lsoa", "")
+                if "lsoa21" not in codes:
+                    codes["lsoa21"] = codes.get("lsoa", "")
+    return resp
