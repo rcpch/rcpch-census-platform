@@ -22,7 +22,6 @@ from drf_spectacular.types import OpenApiTypes
 from .general_functions import quantile_for_rank
 
 from .filter_sets import (
-    DataZoneFilter,
     EnglishIndexMultipleDeprivationFilter,
     WelshIndexMultipleDeprivationFilter,
     ScottishIndexMultipleDeprivationFilter,
@@ -260,9 +259,9 @@ class GreenSpaceViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 @extend_schema(
     request=DataZoneSerializer,
 )
-class DataZoneViewSet(viewsets.ReadOnlyModelViewSet):
+class DataZoneViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
-    This endpoint returns a list of all Scottish data zones (2011) and their associated local authority district.
+    This endpoint returns Scottish data zones (2011) and their associated local authority district by name or code. NOTE: One of `data_zone_code` or `data_zone_name` query parameters must be provided.
 
     Filter Parameters:
 
@@ -272,13 +271,32 @@ class DataZoneViewSet(viewsets.ReadOnlyModelViewSet):
 
     `data_zone_name`
 
-    If none are passed, a list is returned.
     """
 
     queryset = DataZone.objects.all().order_by("data_zone_code")
     serializer_class = DataZoneSerializer
-    filterset_class = DataZoneFilter
     filter_backends = [DjangoFilterBackend]
+    filterset_fields = ["year", "data_zone_code", "data_zone_name"]
+
+    def list(self, request, *args, **kwargs):
+        year = request.query_params.get("year")
+        data_zone_code = request.query_params.get("data_zone_code")
+        data_zone_name = request.query_params.get("data_zone_name")
+        if year is not None:
+            try:
+                year_int = int(year)
+            except (TypeError, ValueError):
+                raise ParseError("Year must be an integer.", code=400)
+            if year_int != 2011:
+                raise ParseError("Year must be one of: 2011.", code=400)
+        else:
+            year_int = 2011
+        if data_zone_code is None and data_zone_name is None:
+            raise ParseError(
+                "One of `data_zone_code` or `data_zone_name` query parameters must be provided.",
+                code=400,
+            )
+        return super().list(request, *args, **kwargs)
 
 
 @extend_schema_view(

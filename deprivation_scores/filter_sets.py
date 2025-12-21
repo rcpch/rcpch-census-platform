@@ -10,25 +10,6 @@ from .models import (
 )
 
 
-class DataZoneFilter(FilterSet):
-    local_authority_code = CharFilter(
-        field_name="local_authority__local_authority_district_code",
-        lookup_expr="icontains",
-    )
-    local_authority_name = CharFilter(
-        field_name="local_authority__local_authority_name",
-        lookup_expr="icontains",
-    )
-
-    class Meta:
-        model = DataZone
-        fields = (
-            "data_zone_code",
-            "data_zone_name",
-            "year",
-        )
-
-
 class EnglishIndexMultipleDeprivationFilter(FilterSet):
     lsoa_code = CharFilter(
         field_name="lsoa__lsoa_code",

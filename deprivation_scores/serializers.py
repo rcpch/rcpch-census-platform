@@ -132,7 +132,9 @@ class GreenSpaceSerializer(serializers.ModelSerializer):
         )
     ]
 )
-class DataZoneSerializer(serializers.HyperlinkedModelSerializer):
+class DataZoneSerializer(serializers.ModelSerializer):
+    local_authority = LocalAuthorityDistrictSerializer(read_only=True)
+
     class Meta:
         model = DataZone
         fields = ["data_zone_code", "data_zone_name", "year", "local_authority"]
