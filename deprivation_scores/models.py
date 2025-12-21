@@ -3,7 +3,7 @@ from django.db import models
 
 class LocalAuthority(models.Model):
     local_authority_district_code = models.CharField(
-        "Local Authority District code (2019)", max_length=50, unique=True
+        "Local Authority District code (2019)", max_length=50
     )
     local_authority_district_name = models.CharField(
         "Local Authority District name (2019)", max_length=50
@@ -15,6 +15,7 @@ class LocalAuthority(models.Model):
     class Meta:
         verbose_name = ("Local Authority",)
         verbose_name_plural = "Local Authorities"
+        unique_together = ("local_authority_district_code", "year")
 
 
 class MSOA(models.Model):
@@ -22,7 +23,6 @@ class MSOA(models.Model):
         "MSOA Code",
         max_length=50,
         help_text="Middle Layer Super Output Layer code",
-        unique=True,
     )
     msoa_name = models.CharField(
         "MSOA name",
@@ -35,9 +35,14 @@ class MSOA(models.Model):
         LocalAuthority, on_delete=models.CASCADE
     )
 
+    class Meta:
+        verbose_name = ("MSOA",)
+        verbose_name_plural = "MSOAs"
+        unique_together = ("msoa_code", "year")
+
 
 class LSOA(models.Model):
-    lsoa_code = models.CharField("LSOA code (2011)", unique=True, max_length=50)
+    lsoa_code = models.CharField("LSOA code (2011)", max_length=50)
     lsoa_name = models.CharField("LSOA name (2011)", max_length=50)
     year = models.IntegerField("Year LSOA calculated")
     total_population_mid_2015 = models.IntegerField(
@@ -73,16 +78,20 @@ class LSOA(models.Model):
     class Meta:
         verbose_name = ("LSOA",)
         verbose_name_plural = "LSOAs"
+        unique_together = ("lsoa_code", "year")
 
 
 class Ward(models.Model):
-    ward_code = models.CharField(
-        "Ward Code", max_length=50, help_text="Ward code", unique=True
-    )
+    ward_code = models.CharField("Ward Code", max_length=50, help_text="Ward code")
     ward_name = models.CharField("Ward name", max_length=50, help_text="Ward name")
     year = models.IntegerField("Ward year")
 
     msoa = models.ForeignKey(MSOA, on_delete=models.CASCADE)
+
+    class Meta:
+        verbose_name = ("Ward",)
+        verbose_name_plural = "Wards"
+        unique_together = ("ward_code", "year")
 
 
 class EnglishIndexMultipleDeprivation(models.Model):
@@ -391,18 +400,29 @@ class EnglishIndexMultipleDeprivation(models.Model):
         help_text="Income Deprivation Affecting Older People Index (IDAOPI) Decile (where 1 is most deprived 10% of LSOAs)",
         null=True,
     )
+    year = models.IntegerField("Year", null=True)
 
     lsoa = models.ForeignKey(LSOA, on_delete=models.CASCADE)
 
+    class Meta:
+        verbose_name = ("English Index of Multiple Deprivation",)
+        verbose_name_plural = "English Indices of Multiple Deprivation"
+        unique_together = ("lsoa", "year")
+
 
 class DataZone(models.Model):
-    data_zone_code = models.CharField("Data Zone Code", max_length=50, unique=True)
+    data_zone_code = models.CharField("Data Zone Code", max_length=50)
     data_zone_name = models.CharField(
         "Data Zone Name",
         max_length=100,
     )
     year = models.IntegerField("Data Zone Year")
     local_authority = models.ForeignKey(LocalAuthority, on_delete=models.CASCADE)
+
+    class Meta:
+        verbose_name = ("Data Zone",)
+        verbose_name_plural = "Data Zones"
+        unique_together = ("data_zone_code", "year")
 
 
 class GreenSpace(models.Model):
@@ -454,8 +474,14 @@ class GreenSpace(models.Model):
     total_average_size_private_outdoor_space = models.IntegerField(
         "Total - average size of all private outdoor space"
     )
+    year = models.IntegerField("Year", null=True)
 
     local_authority = models.ForeignKey(LocalAuthority, on_delete=models.CASCADE)
+
+    class Meta:
+        verbose_name = ("Green Space",)
+        verbose_name_plural = "Green Spaces"
+        unique_together = ("local_authority", "year")
 
 
 class WelshIndexMultipleDeprivation(models.Model):
@@ -525,6 +551,11 @@ class WelshIndexMultipleDeprivation(models.Model):
     lsoa = models.ForeignKey(LSOA, on_delete=models.CASCADE)
     year = models.IntegerField()
 
+    class Meta:
+        verbose_name = ("Welsh Index of Multiple Deprivation",)
+        verbose_name_plural = "Welsh Indices of Multiple Deprivation"
+        unique_together = ("lsoa", "year")
+
 
 class ScottishIndexMultipleDeprivation(models.Model):
     year = models.IntegerField()
@@ -539,11 +570,21 @@ class ScottishIndexMultipleDeprivation(models.Model):
     housing_rank = models.IntegerField()
     data_zone = models.ForeignKey(to=DataZone, on_delete=models.PROTECT)
 
+    class Meta:
+        verbose_name = ("Data Zone",)
+        verbose_name_plural = "Data Zones"
+        unique_together = ("data_zone", "year")
+
 
 class SOA(models.Model):
     year = models.IntegerField()
     soa_code = models.CharField(max_length=50, unique=True)
     soa_name = models.CharField(max_length=50)
+
+    class Meta:
+        verbose_name = ("SOA",)
+        verbose_name_plural = "SOAs"
+        unique_together = ("soa_code", "year")
 
 
 class NorthernIrelandIndexMultipleDeprivation(models.Model):
@@ -558,14 +599,17 @@ class NorthernIrelandIndexMultipleDeprivation(models.Model):
     crime_and_disorder_rank = models.IntegerField()
     soa = models.ForeignKey(to=SOA, on_delete=models.PROTECT)
 
+    class Meta:
+        verbose_name = ("SOA",)
+        verbose_name_plural = "SOAs"
+        unique_together = ("soa", "year")
 
-from django.db import models
 
 class PopulationDensity(models.Model):
-    
+
     lsoa = models.ForeignKey(LSOA, on_delete=models.CASCADE)
     year = models.IntegerField()
-    
+
     perc_buff200 = models.FloatField(blank=True, null=True)
     perc_buff300 = models.FloatField(blank=True, null=True)
     perc_buff1k = models.FloatField(blank=True, null=True)
@@ -639,3 +683,4 @@ class PopulationDensity(models.Model):
         # Optionally define a table name
         verbose_name = "Population Density"
         verbose_name_plural = "Population Densities"
+        unique_together = ("lsoa", "year")

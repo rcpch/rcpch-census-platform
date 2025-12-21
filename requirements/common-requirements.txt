@@ -3,11 +3,11 @@ requests
 python-dateutil
 
 # third party imports
+beautifulsoup4
 django
 djangorestframework
 drf-spectacular
 django-filter
 psycopg2-binary
 whitenoise
-
 # RCPCH imports

@@ -25,29 +25,26 @@ from .models import (
                 "lsoa_code": "E01012057",
                 "lsoa_name": "Middlesbrough 009E",
                 "year": 2011,
-                "total_population_mid_2015": "null",
-                "dependent_children_mid_2015": "null",
-                "population_16_59_mid_2015": "null",
-                "older_population_over_16_mid_2015": "null",
-                "working_age_population_over_18_mid_2015": "null",
             },
             response_only=True,
         )
     ]
 )
-class LSOASerializer(serializers.HyperlinkedModelSerializer):
+class LSOASerializer(serializers.ModelSerializer):
     class Meta:
         model = LSOA
         fields = [
             "lsoa_code",
             "lsoa_name",
             "year",
-            "total_population_mid_2015",
-            "dependent_children_mid_2015",
-            "population_16_59_mid_2015",
-            "older_population_over_16_mid_2015",
-            "working_age_population_over_18_mid_2015",
         ]
+        extra_kwargs = {
+            "url": {
+                "view_name": "england_wales_lower_layer_super_output_areas-detail",
+                "lookup_field": "lsoa_code",
+                "lookup_url_kwarg": "lsoa_code",
+            }
+        }
 
 
 class LocalAuthorityDistrictSerializer(serializers.HyperlinkedModelSerializer):
@@ -82,13 +79,19 @@ class LocalAuthorityDistrictSerializer(serializers.HyperlinkedModelSerializer):
                 "total_addresses_with_private_outdoor_space_count": 97611,
                 "total_percentage_addresses_with_private_outdoor_space": 17547060,
                 "total_average_size_private_outdoor_space": 0,
-                "local_authority": "{BASE_URL}/local_authority_districts/340/",
+                "local_authority": {
+                    "local_authority_district_code": "W06000011",
+                    "local_authority_district_name": "Swansea",
+                    "year": 2019,
+                },
             },
             response_only=True,
-        )
+        ),
     ]
 )
-class GreenSpaceSerializer(serializers.HyperlinkedModelSerializer):
+class GreenSpaceSerializer(serializers.ModelSerializer):
+    local_authority = LocalAuthorityDistrictSerializer(read_only=True)
+
     class Meta:
         model = GreenSpace
         # depth = 1
@@ -129,7 +132,9 @@ class GreenSpaceSerializer(serializers.HyperlinkedModelSerializer):
         )
     ]
 )
-class DataZoneSerializer(serializers.HyperlinkedModelSerializer):
+class DataZoneSerializer(serializers.ModelSerializer):
+    local_authority = LocalAuthorityDistrictSerializer(read_only=True)
+
     class Meta:
         model = DataZone
         fields = ["data_zone_code", "data_zone_name", "year", "local_authority"]
@@ -218,6 +223,11 @@ class SOASerializer(serializers.HyperlinkedModelSerializer):
 )
 class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer):
     type = serializers.SerializerMethodField()
+    year = serializers.SerializerMethodField()
+    lsoa = serializers.SlugRelatedField(
+        read_only=True,
+        slug_field="lsoa_code",
+    )
 
     class Meta:
         model = EnglishIndexMultipleDeprivation
@@ -277,67 +287,76 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSeri
             "idaopi_score",
             "idaopi_rank",
             "idaopi_decile",
+            "year",
             "lsoa",
             "type",  # for PolymorphicProxySerializer
         ]
 
     def get_type(self, obj) -> str:
-        return "English"
+        return "England"
+
+    def get_year(self, obj):
+        # Prefer a year passed in the serializer context; fall back to any year on the object
+        return self.context.get("year", getattr(obj, "year", None))
 
 
 @extend_schema_serializer(
     examples=[
         OpenApiExample(
-            "/welsh_indices_of_multiple_deprivation/1/",
+            "/welsh_indices_of_multiple_deprivation/W01000552/",
             value={
-                "imd_rank": 885,
-                "imd_quartile": 2,
-                "imd_quintile": 3,
-                "imd_decile": 5,
-                "imd_score": "19.2",
-                "income_rank": 898,
-                "income_quartile": 2,
-                "income_quintile": 3,
-                "income_decile": 5,
-                "income_score": "17.0",
-                "employment_rank": 659,
-                "employment_quartile": 2,
-                "employment_quintile": 2,
-                "employment_decile": 4,
-                "employment_score": "23.9",
-                "health_rank": 1213,
+                "imd_rank": 1270,
+                "imd_quartile": 3,
+                "imd_quintile": 4,
+                "imd_decile": 7,
+                "imd_score": "13.1",
+                "income_rank": 1502,
+                "income_quartile": 4,
+                "income_quintile": 4,
+                "income_decile": 8,
+                "income_score": "5.4",
+                "employment_rank": 1538,
+                "employment_quartile": 4,
+                "employment_quintile": 5,
+                "employment_decile": 9,
+                "employment_score": "4.9",
+                "health_rank": 1395,
                 "health_quartile": 3,
                 "health_quintile": 4,
-                "health_decile": 7,
-                "health_score": "10.3",
-                "education_rank": 1057,
-                "education_quartile": 3,
-                "education_quintile": 3,
-                "education_decile": 6,
-                "education_score": "13.4",
-                "access_to_services_rank": 221,
+                "health_decile": 8,
+                "health_score": "7.1",
+                "education_rank": 1498,
+                "education_quartile": 4,
+                "education_quintile": 4,
+                "education_decile": 8,
+                "education_score": "5.5",
+                "access_to_services_rank": 58,
                 "access_to_services_quartile": 1,
                 "access_to_services_quintile": 1,
-                "access_to_services_decile": 2,
-                "access_to_services_score": "47.5",
-                "housing_rank": 935,
+                "access_to_services_decile": 1,
+                "access_to_services_score": "72.7",
+                "housing_rank": 767,
                 "housing_quartile": 2,
                 "housing_quintile": 3,
                 "housing_decile": 5,
-                "housing_score": "16.1",
-                "community_safety_rank": 914,
-                "community_safety_quartile": 2,
-                "community_safety_quintile": 3,
-                "community_safety_decile": 5,
-                "community_safety_score": "16.6",
-                "physical_environment_rank": 1859,
+                "housing_score": "20.6",
+                "community_safety_rank": 1864,
+                "community_safety_quartile": 4,
+                "community_safety_quintile": 5,
+                "community_safety_decile": 10,
+                "community_safety_score": "0.6",
+                "physical_environment_rank": 1483,
                 "physical_environment_quartile": 4,
-                "physical_environment_quintile": 5,
-                "physical_environment_decile": 10,
-                "physical_environment_score": "0.6",
-                "lsoa": "{BASE_URL}/england_wales_lower_layer_super_output_areas/33054/",
+                "physical_environment_quintile": 4,
+                "physical_environment_decile": 8,
+                "physical_environment_score": "5.7",
+                "lsoa": {
+                    "lsoa_code": "W01000552",
+                    "lsoa_name": "Ceredigion 011D",
+                    "year": 2011,
+                },
                 "year": 2019,
-                "type": "English",
+                "type": "Wales",
             },
             response_only=True,
         )
@@ -345,6 +364,7 @@ class EnglishIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSeri
 )
 class WelshIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerializer):
     type = serializers.SerializerMethodField()
+    lsoa = LSOASerializer(read_only=True)
 
     class Meta:
         model = WelshIndexMultipleDeprivation
@@ -400,7 +420,7 @@ class WelshIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerial
         ]
 
     def get_type(self, obj) -> str:
-        return "English"
+        return "Wales"
 
 
 @extend_schema_serializer(
@@ -418,17 +438,25 @@ class WelshIndexMultipleDeprivationSerializer(serializers.HyperlinkedModelSerial
                 "access_rank": 4724,
                 "crime_rank": 4664,
                 "housing_rank": 3248,
-                "data_zone": "{BASE_URL}/scotland_data_zones/1/",
-                "type": "English",
+                "data_zone": {
+                    "data_zone_code": "S01006506",
+                    "data_zone_name": "Culter - 01",
+                    "year": 2011,
+                    "local_authority": {
+                        "local_authority_district_code": "S12000033",
+                        "local_authority_district_name": "Aberdeen City",
+                        "year": 2011,
+                    },
+                },
+                "type": "Scotland",
             },
             response_only=True,
         )
     ]
 )
-class ScottishIndexMultipleDeprivationSerializer(
-    serializers.HyperlinkedModelSerializer
-):
+class ScottishIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
+    data_zone = DataZoneSerializer(read_only=True)
 
     class Meta:
         model = ScottishIndexMultipleDeprivation
@@ -448,34 +476,33 @@ class ScottishIndexMultipleDeprivationSerializer(
         ]
 
     def get_type(self, obj) -> str:
-        return "English"
+        return "Scotland"
 
 
 @extend_schema_serializer(
     examples=[
         OpenApiExample(
-            "/northern_ireland_indices_of_multiple_deprivation/1/",
+            "/northern_ireland_indices_of_multiple_deprivation/95WW23S1/",
             value={
-                "imd_rank": 516,
+                "imd_rank": 628,
                 "year": 2017,
-                "income_rank": 790,
-                "employment_rank": 888,
-                "health_deprivation_and_disability_rank": 890,
-                "education_skills_and_training_rank": 254,
-                "access_to_services_rank": 17,
-                "living_environment_rank": 75,
-                "crime_and_disorder_rank": 874,
-                "soa": "http://localhost:8001/northern_ireland_small_output_areas/1/",
-                "type": "English",
+                "income_rank": 661,
+                "employment_rank": 519,
+                "health_deprivation_and_disability_rank": 516,
+                "education_skills_and_training_rank": 463,
+                "access_to_services_rank": 537,
+                "living_environment_rank": 588,
+                "crime_and_disorder_rank": 242,
+                "soa": {"year": 2001, "soa_code": "95WW23S1", "soa_name": "Rostulla_1"},
+                "type": "Northern Ireland",
             },
             response_only=True,
         )
     ]
 )
-class NorthernIrelandIndexMultipleDeprivationSerializer(
-    serializers.HyperlinkedModelSerializer
-):
+class NorthernIrelandIndexMultipleDeprivationSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
+    soa = SOASerializer(read_only=True)
 
     class Meta:
         model = NorthernIrelandIndexMultipleDeprivation
@@ -494,7 +521,8 @@ class NorthernIrelandIndexMultipleDeprivationSerializer(
         ]
 
     def get_type(self, obj) -> str:
-        return "English"
+        return "Northern Ireland"
+
 
 class NestedLSOASerializer(serializers.ModelSerializer):
     class Meta:
@@ -507,9 +535,8 @@ class NestedLSOASerializer(serializers.ModelSerializer):
 
 class PopulationDensitySerializer(serializers.ModelSerializer):
     lsoa = NestedLSOASerializer(read_only=True)
-    local_authority = LocalAuthorityDistrictSerializer(read_only=True)
 
     class Meta:
         model = PopulationDensity
-        fields ="__all__"
+        fields = "__all__"
         depth = 1

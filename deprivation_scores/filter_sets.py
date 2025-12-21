@@ -1,30 +1,12 @@
-from django_filters.filterset import FilterSet, CharFilter, NumberFilter
+from django_filters.filterset import FilterSet
+from django_filters.filters import CharFilter
 from .models import (
-    DataZone,
     EnglishIndexMultipleDeprivation,
     WelshIndexMultipleDeprivation,
     ScottishIndexMultipleDeprivation,
     NorthernIrelandIndexMultipleDeprivation,
+    GreenSpace,
 )
-
-
-class DataZoneFilter(FilterSet):
-    local_authority_code = CharFilter(
-        field_name="local_authority__local_authority_district_code",
-        lookup_expr="icontains",
-    )
-    local_authority_name = CharFilter(
-        field_name="local_authority__local_authority_name",
-        lookup_expr="icontains",
-    )
-
-    class Meta:
-        model = DataZone
-        fields = (
-            "data_zone_code",
-            "data_zone_name",
-            "year",
-        )
 
 
 class EnglishIndexMultipleDeprivationFilter(FilterSet):
@@ -233,3 +215,20 @@ class NorthernIrelandIndexMultipleDeprivationFilter(FilterSet):
             "crime_and_disorder_rank",
         )
         exclude = "id"
+
+
+class GreenSpaceFilter(FilterSet):
+    local_authority_code = CharFilter(
+        field_name="local_authority__local_authority_district_code",
+        lookup_expr="exact",
+        label="local_authority_code",
+    )
+    local_authority_name = CharFilter(
+        field_name="local_authority__local_authority_district_name",
+        lookup_expr="icontains",
+        label="local_authority_name",
+    )
+
+    class Meta:
+        model = GreenSpace
+        fields = ["id", "local_authority_code", "local_authority_name"]
