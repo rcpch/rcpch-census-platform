@@ -57,6 +57,10 @@ from .general_functions import (
     lsoa_for_postcode,
     regions_for_postcode,
 )
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 @extend_schema(
@@ -332,10 +336,11 @@ class EnglishIndexMultipleDeprivationViewSet(
     serializer_class = EnglishIndexMultipleDeprivationSerializer
     filterset_class = EnglishIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
-    lookup_field = "lsoa_code"
+    lookup_field = "lsoa__lsoa_code"
+    lookup_url_kwarg = "lsoa_code"
 
     def retrieve(self, request, *args, **kwargs):
-        lsoa_code = kwargs.get(self.lookup_field)
+        lsoa_code = kwargs.get(self.lookup_url_kwarg)
         year = request.query_params.get("year")
         if year is not None:
             try:
@@ -413,10 +418,11 @@ class ScottishMultipleDeprivationViewSet(
     serializer_class = ScottishIndexMultipleDeprivationSerializer
     filterset_class = ScottishIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
-    lookup_field = "data_zone_code"
+    lookup_field = "data_zone__data_zone_code"
+    lookup_url_kwarg = "data_zone_code"
 
     def retrieve(self, request, *args, **kwargs):
-        data_zone_code = kwargs.get(self.lookup_field)
+        data_zone_code = kwargs.get(self.lookup_url_kwarg)
         qs = self.filter_queryset(self.get_queryset()).filter(
             data_zone__data_zone_code=data_zone_code
         )
@@ -451,10 +457,11 @@ class NorthernIrelandMultipleDeprivationViewSet(
     serializer_class = NorthernIrelandIndexMultipleDeprivationSerializer
     filterset_class = NorthernIrelandIndexMultipleDeprivationFilter
     filter_backends = [DjangoFilterBackend]
-    lookup_field = "soa_code"
+    lookup_field = "soa__soa_code"
+    lookup_url_kwarg = "soa_code"
 
     def retrieve(self, request, *args, **kwargs):
-        soa_code = kwargs.get(self.lookup_field)
+        soa_code = kwargs.get(self.lookup_url_kwarg)
         qs = self.filter_queryset(self.get_queryset()).filter(soa__soa_code=soa_code)
         instance = qs.first()
 
@@ -505,6 +512,44 @@ class PostcodeView(APIView):
                 ],
             ),
         ],
+        request=None,
+        responses={
+            200: OpenApiResponse(
+                response=OpenApiTypes.OBJECT,
+                description="Valid Response",
+                examples=[
+                    OpenApiExample(
+                        "/postcode?postcode=SW1A1AA",
+                        external_value="external value",
+                        value={
+                            "postcode": "SW1A 1AA",
+                            "quality": 1,
+                            "eastings": 530047,
+                            "northings": 179951,
+                            "country": "England",
+                            "nhs_ha": "London",
+                            "longitude": -0.141588,
+                            "latitude": 51.501009,
+                            "european_electoral_region": "London",
+                            "primary_care_trust": "Westminster",
+                            "region": "London",
+                            "lsoa": "Westminster 018A",
+                            "msoa": "Westminster 018",
+                            "incode": "1AA",
+                            "outcode": "SW1A",
+                            "parliamentary_constituency": "Cities of London and Westminster",
+                            "admin_district": "Westminster",
+                            "admin_county": None,
+                            "admin_ward": "St James's",
+                            "ced": None,
+                            "ccg": "NHS Central London (Westminster)",
+                            "nuts": "Westminster",
+                        },
+                        response_only=True,
+                    ),
+                ],
+            ),
+        },
     )
     def get(self, request):
         """
@@ -512,6 +557,7 @@ class PostcodeView(APIView):
         and returns LSOA code, CCG code and other important codes information
         """
         postcode = request.query_params.get("postcode")
+        logger.info("PostcodeView.get called with postcode=%s", postcode)
         if postcode:
 
             data = regions_for_postcode(postcode=postcode)
@@ -519,12 +565,16 @@ class PostcodeView(APIView):
 
             response = data["response"]
             if status == "error":
+                logger.warning("Postcode lookup error for %s: %s", postcode, response)
                 raise ParseError(response, code=400)
             elif status == "terminated_postcode":
+                logger.info("Postcode terminated for %s", postcode)
                 return Response(response, status=HTTPStatus.GONE)
 
+            logger.debug("Postcode lookup successful for %s", postcode)
             return Response(response)
         else:
+            logger.warning("PostcodeView.get called without postcode")
             raise ParseError(detail="Postcode cannot be blank")
 
 
@@ -615,6 +665,7 @@ class UKIndexMultipleDeprivationView(APIView):
                 elif int(year) in [2019, 2017, 2020]:
                     lsoa_year = 2011
                 else:
+                    logger.warning("Invalid year supplied: %s", year)
                     raise ParseError("Invalid year supplied.", code=400)
             else:
                 lsoa_year = 2011
@@ -624,8 +675,10 @@ class UKIndexMultipleDeprivationView(APIView):
             status = data["status"]
             response = data["response"]
             if status == "error":
+                logger.warning("Postcode lookup error for %s: %s", post_code, response)
                 raise ParseError(response, code=400)
             elif status == "terminated_postcode":
+                logger.info("Postcode terminated for %s", post_code)
                 return Response(response, status=HTTPStatus.GONE)
 
             lsoa_object = response
@@ -645,6 +698,7 @@ class UKIndexMultipleDeprivationView(APIView):
                                 lsoa_code=lsoa_code, year=2011
                             ).get()
                         else:
+                            logger.warning("Invalid year supplied: %s", year)
                             raise ParseError(  # fallback, should not be hit
                                 "Year must be 2019 or 2025 for England.", code=400
                             )
@@ -652,6 +706,7 @@ class UKIndexMultipleDeprivationView(APIView):
                             lsoa=lsoa, year=int(year)
                         ).get()
                     else:
+                        logger.warning("Invalid year supplied: %s", year)
                         raise ParseError(
                             "Year must be 2019 or 2025 for England.", code=400
                         )
@@ -662,6 +717,10 @@ class UKIndexMultipleDeprivationView(APIView):
                     if year is None:
                         year = 2019
                     if int(year) != 2019:
+                        logger.warning(
+                            "Invalid year supplied for Wales IMD postcode request: %s",
+                            year,
+                        )
                         raise ParseError("Year must be 2019 for Wales.", code=400)
                     lsoa = LSOA.objects.filter(lsoa_code=lsoa_code, year=2011).get()
                     imd = WelshIndexMultipleDeprivation.objects.filter(
@@ -699,11 +758,14 @@ class UKIndexMultipleDeprivationView(APIView):
                         instance=imd, context={"request": request}
                     )
                 else:
+                    logger.warning("No valid country found for postcode: %s", post_code)
                     raise ParseError("No valid country supplied.", code=400)
             else:
                 # postcode not valid
+                logger.warning("Invalid postcode supplied: %s", post_code)
                 raise ParseError("Invalid postcode supplied.", code=400)
         else:
+            logger.warning("No postcode supplied in request")
             raise ParseError("Postcode not supplied.", code=400)
 
         return Response(response.data)
@@ -804,17 +866,30 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
 
         # Validate quantile parameter
         if requested_quantile is None:
+            logger.warning(
+                "Quantile parameter missing for quantile view (postcode=%s)", post_code
+            )
             raise ParseError("Quantile parameter is required.", code=400)
 
         valid_quantiles = [2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20]
         try:
             quantile_int = int(requested_quantile)
             if quantile_int not in valid_quantiles:
+                logger.warning(
+                    "Invalid quantile supplied: %s (postcode=%s)",
+                    requested_quantile,
+                    post_code,
+                )
                 raise ParseError(
                     f"{requested_quantile} is not a valid quantile. Must be one of {valid_quantiles}.",
                     code=400,
                 )
         except (ValueError, TypeError):
+            logger.warning(
+                "Quantile parse error for value: %s (postcode=%s)",
+                requested_quantile,
+                post_code,
+            )
             raise ParseError(
                 f"{requested_quantile} is not a valid quantile. Must be one of {valid_quantiles}.",
                 code=400,
@@ -826,6 +901,11 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                 elif int(year) in [2019, 2017, 2020]:
                     lsoa_year = 2011
                 else:
+                    logger.warning(
+                        "Invalid year supplied for quantile view: %s (postcode=%s)",
+                        year,
+                        post_code,
+                    )
                     raise ParseError("Invalid year supplied.", code=400)
             else:
                 lsoa_year = 2011
@@ -836,6 +916,9 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
             status = data["status"]
             response = data["response"]
             if status == "error":
+                logger.warning(
+                    "Postcode lookup returned error for %s: %s", post_code, response
+                )
                 raise ParseError(response, code=400)
             elif status == "terminated_postcode":
                 return Response(response, status=HTTPStatus.GONE)
@@ -857,6 +940,11 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                                 lsoa_code=lsoa_code, year=2011
                             ).get()
                         else:
+                            logger.warning(
+                                "Invalid England year in quantile view: %s (postcode=%s)",
+                                year,
+                                post_code,
+                            )
                             raise ParseError(  # fallback, should not be hit
                                 "Year must be 2019 or 2025 for England.", code=400
                             )
@@ -871,6 +959,11 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                         )
                         response = Response({"result": data})
                     else:
+                        logger.warning(
+                            "Year must be 2019 or 2025 for England (supplied=%s, postcode=%s)",
+                            year,
+                            post_code,
+                        )
                         raise ParseError(
                             "Year must be 2019 or 2025 for England.", code=400
                         )
@@ -878,6 +971,11 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                     if year is None:
                         year = 2019
                     if int(year) != 2019:
+                        logger.warning(
+                            "Year must be 2019 for Wales (supplied=%s, postcode=%s)",
+                            year,
+                            post_code,
+                        )
                         raise ParseError("Year must be 2019 for Wales.", code=400)
                     lsoa = LSOA.objects.filter(lsoa_code=lsoa_code, year=2011).get()
                     imd = WelshIndexMultipleDeprivation.objects.filter(
@@ -894,6 +992,11 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                     if year is None:
                         year = 2020
                     if int(year) != 2020:
+                        logger.warning(
+                            "Year must be 2020 for Scotland (supplied=%s, postcode=%s)",
+                            year,
+                            post_code,
+                        )
                         raise ParseError("Year must be 2020 for Scotland.", code=400)
                     data_zone = DataZone.objects.filter(
                         data_zone_code=lsoa_code, year=2011
@@ -912,6 +1015,11 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                     if year is None:
                         year = 2017
                     if int(year) != 2017:
+                        logger.warning(
+                            "Year must be 2017 for Northern Ireland (supplied=%s, postcode=%s)",
+                            year,
+                            post_code,
+                        )
                         raise ParseError(
                             "Year must be 2017 for Northern Ireland.", code=400
                         )
@@ -930,8 +1038,10 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                     raise ParseError("No valid country supplied.", code=400)
             else:
                 # postcode not valid
+                logger.warning("Invalid postcode supplied: %s", post_code)
                 raise ParseError("Invalid postcode supplied.", code=400)
         else:
+            logger.warning("Postcode not supplied in quantile request")
             raise ParseError("Postcode not supplied.", code=400)
 
         return Response(response.data)
