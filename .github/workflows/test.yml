@@ -1,0 +1,84 @@
+# Runs tests on Pull Requests
+# Requires seeding the database with IMD data before running tests
+
+name: Run Tests
+
+on:
+    pull_request:
+        branches:
+            - live
+            - development
+    workflow_dispatch:
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+
+        services:
+            postgres:
+                image: postgres:latest
+                env:
+                    POSTGRES_USER: rcpchCensususer
+                    POSTGRES_PASSWORD: password
+                    POSTGRES_DB: rcpchCensusdb
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd pg_isready
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+                  cache: "pip"
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements.txt
+                  pip install -r requirements/development-requirements.txt
+
+            - name: Run migrations
+              env:
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER: rcpchCensususer
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD: password
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME: rcpchCensusdb
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST: localhost
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT: 5432
+                  RCPCH_CENSUS_ENGINE_SECRET_KEY: test-secret-key
+                  DEBUG: "True"
+                  DJANGO_ALLOWED_HOSTS: localhost
+                  POSTCODES_IO_API_URL: https://api.postcodes.io
+              run: python manage.py migrate
+
+            - name: Seed database
+              env:
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER: rcpchCensususer
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD: password
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME: rcpchCensusdb
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST: localhost
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT: 5432
+                  RCPCH_CENSUS_ENGINE_SECRET_KEY: test-secret-key
+                  DEBUG: "True"
+                  DJANGO_ALLOWED_HOSTS: localhost
+                  POSTCODES_IO_API_URL: https://api.postcodes.io
+              run: python manage.py seed --mode='ci_test'
+
+            - name: Run tests
+              env:
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER: rcpchCensususer
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD: password
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME: rcpchCensusdb
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST: localhost
+                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT: 5432
+                  RCPCH_CENSUS_ENGINE_SECRET_KEY: test-secret-key
+                  DEBUG: "True"
+                  DJANGO_ALLOWED_HOSTS: localhost
+                  POSTCODES_IO_API_URL: https://api.postcodes.io
+              run: python -m pytest tests/ -v --tb=short
