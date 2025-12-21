@@ -204,20 +204,17 @@ class LSOAViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
 
 @extend_schema(
     request=SOASerializer,
+    parameters=[
+        OpenApiParameter("soa_code", type=OpenApiTypes.STR, required=False),
+        OpenApiParameter("soa_name", type=OpenApiTypes.STR, required=False),
+        OpenApiParameter("year", type=OpenApiTypes.INT, required=False),
+    ],
 )
-class SOAViewSet(viewsets.ReadOnlyModelViewSet):
+class SOAViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
-    This endpoint returns a list of SOAs in Northern Ireland.
-
-    Filter Parameters:
-
-    `year`
-
-    `soa_code`
-
-    `soa_name`
-
-    If none are passed, a list is returned.
+    This endpoint returns a a Super Output Areas in Northern Ireland, by SOA code.
+    This is a 2001 only dataset and is used for the Northern Ireland Index of Multiple Deprivation.
+    NOTE: One of `soa_code` or `soa_name` query parameters must be provided.
     """
 
     queryset = SOA.objects.all().order_by("-soa_code")
@@ -227,6 +224,8 @@ class SOAViewSet(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, *args, **kwargs):
         year = request.query_params.get("year")
+        soa_code = request.query_params.get("soa_code")
+        soa_name = request.query_params.get("soa_name")
         if year is not None:
             try:
                 year_int = int(year)
@@ -234,6 +233,11 @@ class SOAViewSet(viewsets.ReadOnlyModelViewSet):
                 raise ParseError("Year must be an integer.", code=400)
             if year_int != 2001:
                 raise ParseError("Year must be one of: 2001.", code=400)
+        if not soa_code and not soa_name:
+            raise ParseError(
+                "One of `soa_code` or `soa_name` query parameters must be provided.",
+                code=400,
+            )
         return super().list(request, *args, **kwargs)
 
 
