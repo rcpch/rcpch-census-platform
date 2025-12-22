@@ -1,0 +1,41 @@
+FROM python:3.12
+
+# Prevent Python from writing .pyc files and buffer stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# Install system dependencies required for GeoDjango/PostGIS support
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    gdal-bin \
+    libgdal-dev \
+    binutils \
+    proj-bin \
+    libproj-dev \
+    libgeos-dev \
+    libpq-dev \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Ensure GDAL include paths are available for Python wheels
+ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
+ENV C_INCLUDE_PATH=/usr/include/gdal
+
+# Copy requirements (same layout as the main Dockerfile)
+COPY requirements/development-requirements.txt /app/requirements/development-requirements.txt
+COPY requirements/common-requirements.txt /app/requirements/common-requirements.txt
+COPY requirements/postgis-requirements.txt /app/requirements/postgis-requirements.txt
+
+WORKDIR /app/requirements/
+
+RUN pip install --upgrade pip
+# Install the PostGIS-capable Python deps (requires system GDAL/GEOS/PROJ present)
+RUN pip install -r /app/requirements/postgis-requirements.txt
+
+WORKDIR /app/
+
+# Copy project files
+COPY . /app/
+
+EXPOSE 8001
