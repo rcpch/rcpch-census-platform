@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.gis.db import models as gis_models
 
 
 class LocalAuthority(models.Model):
@@ -11,6 +12,9 @@ class LocalAuthority(models.Model):
     year = models.IntegerField(
         "Local Authority District Year",
     )
+
+    # Geometry column for LSOA boundaries (EPSG:4326)
+    geom = gis_models.MultiPolygonField(srid=4326, null=True, blank=True)
 
     class Meta:
         verbose_name = ("Local Authority",)
@@ -74,6 +78,9 @@ class LSOA(models.Model):
     local_authority_district = models.ForeignKey(
         to=LocalAuthority, on_delete=models.CASCADE
     )
+
+    # Geometry column for LSOA boundaries (EPSG:4326)
+    geom = gis_models.MultiPolygonField(srid=4326, null=True, blank=True)
 
     class Meta:
         verbose_name = ("LSOA",)

@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
+    "django.contrib.gis",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
@@ -100,7 +101,7 @@ WSGI_APPLICATION = "rcpch_census_platform.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
         "NAME": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME"),
         "USER": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER"),
         "PASSWORD": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD"),

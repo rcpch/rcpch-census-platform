@@ -1,7 +1,10 @@
 from enum import Enum
+import re
 from math import floor
 import sys
 import csv
+import os
+import json
 from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.conf import settings
@@ -18,6 +21,7 @@ from ...models import (
     NorthernIrelandIndexMultipleDeprivation,
     PopulationDensity,
 )
+from django.db import connection
 
 
 class QuantileType(Enum):
@@ -82,8 +86,19 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--mode", type=str, help="Mode")
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Force re-import even if expected records with geom already exist",
+        )
 
     def handle(self, *args, **options):
+        if options.get("mode") == "add_boundaries":
+            self.stdout.write(
+                "\n" + G + "Importing boundary GeoJSON files..." + W + "\n"
+            )
+            boundary_files(self, force=options.get("force"))
+            return
         if options["mode"] == "add_organisational_areas":
             self.stdout.write(B + "Adding organisational areas..." + W)
             add_lsoas_2011_wards_2019_to_LADS_2019()
@@ -204,6 +219,11 @@ class Command(BaseCommand):
             add_northern_ireland_soas_and_deprivation_domains_with_ranks()
         elif options["mode"] == "test_table_totals":
             test_table_totals()
+        elif options["mode"] == "boundary_files":
+            self.stdout.write(
+                "\n" + G + "Importing boundary GeoJSON files..." + W + "\n"
+            )
+            boundary_files(self, force=options.get("force"))
         else:
             self.stdout.write("No options supplied...")
         self.stdout.write(image())
@@ -376,6 +396,222 @@ def add_lsoas_2021_wards_2024_to_LADS_2024():
             pass
 
 
+def boundary_files(command=None, force=False):
+    """Import GeoJSON boundary files into deprivation_scores_lsoa.geom
+
+    This uses raw SQL / PostGIS to add a geometry column if it does not
+    exist, and updates matched records by lsoa_code and year.
+    """
+    # files: (relative path from project root, property name in geojson, year, table, code_field)
+    files = [
+        (
+            "deprivation_scores/geojson/Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5_-7764840717091613250.geojson",
+            "lsoa21cd",
+            2021,
+            "deprivation_scores_lsoa",
+            "lsoa_code",
+        ),
+        (
+            "deprivation_scores/geojson/LSOA_Dec_2011_Boundaries_Generalised_Clipped_BGC_EW_V3_-335161623626682850.geojson",
+            "lsoa11cd",
+            2011,
+            "deprivation_scores_lsoa",
+            "lsoa_code",
+        ),
+        (
+            "deprivation_scores/geojson/Local_Authority_Districts_December_2024_Boundaries_UK_BGC_-8811838383176485936.geojson",
+            "lad24cd",
+            2024,
+            "deprivation_scores_localauthority",
+            "local_authority_district_code",
+        ),
+    ]
+
+    project_root = getattr(settings, "PROJECT_ROOT", None) or os.getcwd()
+
+    # Header (match other functions' pattern)
+    sys.stdout.write("\n" + B + "Adding LSOA boundary geojson..." + W + "\n")
+
+    for relpath, prop_code, year, table_name, code_field in files:
+        path = os.path.join(project_root, relpath)
+        if not os.path.exists(path):
+            msg = f"GeoJSON not found: {path} -- skipping."
+            sys.stdout.write(R + msg + W + "\n")
+            continue
+        # If the expected number of records for this table/year already have geometries, skip
+        expected = None
+        if table_name == "deprivation_scores_lsoa" and year == 2021:
+            expected = 35672
+        elif table_name == "deprivation_scores_lsoa" and year == 2011:
+            expected = 34753
+        elif table_name == "deprivation_scores_localauthority" and year == 2024:
+            expected = 318
+
+        if expected is not None:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {table_name} WHERE year = %s AND geom IS NOT NULL",
+                    [year],
+                )
+                existing_geom_count = cursor.fetchone()[0]
+            if existing_geom_count == expected and not force:
+                sys.stdout.write(
+                    B
+                    + f"\n📎 {year} geometries already present for table {table_name} ({existing_geom_count} records). Skipping..."
+                    + W
+                    + "\n"
+                )
+                continue
+            if force and existing_geom_count == expected:
+                sys.stdout.write(
+                    P
+                    + f"\n⚠️ Force flag set — re-importing {year} geometries for table {table_name} (existing {existing_geom_count})."
+                    + W
+                    + "\n"
+                )
+
+        # Per-file start message (match requested pattern)
+        sys.stdout.write(
+            "\n"
+            + B
+            + f"📎 Adding BGC (Boundaries Generalised Clipped) for LSOAs ({year})..."
+            + W
+            + "\n"
+        )
+
+        with open(path, "r", encoding="utf-8") as fh:
+            gj = json.load(fh)
+
+        # ensure geom column exists on the target table
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS geom geometry(MultiPolygon,4326);"
+            )
+
+        updated = 0
+        missing = 0
+        total = 0
+        missing_codes = []
+
+        for feat in gj.get("features", []):
+            total += 1
+            props = feat.get("properties", {}) or {}
+            # Case-insensitive property lookup (GeoJSON may use upper-case keys)
+            code = None
+            for k, v in props.items():
+                if k and k.lower() == prop_code.lower():
+                    code = v
+                    break
+            if not code:
+                missing += 1
+                continue
+            # Normalize code string (strip, uppercase) to match DB values
+            try:
+                code = str(code).strip().upper()
+            except Exception:
+                missing += 1
+                continue
+
+            geom_json = json.dumps(feat.get("geometry"))
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"UPDATE {table_name} SET geom = ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326) WHERE {code_field} = %s AND year = %s",
+                    [geom_json, code, year],
+                )
+                # rowcount is number of rows updated by this statement
+                if cursor.rowcount and cursor.rowcount > 0:
+                    updated += cursor.rowcount
+                else:
+                    # Try fallback: case-insensitive match using ILIKE
+                    cursor.execute(
+                        f"UPDATE {table_name} SET geom = ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326) WHERE {code_field} ILIKE %s AND year = %s",
+                        [geom_json, code, year],
+                    )
+                    if cursor.rowcount and cursor.rowcount > 0:
+                        updated += cursor.rowcount
+                    else:
+                        # Try numeric-suffix match (match last N digits)
+                        m = re.search(r"(\d+)$", code)
+                        if m:
+                            suffix = m.group(1)
+                            cursor.execute(
+                                f"UPDATE {table_name} SET geom = ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326) WHERE RIGHT({code_field}, %s) = %s AND year = %s",
+                                [geom_json, len(suffix), suffix, year],
+                            )
+                            if cursor.rowcount and cursor.rowcount > 0:
+                                updated += cursor.rowcount
+                            else:
+                                missing += 1
+                                missing_codes.append(code)
+                        else:
+                            missing += 1
+                            missing_codes.append(code)
+
+        msg = f"Processed {total} features: updated {updated}, missing code {missing}."
+        sys.stdout.write(G + msg + W + "\n")
+
+        # After processing, report completion and count DB rows with geom for this year
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) FROM deprivation_scores_lsoa WHERE year = %s AND geom IS NOT NULL",
+                [year],
+            )
+            lsoa_count = cursor.fetchone()[0]
+
+        final = f"  Added {lsoa_count} LSOAs ({year})."
+        sys.stdout.write(BOLD + "\n🔥 Complete." + END + final + W + "\n")
+
+        # Assert expected totals like other functions
+        expected = None
+        if year == 2021:
+            expected = 35672
+        elif year == 2011:
+            expected = 34753
+
+        if expected is not None and lsoa_count != expected:
+            sys.stdout.write(
+                "\n"
+                + R
+                + f"😬 Expected {expected} lsoa records, but got {lsoa_count}."
+                + W
+                + "\n"
+            )
+
+        # If there are missing codes provide a short diagnostic to help debugging
+        if missing_codes:
+            sample = missing_codes[:10]
+            diag_msg = (
+                f"Sample missing codes (first {len(sample)}): {', '.join(sample)}"
+            )
+            sys.stdout.write(R + diag_msg + W + "\n")
+
+            # Quick DB sanity checks for the year
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {table_name} WHERE year = %s",
+                    [year],
+                )
+                year_count = cursor.fetchone()[0]
+                info = f"DB has {year_count} rows in {table_name} for year {year}."
+                sys.stdout.write(B + info + W + "\n")
+
+            # Try to find close matches for the first sample code
+            exemplar = sample[0]
+            like_pattern = f"%{exemplar}%"
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT lsoa_code FROM deprivation_scores_lsoa WHERE year = %s AND lsoa_code ILIKE %s LIMIT 5",
+                    [year, like_pattern],
+                )
+                matches = [r[0] for r in cursor.fetchall()]
+                if matches:
+                    match_msg = f"Database example matches for '{exemplar}': {', '.join(matches)}"
+                else:
+                    match_msg = f"No example matches found in DB for '{exemplar}' using ILIKE '%{exemplar}%'."
+                sys.stdout.write(B + match_msg + W + "\n")
+
+
 """
 2019 English IMD data
 """
@@ -458,7 +694,11 @@ def update_english_imd_data_with_subdomains():
 
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_SUBDOMAINS_OF_DEPRIVATION}"
     sys.stdout.write(
-        "\n" + G + "📎 - Adding sub-domains of deprivation to LSOAs" + W + "\n"
+        "\n"
+        + G
+        + "📎 - Adding 2019 sub-domains of deprivation to 2011 LSOAs"
+        + W
+        + "\n"
     )
     with open(path, "r") as f:
         data = list(csv.reader(f, delimiter=","))
@@ -520,7 +760,7 @@ def update_english_imd_data_with_supplementary_indices():
         sys.stdout.write(
             "\n"
             + G
-            + "📎 - Adding supplementary indices (IDACI and IDAOPI) of deprivation to LSOAs"
+            + "📎 - Adding 2019 supplementary indices (IDACI and IDAOPI) of deprivation to 2011 LSOAs"
             + W
             + "\n"
         )
@@ -542,7 +782,7 @@ def update_english_imd_data_with_supplementary_indices():
                 idaopi_decile=int(float(row[9])),
             )
             count += 1
-    final = f" Added {count} supplementary indices (IDACI and IDAOPI) of deprivation 2019 to LSOAs\n"
+    final = f" Added {count} supplementary indices (IDACI and IDAOPI) of deprivation 2019 to 2011 LSOAs\n"
     sys.stdout.write(BOLD + "\n🔥 Complete." + END + final)
     try:
         assert count == 32844
@@ -570,7 +810,11 @@ def update_english_imd_data_with_scores():
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_SCORES_OF_DEPRIVATION}"
     with open(path, "r") as f:
         sys.stdout.write(
-            "\n" + G + "📎 - Adding English scores of deprivation to LSOAs" + W + "\n"
+            "\n"
+            + G
+            + "📎 - Adding 2019 English scores of deprivation to 2011 LSOAs"
+            + W
+            + "\n"
         )
         data = list(csv.reader(f, delimiter=","))
         count = 0
@@ -637,7 +881,7 @@ def update_english_imd_data_with_transformed_scores():
     sys.stdout.write(
         "\n"
         + G
-        + "📎 - Adding English transformed scores of deprivation to LSOAs"
+        + "📎 - Adding 2019 English transformed scores of deprivation to 2011 LSOAs"
         + W
         + "\n"
     )
@@ -662,7 +906,7 @@ def update_english_imd_data_with_transformed_scores():
                 living_environment_score_exponentially_transformed=Decimal(row[10]),
             )
             count += 1
-    final = f" Added {count} English transformed scores of deprivation 2019\n"
+    final = f" Added {count} English 2019 transformed scores of deprivation 2019\n"
     sys.stdout.write(BOLD + "\n🔥 Complete." + END + final)
     try:
         assert count == 32844
@@ -1771,15 +2015,15 @@ def test_table_totals():
     normal_vals = [
         {
             "model": LSOA,
-            "count": LSOA.objects.filter(year=2011).count(),
+            "count": LSOA.objects.filter(year=2011, geom__isnull=False).count(),
             "expected": 34753,
-            "message": "2011 LSOA should have 34753 (32844 in England, 1909 in wales) rows.",
+            "message": "2011 LSOA should have 34753 (32844 in England, 1909 in wales) rows with geometries.",
         },
         {
             "model": LSOA,
-            "count": LSOA.objects.filter(year=2021).count(),
+            "count": LSOA.objects.filter(year=2021, geom__isnull=False).count(),
             "expected": 35672,
-            "message": "2021 LSOA should have 35672 rows.",
+            "message": "2021 LSOA should have 35672 rows with geometries.",
         },
         {
             "model": DataZone,
@@ -1801,9 +2045,9 @@ def test_table_totals():
         },
         {
             "model": LocalAuthority,
-            "count": LocalAuthority.objects.filter(year=2024).count(),
+            "count": LocalAuthority.objects.filter(year=2024, geom__isnull=False).count(),
             "expected": 318,
-            "message": "2024 LocalAuthority should have 318 rows. ",
+            "message": "2024 LocalAuthority should have 318 rows with geometries.",
         },
         {
             "model": PopulationDensity,
