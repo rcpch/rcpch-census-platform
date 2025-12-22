@@ -2045,7 +2045,9 @@ def test_table_totals():
         },
         {
             "model": LocalAuthority,
-            "count": LocalAuthority.objects.filter(year=2024, geom__isnull=False).count(),
+            "count": LocalAuthority.objects.filter(
+                year=2024, geom__isnull=False
+            ).count(),
             "expected": 318,
             "message": "2024 LocalAuthority should have 318 rows with geometries.",
         },
