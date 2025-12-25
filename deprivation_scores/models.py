@@ -5,7 +5,6 @@ from django.contrib.gis.db import models as gis_models
 class LocalAuthority(models.Model):
     local_authority_district_code = models.CharField(
         "Local Authority District code (2019)", max_length=50
-        "Local Authority District code (2019)", max_length=50
     )
     local_authority_district_name = models.CharField(
         "Local Authority District name (2019)", max_length=50
@@ -422,7 +421,6 @@ class DataZone(models.Model):
     data_zone_code = models.CharField("Data Zone Code", max_length=50)
     data_zone_name = models.CharField(
         "Data Zone Name",
-        max_length=100,
         max_length=100,
     )
     year = models.IntegerField("Data Zone Year")
