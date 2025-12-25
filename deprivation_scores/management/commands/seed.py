@@ -251,183 +251,120 @@ class Command(BaseCommand):
                     self.stderr.write(self.style.ERROR(f"SQL Error: {e}"))
 
     def _stream_bfc_import(self, dataset, force=False):
-        """
-        Imports Boundary Fine Clipped (BFC) geometries.
-        Handles local optimized GeoJSONs, raw NI Small Area files, and ArcGIS APIs.
-        """
         source = dataset["url"]
         table_name = dataset["table"]
         year = dataset["year"]
-        chunk_size = dataset.get("chunk_size", 1000)
         specific_code_col = dataset.get("code_column", "").lower()
         django_col = dataset.get("django_code_col")
 
-        # --- 1. THE GUARD: Skip if database already has geometries for this year ---
+        # 1. Guard
         with connection.cursor() as cursor:
-            try:
-                cursor.execute(
-                    f"SELECT COUNT(*) FROM {table_name} WHERE year = %s AND geom IS NOT NULL",
-                    [year],
-                )
-                count = cursor.fetchone()[0]
-                if count > 0 and not force:
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"  {dataset['name']} ({year}) already spatialized. Skipping."
-                        )
-                    )
-                    return
-            except Exception as e:
+            cursor.execute(
+                f"SELECT COUNT(*) FROM {table_name} WHERE year = %s AND geom IS NOT NULL",
+                [year],
+            )
+            if cursor.fetchone()[0] > 0 and not force:
                 self.stdout.write(
-                    f"  Initial check: Table/column not ready, proceeding... ({e})"
+                    self.style.SUCCESS(
+                        f"  {dataset['name']} already spatialized. Skipping."
+                    )
                 )
-
-        db = settings.DATABASES["default"]
-        engine = create_engine(
-            f"postgresql+psycopg2://{db['USER']}:{db['PASSWORD']}@{db['HOST']}:{db.get('PORT', 5432)}/{db['NAME']}"
-        )
-
-        final_gdf = None
+                return
 
         try:
-            # --- 2. DATA LOADING & SMART DISSOLVE ---
-            if os.path.exists(source):
+            # 2. Remote Download with simple progress log
+            if source.startswith("http"):
+                self.stdout.write(f"  Starting download: {source}")
+                response = requests.get(source, stream=True, timeout=300)
+                response.raise_for_status()
+
+                total_size = int(response.headers.get("content-length", 0))
+                bytes_data = io.BytesIO()
+                downloaded = 0
+                last_percent = -1
+
+                for chunk in response.iter_content(chunk_size=8192):
+                    bytes_data.write(chunk)
+                    if total_size > 0:
+                        downloaded += len(chunk)
+                        percent = int(100 * downloaded / total_size)
+                        if percent % 10 == 0 and percent != last_percent:
+                            self.stdout.write(f"    Download Progress: {percent}%")
+                            last_percent = percent
+
+                self.stdout.write("  Download complete. Parsing JSON into GeoPandas...")
+                bytes_data.seek(0)
+                final_gdf = gpd.read_file(bytes_data)
+            else:
                 self.stdout.write(f"  Loading local file: {source}")
                 final_gdf = gpd.read_file(source)
-                final_gdf.columns = [c.lower() for c in final_gdf.columns]
 
-                # Logic: If row count > 1000, it's a raw Small Area file that needs dissolving.
-                # If row count is ~890, it's our new optimized file; skip dissolve.
-                if len(final_gdf) > 1000 and specific_code_col in final_gdf.columns:
-                    self.stdout.write(
-                        f"  Raw data detected ({len(final_gdf)} rows). Dissolving Small Areas into SOAs..."
-                    )
-                    final_gdf = final_gdf.dissolve(by=specific_code_col).reset_index()
-                    self.stdout.write(
-                        f"  Dissolve complete. New row count: {len(final_gdf)}"
-                    )
-                else:
-                    self.stdout.write(
-                        f"  Optimized data detected ({len(final_gdf)} rows). Skipping dissolve step."
-                    )
-            else:
-                # --- API Download Logic ---
-                all_chunks = []
-                offset = 0
-                more_pages = True
-                while more_pages:
-                    if (
-                        "2001" in dataset["name"]
-                        or "Northern Ireland" in dataset["name"]
-                    ):
-                        params = {
-                            "where": "1=1",
-                            "outFields": "*",
-                            "returnGeometry": "true",
-                            "f": "json",
-                        }
-                        more_pages = False
-                    else:
-                        params = {
-                            "where": "1=1",
-                            "outSR": 4326,
-                            "f": "json",
-                            "outFields": dataset["code_column"],
-                            "resultOffset": offset,
-                            "resultRecordCount": chunk_size,
-                            "geometryPrecision": 6,
-                        }
+            final_gdf.columns = [c.lower() for c in final_gdf.columns]
 
-                    response = requests.get(source, params=params, timeout=180)
-                    if response.status_code != 200 or '"error"' in response.text:
-                        self.stderr.write(f"  ArcGIS Error: {response.text}")
-                        break
-
-                    chunk_gdf = gpd.read_file(
-                        io.StringIO(response.text), driver="ESRIJSON"
-                    )
-                    if not chunk_gdf.empty:
-                        chunk_gdf.columns = [c.lower() for c in chunk_gdf.columns]
-                        all_chunks.append(chunk_gdf)
-                        features_in_chunk = len(chunk_gdf)
-                        offset += features_in_chunk
-
-                        if "2001" in dataset["name"]:
-                            more_pages = False
-                        else:
-                            data = response.json()
-                            more_pages = (
-                                data.get("exceededTransferLimit", False)
-                                or features_in_chunk >= chunk_size
-                            )
-                    else:
-                        more_pages = False
-
-                if not all_chunks:
-                    raise Exception("No data retrieved from API")
-                final_gdf = gpd.GeoDataFrame(pd.concat(all_chunks, ignore_index=True))
-
-            # --- 3. STANDARDIZE GEOMETRY & CRS ---
-            for col in ["geometry", "shape", "the_geom", "geom"]:
-                if col in final_gdf.columns:
-                    if col != "geometry":
-                        final_gdf = final_gdf.rename(columns={col: "geometry"})
-                    final_gdf = final_gdf.set_geometry("geometry")
-                    break
-
-            # Coordinate System Handling (Irish Grid Detect)
-            if final_gdf.crs is None or final_gdf.geometry.iloc[0].centroid.x > 1000:
+            # 3. Geometric Processing
+            if len(final_gdf) > 1000 and specific_code_col in final_gdf.columns:
                 self.stdout.write(
-                    "  Applying Irish Grid (EPSG:29903) and reprojecting to WGS84..."
+                    f"  Condensing {len(final_gdf)} Small Areas into 890 SOAs (Memory Intensive)..."
                 )
+
+                if final_gdf.crs is None:
+                    final_gdf.set_crs("EPSG:29903", inplace=True)
+
+                # Dissolve
+                final_gdf = final_gdf.dissolve(by=specific_code_col).reset_index()
+
+                # Simplify (Tolerance 1.0m)
+                self.stdout.write(
+                    "  Simplifying geometries for database optimization..."
+                )
+                final_gdf["geometry"] = final_gdf.simplify(
+                    tolerance=1.0, preserve_topology=True
+                )
+
+            # 4. Standardize CRS & Geometry Type
+            if final_gdf.crs is None or final_gdf.geometry.iloc[0].centroid.x > 1000:
                 final_gdf.set_crs("EPSG:29903", allow_override=True, inplace=True)
 
             if final_gdf.crs != "EPSG:4326":
+                self.stdout.write("  Reprojecting to WGS84...")
                 final_gdf = final_gdf.to_crs("EPSG:4326")
 
-            # Force MultiPolygon for PostGIS compatibility
-            final_gdf = final_gdf[final_gdf.geometry.notnull()]
             final_gdf["geometry"] = final_gdf["geometry"].map(
                 lambda g: g if g.geom_type == "MultiPolygon" else MultiPolygon([g])
             )
 
-            # --- 4. DATABASE MERGE ---
+            # 5. Database Merge
+            db = settings.DATABASES["default"]
+            engine = create_engine(
+                f"postgresql+psycopg2://{db['USER']}:{db['PASSWORD']}@{db['HOST']}:{db.get('PORT', 5432)}/{db['NAME']}"
+            )
+
             temp_table = f"temp_shapes_{year}"
-            self.stdout.write(f"  Uploading shapes to {temp_table}...")
+            self.stdout.write(f"  Uploading shapes to PostgreSQL...")
+
             final_gdf[[specific_code_col, "geometry"]].to_postgis(
                 temp_table, engine, if_exists="replace", index=False
             )
 
             with connection.cursor() as cursor:
-                self.stdout.write(
-                    f"  Merging {temp_table} -> {table_name} for year {year}..."
-                )
                 cursor.execute(
                     f"""
-                    UPDATE {table_name} 
-                    SET geom = t.geometry
+                    UPDATE {table_name} SET geom = t.geometry
                     FROM {temp_table} t
-                    WHERE {table_name}.{django_col} = t.{specific_code_col}
-                    AND {table_name}.year = %s;
+                    WHERE {table_name}.{django_col} = t.{specific_code_col} AND {table_name}.year = %s;
                 """,
                     [year],
                 )
-
-                rows_updated = cursor.rowcount
+                count = cursor.rowcount
                 cursor.execute(f"DROP TABLE IF EXISTS {temp_table};")
+                connection.commit()
 
-            # Commit the transaction so progress is saved even if tests crash
-            connection.commit()
             self.stdout.write(
-                self.style.SUCCESS(
-                    f"  Successfully updated {rows_updated} rows in {table_name}."
-                )
+                self.style.SUCCESS(f"  Successfully spatialized {count} rows.")
             )
 
         except Exception as e:
-            self.stderr.write(
-                self.style.ERROR(f"  Import failed for {dataset['name']}: {e}")
-            )
+            self.stderr.write(self.style.ERROR(f"  Import failed: {str(e)}"))
             with connection.cursor() as cursor:
                 cursor.execute(f"DROP TABLE IF EXISTS temp_shapes_{year};")
 
@@ -488,8 +425,8 @@ class Command(BaseCommand):
                 "code_column": "DataZone",
             },
             {
-                "name": "Northern Ireland SOA 2011 Optimized",
-                "url": "deprivation_scores/shape_files/soa2011_optimized.json",
+                "name": "Northern Ireland SOA 2011 (Auto-Processed)",
+                "url": "https://admin.opendatani.gov.uk/dataset/519e5019-6726-445d-8821-12d88f164c1e/resource/b64d8909-883e-42b1-bc79-50dc43f6769e/download/sa2011.json",
                 "table": "deprivation_scores_soa",
                 "django_code_col": "soa_code",
                 "year": 2001,
