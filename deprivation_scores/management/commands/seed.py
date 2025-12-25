@@ -393,6 +393,21 @@ class Command(BaseCommand):
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"  ❌ CDN Purge error: {e}"))
 
+    def warm_cache(self):
+        self.stdout.write(
+            self.style.HTTP_INFO("  Pre-warming cache for zoom levels...")
+        )
+        # We target the specific levels our views are optimized for
+        for z in [3, 6, 9]:
+            url = f"{settings.SITE_URL}/api/map-data/?z={z}"
+            try:
+                # We use a long timeout because generating the first UK-wide
+                # GeoJSON from the DB can take a few seconds
+                requests.get(url, timeout=120)
+                self.stdout.write(f"    ✅ Cache primed for zoom {z}")
+            except Exception as e:
+                self.stdout.write(f"    ⚠️ Could not warm zoom {z}: {e}")
+
     def add_arguments(self, parser):
         parser.add_argument("--mode", type=str, help="Mode")
         parser.add_argument(
@@ -482,6 +497,9 @@ class Command(BaseCommand):
             # Warm the local cache and then purge the remote CDN
             if not settings.DEBUG:  # Only purge in production
                 self.purge_cdn_cache()
+                # Trigger the CDN to fetch the new data immediately
+                self.warm_cache()
+
             # test that the tables have the correct number of geometries
             test_geometries()
             return
