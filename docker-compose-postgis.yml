@@ -50,6 +50,7 @@ services:
   pg_tileserv:
     image: pramsey/pg_tileserv:latest
     environment:
+      - HTTP_CORS_ORIGIN=*
       - DATABASE_URL=postgresql://rcpchCensususer:password@db:5432/rcpchCensusdb
     ports:
       - 7800:7800
