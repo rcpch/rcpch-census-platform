@@ -1,12 +1,19 @@
-from enum import Enum
-import re
-from math import floor
-import sys
+import gc
 import csv
-import os
+from enum import Enum
+import io
 import json
+import os
+from math import floor
+import requests
+from shapely.geometry import MultiPolygon
+import sys
 from decimal import Decimal
+import geopandas as gpd
+import pandas as pd
+from sqlalchemy import create_engine
 from django.core.management.base import BaseCommand
+from django.db import connection
 from django.conf import settings
 from ...models import (
     LSOA,
@@ -84,6 +91,261 @@ END = "\033[0m"
 class Command(BaseCommand):
     help = "seed database with census and IMD data for England, Wales, Scotland and Northern Ireland."
 
+    def _run_post_processing_sql(self):
+        self.stdout.write(
+            self.style.WARNING(
+                "Running PostGIS spatial optimizations and building views..."
+            )
+        )
+
+        # --- Nested SQL Helpers ---
+
+        def get_lsoa_view_sql(view_name, geom_column):
+            """Creates the individual England/Wales View"""
+            return f"""
+            CREATE OR REPLACE VIEW public.{view_name} AS
+            SELECT 
+                l.year as boundary_year, 
+                l.{geom_column} AS geom,
+                l.lsoa_code,
+                COALESCE(e.imd_decile, w.imd_decile, 0) as imd_decile,
+                COALESCE(e.imd_rank, w.imd_rank, 0) as imd_rank
+            FROM deprivation_scores_lsoa l
+            LEFT JOIN deprivation_scores_englishindexmultipledeprivation e 
+                ON e.lsoa_id = l.id AND e.year IN (2019, 2025)
+            LEFT JOIN deprivation_scores_welshindexmultipledeprivation w
+                ON w.lsoa_id = l.id AND w.year = 2019
+            WHERE l.{geom_column} IS NOT NULL;
+            """
+
+        def get_uk_master_view_sql(view_name, geom_suffix):
+            """
+            Creates the Unified UK View.
+            geom_suffix should be 'simp_z0_4', 'simp_z5_7', or '3857' (for full detail).
+            """
+            # If we want the base geom_3857, we pass '3857'.
+            # If we want simplified, we pass 'simp_z0_4'
+            if geom_suffix == "3857":
+                actual_geom_col = "geom_3857"
+            else:
+                actual_geom_col = f"geom_3857_{geom_suffix}"
+
+            return f"""
+            CREATE OR REPLACE VIEW public.{view_name} AS
+            -- ENGLAND
+            SELECT 
+                l.year, l.lsoa_code AS code, l.{actual_geom_col} AS geom, 
+                COALESCE(e.imd_decile, 0) as imd_decile, 
+                COALESCE(e.imd_rank, 0) as imd_rank,
+                'england' as nation
+            FROM deprivation_scores_lsoa l
+            LEFT JOIN deprivation_scores_englishindexmultipledeprivation e ON e.lsoa_id = l.id
+            WHERE l.lsoa_code LIKE 'E%' AND l.{actual_geom_col} IS NOT NULL
+            
+            UNION ALL
+            
+            -- WALES
+            SELECT 
+                l.year, l.lsoa_code AS code, l.{actual_geom_col} AS geom, 
+                COALESCE(w.imd_decile, 0) as imd_decile, 
+                COALESCE(w.imd_rank, 0) as imd_rank,
+                'wales' as nation
+            FROM deprivation_scores_lsoa l
+            LEFT JOIN deprivation_scores_welshindexmultipledeprivation w ON w.lsoa_id = l.id
+            WHERE l.lsoa_code LIKE 'W%' AND l.{actual_geom_col} IS NOT NULL
+            
+            UNION ALL
+            
+            -- SCOTLAND (6,976 Data Zones)
+            SELECT 
+                d.year, d.data_zone_code AS code, d.{actual_geom_col} AS geom, 
+                -- Width bucket creates 10 equal groups from rank 1 to 6976
+                COALESCE(WIDTH_BUCKET(s.imd_rank, 1, 6977, 10), 0) as imd_decile, 
+                COALESCE(s.imd_rank, 0) as imd_rank,
+                'scotland' as nation
+            FROM deprivation_scores_datazone d
+            LEFT JOIN deprivation_scores_scottishindexmultipledeprivation s ON s.data_zone_id = d.id
+            WHERE d.{actual_geom_col} IS NOT NULL
+            
+            UNION ALL
+            
+            -- NORTHERN IRELAND (890 SOAs)
+            SELECT 
+                so.year, so.soa_code AS code, so.{actual_geom_col} AS geom, 
+                COALESCE(WIDTH_BUCKET(ni.imd_rank, 1, 891, 10), 0) as imd_decile, 
+                COALESCE(ni.imd_rank, 0) as imd_rank,
+                'northern_ireland' as nation
+            FROM deprivation_scores_soa so
+            LEFT JOIN deprivation_scores_northernirelandindexmultipledeprivation ni ON ni.soa_id = so.id
+            WHERE so.{actual_geom_col} IS NOT NULL;
+            """
+
+        # --- SQL Statement List ---
+
+        sql_statements = [
+            # 1. CLEANUP
+            "DROP VIEW IF EXISTS public.uk_master_tiles_z0_4 CASCADE;",
+            "DROP VIEW IF EXISTS public.uk_master_tiles_z5_7 CASCADE;",
+            "DROP VIEW IF EXISTS public.uk_master_tiles_z8_10 CASCADE;",
+            "DROP VIEW IF EXISTS public.lsoa_tiles_z0_4 CASCADE;",
+            "DROP VIEW IF EXISTS public.lsoa_tiles_z5_7 CASCADE;",
+            "DROP VIEW IF EXISTS public.lsoa_tiles_z8_10 CASCADE;",
+            "DROP VIEW IF EXISTS public.la_tiles CASCADE;",
+            # 2. SCHEMA: Geometry columns
+            "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z8_10 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_datazone ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_datazone ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_datazone ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            # 3. GEOPROCESSING
+            # England/Wales
+            "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_SimplifyPreserveTopology(geom_3857, 1000) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z5_7 = ST_SimplifyPreserveTopology(geom_3857, 50) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z8_10 = ST_SimplifyPreserveTopology(geom_3857, 2) WHERE geom_3857_simp_z8_10 IS NULL AND geom_3857 IS NOT NULL;",
+            # Scotland & NI Simplification (Crucial for the UK views to work)
+            "UPDATE deprivation_scores_datazone SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_SimplifyPreserveTopology(geom_3857, 1000) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_SimplifyPreserveTopology(geom_3857, 50) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_SimplifyPreserveTopology(geom_3857, 1000) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z5_7 = ST_SimplifyPreserveTopology(geom_3857, 50) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_localauthority SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            # 4. EXECUTE HELPERS: Views
+            # Individual England/Wales views (Expect full column names)
+            get_lsoa_view_sql("lsoa_tiles_z0_4", "geom_3857_simp_z0_4"),
+            get_lsoa_view_sql("lsoa_tiles_z5_7", "geom_3857_simp_z5_7"),
+            get_lsoa_view_sql("lsoa_tiles_z8_10", "geom_3857_simp_z8_10"),
+            # Unified UK Master views (Expect suffixes only, as helper adds 'geom_3857_')
+            get_uk_master_view_sql("uk_master_tiles_z0_4", "simp_z0_4"),
+            get_uk_master_view_sql("uk_master_tiles_z5_7", "simp_z5_7"),
+            get_uk_master_view_sql("uk_master_tiles_z8_10", "3857"),
+            # 5. LOCAL AUTHORITY VIEW
+            """
+            CREATE OR REPLACE VIEW public.la_tiles AS
+            SELECT year, geom_3857 AS geom, local_authority_district_code AS lad_code
+            FROM deprivation_scores_localauthority;
+            """,
+            # 6. PERFORMANCE & PERMISSIONS
+            "CREATE INDEX IF NOT EXISTS idx_lsoa_3857 ON deprivation_scores_lsoa USING GIST (geom_3857);",
+            "CREATE INDEX IF NOT EXISTS idx_datazone_3857 ON deprivation_scores_datazone USING GIST (geom_3857);",
+            "CREATE INDEX IF NOT EXISTS idx_soa_3857 ON deprivation_scores_soa USING GIST (geom_3857);",
+            "GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;",
+            "ANALYZE deprivation_scores_lsoa;",
+            "ANALYZE deprivation_scores_datazone;",
+            "ANALYZE deprivation_scores_soa;",
+        ]
+
+        with connection.cursor() as cursor:
+            for statement in sql_statements:
+                try:
+                    if statement.strip():
+                        cursor.execute(statement)
+                except Exception as e:
+                    self.stderr.write(self.style.ERROR(f"SQL Error: {e}"))
+
+    def _stream_bfc_import(self, dataset, force=False):
+        source = dataset["url"]
+        table_name = dataset["table"]
+        year = dataset["year"]
+        specific_code_col = dataset.get("code_column", "").lower()
+        django_col = dataset.get("django_code_col")
+
+        # 1. Guard
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT COUNT(*) FROM {table_name} WHERE year = %s AND geom IS NOT NULL",
+                [year],
+            )
+            if cursor.fetchone()[0] > 0 and not force:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"  {dataset['name']} ({year}) already spatialized. Skipping."
+                    )
+                )
+                return
+
+        db = settings.DATABASES["default"]
+        engine = create_engine(
+            f"postgresql+psycopg2://{db['USER']}:{db['PASSWORD']}@{db['HOST']}:{db.get('PORT', 5432)}/{db['NAME']}"
+        )
+
+        try:
+            # 2. Load and Dissolve
+            if os.path.exists(source):
+                self.stdout.write(f"  Loading local file: {source}")
+                final_gdf = gpd.read_file(source)
+                final_gdf.columns = [c.lower() for c in final_gdf.columns]
+
+                if specific_code_col in final_gdf.columns and len(final_gdf) > 1000:
+                    self.stdout.write(f"  Dissolving Small Areas into SOAs...")
+                    final_gdf = final_gdf.dissolve(by=specific_code_col).reset_index()
+
+            # 3. Standardize & Reproject
+            for col in ["geometry", "shape", "the_geom", "geom"]:
+                if col in final_gdf.columns:
+                    final_gdf = final_gdf.rename(
+                        columns={col: "geometry"}
+                    ).set_geometry("geometry")
+                    break
+
+            if final_gdf.crs is None or final_gdf.geometry.iloc[0].centroid.x > 1000:
+                final_gdf.set_crs("EPSG:29903", allow_override=True, inplace=True)
+
+            final_gdf = final_gdf.to_crs("EPSG:4326")
+            final_gdf["geometry"] = final_gdf["geometry"].map(
+                lambda g: g if g.geom_type == "MultiPolygon" else MultiPolygon([g])
+            )
+
+            # 4. Merge
+            temp_table = f"temp_shapes_{year}"
+            final_gdf[[specific_code_col, "geometry"]].to_postgis(
+                temp_table, engine, if_exists="replace", index=False
+            )
+
+            with connection.cursor() as cursor:
+                # First, check if the year even exists in the target table
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {table_name} WHERE year = %s", [year]
+                )
+                db_year_count = cursor.fetchone()[0]
+
+                if db_year_count == 0:
+                    self.stderr.write(
+                        self.style.ERROR(
+                            f"  ❌ Data Error: No rows found in {table_name} for year {year}. Check your BFC_DATASETS config."
+                        )
+                    )
+                else:
+                    self.stdout.write(
+                        f"  Merging {temp_table} -> {table_name} for year {year}..."
+                    )
+                    cursor.execute(
+                        f"""
+                        UPDATE {table_name} SET geom = t.geometry
+                        FROM {temp_table} t
+                        WHERE {table_name}.{django_col} = t.{specific_code_col} AND {table_name}.year = %s;
+                    """,
+                        [year],
+                    )
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"  Successfully updated {cursor.rowcount} rows."
+                        )
+                    )
+
+                cursor.execute(f"DROP TABLE IF EXISTS {temp_table};")
+                connection.commit()
+
+        except Exception as e:
+            self.stderr.write(self.style.ERROR(f"  Import failed: {e}"))
+
     def add_arguments(self, parser):
         parser.add_argument("--mode", type=str, help="Mode")
         parser.add_argument(
@@ -93,12 +355,86 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        if options.get("mode") == "add_boundaries":
+        force = options.get("force", False)
+
+        # Define the datasets to be used by the engine
+        BFC_DATASETS = [
+            {
+                "name": "LSOA 2011 BFC",
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Lower_layer_Super_Output_Areas_Dec_2011_Boundaries_Full_Clipped_BFC_EW_V3_2022/FeatureServer/0/query",
+                "table": "deprivation_scores_lsoa",
+                "django_code_col": "lsoa_code",
+                "year": 2011,
+                "code_column": "LSOA11CD",
+            },
+            {
+                "name": "LSOA 2021 BFC",
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LSOA_2021_EW_BFE_V10_RUC/FeatureServer/3/query",
+                "table": "deprivation_scores_lsoa",
+                "django_code_col": "lsoa_code",
+                "year": 2021,
+                "code_column": "LSOA21CD",
+            },
+            {
+                "name": "LAD 2024 BFC",
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_May_2024_Boundaries_UK_BFC/FeatureServer/0/query",
+                "table": "deprivation_scores_localauthority",
+                "django_code_col": "local_authority_district_code",
+                "year": 2024,
+                "code_column": "LAD24CD",
+                "chunk_size": 100,  # Fewer LAs
+            },
+            {
+                "name": "LAD 2019 BFC",
+                # Note the _2022 suffix and the /0/query at the end
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LAD_Dec_2019_Boundaries_UK_BFC_2022/FeatureServer/0/query",
+                "table": "deprivation_scores_localauthority",
+                "django_code_col": "local_authority_district_code",
+                "year": 2019,
+                "code_column": "lad19cd",  # MUST be lowercase for this specific service
+                "chunk_size": 25,  # Very complex polygons; keep chunk size small
+            },
+            {
+                "name": "Scotland DataZones 2011 BFC",
+                "url": "https://maps.gov.scot/server/rest/services/ScotGov/StatisticalUnits/MapServer/2/query",
+                "table": "deprivation_scores_datazone",
+                "django_code_col": "data_zone_code",  # Matched to model
+                "year": 2011,
+                "code_column": "DataZone",
+            },
+            {
+                "name": "Northern Ireland SOA 2011 Local",
+                "url": "deprivation_scores/shape_files/sa2011.json",
+                "table": "deprivation_scores_soa",
+                "django_code_col": "soa_code",
+                "year": 2001,  # Change this from 2011 to 2001
+                "code_column": "soa2011",
+            },
+        ]
+
+        # Update your logic here
+        if options.get("mode") == "import_bfc_boundaries":
             self.stdout.write(
-                "\n" + G + "Importing boundary GeoJSON files..." + W + "\n"
+                "\n"
+                + self.style.SUCCESS(
+                    "Starting high-performance BFC boundary import via ArcGIS API..."
+                )
+                + "\n"
             )
-            boundary_files(self, force=options.get("force"))
+
+            for ds in BFC_DATASETS:
+                # We now pass the entire dictionary 'ds' instead of individual arguments
+                self._stream_bfc_import(
+                    dataset=ds,
+                    force=force,
+                )
+
+            # Run optimizations after all datasets are imported
+            self._run_post_processing_sql()
+            # test that the tables have the correct number of geometries
+            test_geometries()
             return
+
         if options["mode"] == "add_organisational_areas":
             self.stdout.write(B + "Adding organisational areas..." + W)
             add_lsoas_2011_wards_2019_to_LADS_2019()
@@ -394,222 +730,6 @@ def add_lsoas_2021_wards_2024_to_LADS_2024():
                 + "\n"
             )
             pass
-
-
-def boundary_files(command=None, force=False):
-    """Import GeoJSON boundary files into deprivation_scores_lsoa.geom
-
-    This uses raw SQL / PostGIS to add a geometry column if it does not
-    exist, and updates matched records by lsoa_code and year.
-    """
-    # files: (relative path from project root, property name in geojson, year, table, code_field)
-    files = [
-        (
-            "deprivation_scores/geojson/Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5_-7764840717091613250.geojson",
-            "lsoa21cd",
-            2021,
-            "deprivation_scores_lsoa",
-            "lsoa_code",
-        ),
-        (
-            "deprivation_scores/geojson/LSOA_Dec_2011_Boundaries_Generalised_Clipped_BGC_EW_V3_-335161623626682850.geojson",
-            "lsoa11cd",
-            2011,
-            "deprivation_scores_lsoa",
-            "lsoa_code",
-        ),
-        (
-            "deprivation_scores/geojson/Local_Authority_Districts_December_2024_Boundaries_UK_BGC_-8811838383176485936.geojson",
-            "lad24cd",
-            2024,
-            "deprivation_scores_localauthority",
-            "local_authority_district_code",
-        ),
-    ]
-
-    project_root = getattr(settings, "PROJECT_ROOT", None) or os.getcwd()
-
-    # Header (match other functions' pattern)
-    sys.stdout.write("\n" + B + "Adding LSOA boundary geojson..." + W + "\n")
-
-    for relpath, prop_code, year, table_name, code_field in files:
-        path = os.path.join(project_root, relpath)
-        if not os.path.exists(path):
-            msg = f"GeoJSON not found: {path} -- skipping."
-            sys.stdout.write(R + msg + W + "\n")
-            continue
-        # If the expected number of records for this table/year already have geometries, skip
-        expected = None
-        if table_name == "deprivation_scores_lsoa" and year == 2021:
-            expected = 35672
-        elif table_name == "deprivation_scores_lsoa" and year == 2011:
-            expected = 34753
-        elif table_name == "deprivation_scores_localauthority" and year == 2024:
-            expected = 318
-
-        if expected is not None:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    f"SELECT COUNT(*) FROM {table_name} WHERE year = %s AND geom IS NOT NULL",
-                    [year],
-                )
-                existing_geom_count = cursor.fetchone()[0]
-            if existing_geom_count == expected and not force:
-                sys.stdout.write(
-                    B
-                    + f"\n📎 {year} geometries already present for table {table_name} ({existing_geom_count} records). Skipping..."
-                    + W
-                    + "\n"
-                )
-                continue
-            if force and existing_geom_count == expected:
-                sys.stdout.write(
-                    P
-                    + f"\n⚠️ Force flag set — re-importing {year} geometries for table {table_name} (existing {existing_geom_count})."
-                    + W
-                    + "\n"
-                )
-
-        # Per-file start message (match requested pattern)
-        sys.stdout.write(
-            "\n"
-            + B
-            + f"📎 Adding BGC (Boundaries Generalised Clipped) for LSOAs ({year})..."
-            + W
-            + "\n"
-        )
-
-        with open(path, "r", encoding="utf-8") as fh:
-            gj = json.load(fh)
-
-        # ensure geom column exists on the target table
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS geom geometry(MultiPolygon,4326);"
-            )
-
-        updated = 0
-        missing = 0
-        total = 0
-        missing_codes = []
-
-        for feat in gj.get("features", []):
-            total += 1
-            props = feat.get("properties", {}) or {}
-            # Case-insensitive property lookup (GeoJSON may use upper-case keys)
-            code = None
-            for k, v in props.items():
-                if k and k.lower() == prop_code.lower():
-                    code = v
-                    break
-            if not code:
-                missing += 1
-                continue
-            # Normalize code string (strip, uppercase) to match DB values
-            try:
-                code = str(code).strip().upper()
-            except Exception:
-                missing += 1
-                continue
-
-            geom_json = json.dumps(feat.get("geometry"))
-
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    f"UPDATE {table_name} SET geom = ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326) WHERE {code_field} = %s AND year = %s",
-                    [geom_json, code, year],
-                )
-                # rowcount is number of rows updated by this statement
-                if cursor.rowcount and cursor.rowcount > 0:
-                    updated += cursor.rowcount
-                else:
-                    # Try fallback: case-insensitive match using ILIKE
-                    cursor.execute(
-                        f"UPDATE {table_name} SET geom = ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326) WHERE {code_field} ILIKE %s AND year = %s",
-                        [geom_json, code, year],
-                    )
-                    if cursor.rowcount and cursor.rowcount > 0:
-                        updated += cursor.rowcount
-                    else:
-                        # Try numeric-suffix match (match last N digits)
-                        m = re.search(r"(\d+)$", code)
-                        if m:
-                            suffix = m.group(1)
-                            cursor.execute(
-                                f"UPDATE {table_name} SET geom = ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326) WHERE RIGHT({code_field}, %s) = %s AND year = %s",
-                                [geom_json, len(suffix), suffix, year],
-                            )
-                            if cursor.rowcount and cursor.rowcount > 0:
-                                updated += cursor.rowcount
-                            else:
-                                missing += 1
-                                missing_codes.append(code)
-                        else:
-                            missing += 1
-                            missing_codes.append(code)
-
-        msg = f"Processed {total} features: updated {updated}, missing code {missing}."
-        sys.stdout.write(G + msg + W + "\n")
-
-        # After processing, report completion and count DB rows with geom for this year
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT COUNT(*) FROM deprivation_scores_lsoa WHERE year = %s AND geom IS NOT NULL",
-                [year],
-            )
-            lsoa_count = cursor.fetchone()[0]
-
-        final = f"  Added {lsoa_count} LSOAs ({year})."
-        sys.stdout.write(BOLD + "\n🔥 Complete." + END + final + W + "\n")
-
-        # Assert expected totals like other functions
-        expected = None
-        if year == 2021:
-            expected = 35672
-        elif year == 2011:
-            expected = 34753
-
-        if expected is not None and lsoa_count != expected:
-            sys.stdout.write(
-                "\n"
-                + R
-                + f"😬 Expected {expected} lsoa records, but got {lsoa_count}."
-                + W
-                + "\n"
-            )
-
-        # If there are missing codes provide a short diagnostic to help debugging
-        if missing_codes:
-            sample = missing_codes[:10]
-            diag_msg = (
-                f"Sample missing codes (first {len(sample)}): {', '.join(sample)}"
-            )
-            sys.stdout.write(R + diag_msg + W + "\n")
-
-            # Quick DB sanity checks for the year
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    f"SELECT COUNT(*) FROM {table_name} WHERE year = %s",
-                    [year],
-                )
-                year_count = cursor.fetchone()[0]
-                info = f"DB has {year_count} rows in {table_name} for year {year}."
-                sys.stdout.write(B + info + W + "\n")
-
-            # Try to find close matches for the first sample code
-            exemplar = sample[0]
-            like_pattern = f"%{exemplar}%"
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "SELECT lsoa_code FROM deprivation_scores_lsoa WHERE year = %s AND lsoa_code ILIKE %s LIMIT 5",
-                    [year, like_pattern],
-                )
-                matches = [r[0] for r in cursor.fetchall()]
-                if matches:
-                    match_msg = f"Database example matches for '{exemplar}': {', '.join(matches)}"
-                else:
-                    match_msg = f"No example matches found in DB for '{exemplar}' using ILIKE '%{exemplar}%'."
-                sys.stdout.write(B + match_msg + W + "\n")
 
 
 """
@@ -2015,15 +2135,15 @@ def test_table_totals():
     normal_vals = [
         {
             "model": LSOA,
-            "count": LSOA.objects.filter(year=2011, geom__isnull=False).count(),
+            "count": LSOA.objects.filter(year=2011).count(),
             "expected": 34753,
-            "message": "2011 LSOA should have 34753 (32844 in England, 1909 in wales) rows with geometries.",
+            "message": "2011 LSOA should have 34753 (32844 in England, 1909 in wales) rows.",
         },
         {
             "model": LSOA,
-            "count": LSOA.objects.filter(year=2021, geom__isnull=False).count(),
+            "count": LSOA.objects.filter(year=2021).count(),
             "expected": 35672,
-            "message": "2021 LSOA should have 35672 rows with geometries.",
+            "message": "2021 LSOA should have 35672 rows.",
         },
         {
             "model": DataZone,
@@ -2099,6 +2219,43 @@ def test_table_totals():
         sys.stdout.write(
             W + f"✅ {val['model'].__name__} has {val['count']} records." + W + "\n"
         )
+
+
+def test_geometries():
+    sys.stdout.write(
+        "\n" + G + "📎 - Testing geometries across all nations..." + W + "\n"
+    )
+    with connection.cursor() as cursor:
+        # NI Check (Using 2001 as the filter)
+        cursor.execute(
+            "SELECT COUNT(*) FROM deprivation_scores_soa WHERE year = 2001 AND geom IS NOT NULL"
+        )
+        ni_count = cursor.fetchone()[0]
+
+        # Scotland Check
+        cursor.execute(
+            "SELECT COUNT(*) FROM deprivation_scores_datazone WHERE geom IS NOT NULL"
+        )
+        scot_count = cursor.fetchone()[0]
+
+        # England/Wales
+        cursor.execute(
+            "SELECT COUNT(*) FROM lsoa_tiles_z8_10 WHERE imd_decile > 0 AND lsoa_code LIKE 'E%'"
+        )
+        eng_count = cursor.fetchone()[0]
+
+        sys.stdout.write(f"✅ N. Ireland (2001): {ni_count} SOAs spatialized.\n")
+        sys.stdout.write(f"✅ Scotland:         {scot_count} DataZones spatialized.\n")
+        sys.stdout.write(f"✅ England/Wales:    {eng_count} LSOAs mapped.\n")
+
+        # SRID Verification
+        cursor.execute(
+            "SELECT ST_SRID(geom) FROM deprivation_scores_soa WHERE geom IS NOT NULL LIMIT 1"
+        )
+        res = cursor.fetchone()
+        srid = res[0] if res else "None"
+        sys.stdout.write(f"✅ SRID Check: NI Geometries are {srid}.\n")
+    sys.stdout.write(G + "🏁 - Tests complete." + W + "\n")
 
 
 def image():

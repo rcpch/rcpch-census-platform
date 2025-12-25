@@ -47,5 +47,18 @@ services:
     tty: true
     stdin_open: true
 
+  pg_tileserv:
+    image: pramsey/pg_tileserv:latest
+    environment:
+      - DATABASE_URL=postgresql://rcpchCensususer:password@db:5432/rcpchCensusdb
+    ports:
+      - 7800:7800
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+
 volumes:
   datadb_postgis:

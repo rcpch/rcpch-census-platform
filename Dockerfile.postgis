@@ -6,6 +6,7 @@ ENV PYTHONUNBUFFERED 1
 
 # Install system dependencies required for GeoDjango/PostGIS support
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
     build-essential \
     gcc \
     gdal-bin \
@@ -16,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgeos-dev \
     libpq-dev \
     postgresql-client \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Ensure GDAL include paths are available for Python wheels
@@ -29,9 +31,8 @@ COPY requirements/postgis-requirements.txt /app/requirements/postgis-requirement
 
 WORKDIR /app/requirements/
 
-RUN pip install --upgrade pip
-# Install the PostGIS-capable Python deps (requires system GDAL/GEOS/PROJ present)
-RUN pip install -r /app/requirements/postgis-requirements.txt
+RUN pip install --upgrade pip \
+    && pip install -r /app/requirements/postgis-requirements.txt 
 
 WORKDIR /app/
 

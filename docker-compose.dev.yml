@@ -3,8 +3,6 @@
 # migrates the database and seeds the database
 # YOU ONLY NEED TO USE THIS COMPOSE FILE THE FIRST TIME
 
-version: "3.12"
-
 services:
   # web container - runs the django app
   web:

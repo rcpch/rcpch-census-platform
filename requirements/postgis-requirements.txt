@@ -8,6 +8,10 @@ gdal==3.10.3
 pyproj>=3.5,<5
 shapely>=2.0,<3
 fiona>=1.9,<2
+geopandas==1.1.2
+pandas==2.3.3
+SQLAlchemy==2.0.45
+GeoAlchemy2==0.18.1
 
 # Optional: add any other geospatial packages you need (rasterio, geopandas, etc.)
 # rasterio
