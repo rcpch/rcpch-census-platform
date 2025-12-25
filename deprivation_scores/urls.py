@@ -63,7 +63,7 @@ router.register(
 )
 
 router.register(
-    f"uk_population_density",
+    "uk_population_density",
     viewset=PopulationDensityViewSet,
     basename="uk_population_density",
 )

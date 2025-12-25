@@ -408,6 +408,62 @@ class Command(BaseCommand):
             except Exception as e:
                 self.stdout.write(f"    ⚠️ Could not warm zoom {z}: {e}")
 
+    def test_geometries(self):
+        self.stdout.write(
+            self.style.MIGRATE_LABEL("\n🔍 Validating Spatial Data & Views...")
+        )
+
+        with connection.cursor() as cursor:
+            # 1. Check the Master View for all nations
+            cursor.execute(
+                """
+                SELECT nation, COUNT(*) 
+                FROM public.uk_master_tiles_z8_10 
+                GROUP BY nation;
+            """
+            )
+            results = cursor.fetchall()
+            nations_found = {row[0]: row[1] for row in results}
+
+            expected_nations = ["england", "wales", "scotland", "northern_ireland"]
+
+            for nation in expected_nations:
+                count = nations_found.get(nation, 0)
+                if count > 0:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"  ✅ {nation.replace('_', ' ').title()}: {count} polygons in Master View."
+                        )
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"  ❌ {nation.replace('_', ' ').title()}: No data found in Master View!"
+                        )
+                    )
+
+            # 2. Coordinate System Verification
+            # Check if one random point from the Master View is actually in Web Mercator (3857)
+            # 3857 coordinates are usually in the millions (e.g., -600000, 7000000)
+            cursor.execute(
+                "SELECT ST_X(ST_Centroid(geom)) FROM uk_master_tiles_z8_10 LIMIT 1;"
+            )
+            coord_sample = cursor.fetchone()
+            if coord_sample and abs(coord_sample[0]) > 180:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        "  ✅ Coordinate System: Web Mercator (EPSG:3857) confirmed."
+                    )
+                )
+            else:
+                self.stdout.write(
+                    self.style.WARNING(
+                        "  ⚠️ Coordinate System: Might be WGS84. Check ST_Transform logic."
+                    )
+                )
+
+        self.stdout.write(self.style.SUCCESS("✨ Validation Complete.\n"))
+
     def add_arguments(self, parser):
         parser.add_argument("--mode", type=str, help="Mode")
         parser.add_argument(
@@ -501,7 +557,7 @@ class Command(BaseCommand):
                 self.warm_cache()
 
             # test that the tables have the correct number of geometries
-            test_geometries()
+            self.test_geometries()
             return
 
         if options["mode"] == "add_organisational_areas":
@@ -2195,6 +2251,11 @@ def quantile_for_rank(rank: int, quantile: QuantileType) -> int:
         raise ValueError(f"Incorrect rank {rank} passed for {quantile.value}")
 
 
+"""
+Tests
+"""
+
+
 def test_table_totals():
     """
     Test the total number of records in each table
@@ -2288,43 +2349,6 @@ def test_table_totals():
         sys.stdout.write(
             W + f"✅ {val['model'].__name__} has {val['count']} records." + W + "\n"
         )
-
-
-def test_geometries():
-    sys.stdout.write(
-        "\n" + G + "📎 - Testing geometries across all nations..." + W + "\n"
-    )
-    with connection.cursor() as cursor:
-        # NI Check (Using 2001 as the filter)
-        cursor.execute(
-            "SELECT COUNT(*) FROM deprivation_scores_soa WHERE year = 2001 AND geom IS NOT NULL"
-        )
-        ni_count = cursor.fetchone()[0]
-
-        # Scotland Check
-        cursor.execute(
-            "SELECT COUNT(*) FROM deprivation_scores_datazone WHERE geom IS NOT NULL"
-        )
-        scot_count = cursor.fetchone()[0]
-
-        # England/Wales
-        cursor.execute(
-            "SELECT COUNT(*) FROM lsoa_tiles_z8_10 WHERE imd_decile > 0 AND lsoa_code LIKE 'E%'"
-        )
-        eng_count = cursor.fetchone()[0]
-
-        sys.stdout.write(f"✅ N. Ireland (2001): {ni_count} SOAs spatialized.\n")
-        sys.stdout.write(f"✅ Scotland:         {scot_count} DataZones spatialized.\n")
-        sys.stdout.write(f"✅ England/Wales:    {eng_count} LSOAs mapped.\n")
-
-        # SRID Verification
-        cursor.execute(
-            "SELECT ST_SRID(geom) FROM deprivation_scores_soa WHERE geom IS NOT NULL LIMIT 1"
-        )
-        res = cursor.fetchone()
-        srid = res[0] if res else "None"
-        sys.stdout.write(f"✅ SRID Check: NI Geometries are {srid}.\n")
-    sys.stdout.write(G + "🏁 - Tests complete." + W + "\n")
 
 
 def image():
