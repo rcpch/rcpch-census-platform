@@ -125,3 +125,6 @@ staticfiles/
 .data
 
 build_info.json
+# Ignore large generated/staging geojson and shapefiles
+deprivation_scores/geojson/
+deprivation_scores/shape_files/

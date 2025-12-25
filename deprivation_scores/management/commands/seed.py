@@ -251,100 +251,144 @@ class Command(BaseCommand):
                     self.stderr.write(self.style.ERROR(f"SQL Error: {e}"))
 
     def _stream_bfc_import(self, dataset, force=False):
+        """
+        Imports Boundary Fine Clipped (BFC) geometries.
+        Handles local optimized GeoJSONs, raw NI Small Area files, and ArcGIS APIs.
+        """
         source = dataset["url"]
         table_name = dataset["table"]
         year = dataset["year"]
+        chunk_size = dataset.get("chunk_size", 1000)
         specific_code_col = dataset.get("code_column", "").lower()
         django_col = dataset.get("django_code_col")
 
-        # 1. Guard
+        # --- 1. THE GUARD: Skip if database already has geometries for this year ---
         with connection.cursor() as cursor:
-            cursor.execute(
-                f"SELECT COUNT(*) FROM {table_name} WHERE year = %s AND geom IS NOT NULL",
-                [year],
-            )
-            if cursor.fetchone()[0] > 0 and not force:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"  {dataset['name']} ({year}) already spatialized. Skipping."
-                    )
+            try:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {table_name} WHERE year = %s AND geom IS NOT NULL",
+                    [year],
                 )
-                return
+                count = cursor.fetchone()[0]
+                if count > 0 and not force:
+                    self.stdout.write(self.style.SUCCESS(f"  {dataset['name']} ({year}) already spatialized. Skipping."))
+                    return
+            except Exception as e:
+                self.stdout.write(f"  Initial check: Table/column not ready, proceeding... ({e})")
 
         db = settings.DATABASES["default"]
         engine = create_engine(
             f"postgresql+psycopg2://{db['USER']}:{db['PASSWORD']}@{db['HOST']}:{db.get('PORT', 5432)}/{db['NAME']}"
         )
 
+        final_gdf = None
+
         try:
-            # 2. Load and Dissolve
+            # --- 2. DATA LOADING & SMART DISSOLVE ---
             if os.path.exists(source):
                 self.stdout.write(f"  Loading local file: {source}")
                 final_gdf = gpd.read_file(source)
                 final_gdf.columns = [c.lower() for c in final_gdf.columns]
 
-                if specific_code_col in final_gdf.columns and len(final_gdf) > 1000:
-                    self.stdout.write(f"  Dissolving Small Areas into SOAs...")
+                # Logic: If row count > 1000, it's a raw Small Area file that needs dissolving.
+                # If row count is ~890, it's our new optimized file; skip dissolve.
+                if len(final_gdf) > 1000 and specific_code_col in final_gdf.columns:
+                    self.stdout.write(f"  Raw data detected ({len(final_gdf)} rows). Dissolving Small Areas into SOAs...")
                     final_gdf = final_gdf.dissolve(by=specific_code_col).reset_index()
+                    self.stdout.write(f"  Dissolve complete. New row count: {len(final_gdf)}")
+                else:
+                    self.stdout.write(f"  Optimized data detected ({len(final_gdf)} rows). Skipping dissolve step.")
+            else:
+                # --- API Download Logic ---
+                all_chunks = []
+                offset = 0
+                more_pages = True
+                while more_pages:
+                    if "2001" in dataset["name"] or "Northern Ireland" in dataset["name"]:
+                        params = {"where": "1=1", "outFields": "*", "returnGeometry": "true", "f": "json"}
+                        more_pages = False
+                    else:
+                        params = {
+                            "where": "1=1", "outSR": 4326, "f": "json",
+                            "outFields": dataset["code_column"],
+                            "resultOffset": offset, "resultRecordCount": chunk_size,
+                            "geometryPrecision": 6,
+                        }
 
-            # 3. Standardize & Reproject
+                    response = requests.get(source, params=params, timeout=180)
+                    if response.status_code != 200 or '"error"' in response.text:
+                        self.stderr.write(f"  ArcGIS Error: {response.text}")
+                        break
+
+                    chunk_gdf = gpd.read_file(io.StringIO(response.text), driver="ESRIJSON")
+                    if not chunk_gdf.empty:
+                        chunk_gdf.columns = [c.lower() for c in chunk_gdf.columns]
+                        all_chunks.append(chunk_gdf)
+                        features_in_chunk = len(chunk_gdf)
+                        offset += features_in_chunk
+                        
+                        if "2001" in dataset["name"]:
+                            more_pages = False
+                        else:
+                            data = response.json()
+                            more_pages = data.get("exceededTransferLimit", False) or features_in_chunk >= chunk_size
+                    else:
+                        more_pages = False
+
+                if not all_chunks:
+                    raise Exception("No data retrieved from API")
+                final_gdf = gpd.GeoDataFrame(pd.concat(all_chunks, ignore_index=True))
+
+            # --- 3. STANDARDIZE GEOMETRY & CRS ---
             for col in ["geometry", "shape", "the_geom", "geom"]:
                 if col in final_gdf.columns:
-                    final_gdf = final_gdf.rename(
-                        columns={col: "geometry"}
-                    ).set_geometry("geometry")
+                    if col != "geometry":
+                        final_gdf = final_gdf.rename(columns={col: "geometry"})
+                    final_gdf = final_gdf.set_geometry("geometry")
                     break
 
+            # Coordinate System Handling (Irish Grid Detect)
             if final_gdf.crs is None or final_gdf.geometry.iloc[0].centroid.x > 1000:
+                self.stdout.write("  Applying Irish Grid (EPSG:29903) and reprojecting to WGS84...")
                 final_gdf.set_crs("EPSG:29903", allow_override=True, inplace=True)
+            
+            if final_gdf.crs != "EPSG:4326":
+                final_gdf = final_gdf.to_crs("EPSG:4326")
 
-            final_gdf = final_gdf.to_crs("EPSG:4326")
+            # Force MultiPolygon for PostGIS compatibility
+            final_gdf = final_gdf[final_gdf.geometry.notnull()]
             final_gdf["geometry"] = final_gdf["geometry"].map(
                 lambda g: g if g.geom_type == "MultiPolygon" else MultiPolygon([g])
             )
 
-            # 4. Merge
+            # --- 4. DATABASE MERGE ---
             temp_table = f"temp_shapes_{year}"
+            self.stdout.write(f"  Uploading shapes to {temp_table}...")
             final_gdf[[specific_code_col, "geometry"]].to_postgis(
                 temp_table, engine, if_exists="replace", index=False
             )
 
             with connection.cursor() as cursor:
-                # First, check if the year even exists in the target table
-                cursor.execute(
-                    f"SELECT COUNT(*) FROM {table_name} WHERE year = %s", [year]
-                )
-                db_year_count = cursor.fetchone()[0]
-
-                if db_year_count == 0:
-                    self.stderr.write(
-                        self.style.ERROR(
-                            f"  ❌ Data Error: No rows found in {table_name} for year {year}. Check your BFC_DATASETS config."
-                        )
-                    )
-                else:
-                    self.stdout.write(
-                        f"  Merging {temp_table} -> {table_name} for year {year}..."
-                    )
-                    cursor.execute(
-                        f"""
-                        UPDATE {table_name} SET geom = t.geometry
-                        FROM {temp_table} t
-                        WHERE {table_name}.{django_col} = t.{specific_code_col} AND {table_name}.year = %s;
-                    """,
-                        [year],
-                    )
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"  Successfully updated {cursor.rowcount} rows."
-                        )
-                    )
-
+                self.stdout.write(f"  Merging {temp_table} -> {table_name} for year {year}...")
+                cursor.execute(f"""
+                    UPDATE {table_name} 
+                    SET geom = t.geometry
+                    FROM {temp_table} t
+                    WHERE {table_name}.{django_col} = t.{specific_code_col}
+                    AND {table_name}.year = %s;
+                """, [year])
+                
+                rows_updated = cursor.rowcount
                 cursor.execute(f"DROP TABLE IF EXISTS {temp_table};")
-                connection.commit()
+                
+            # Commit the transaction so progress is saved even if tests crash
+            connection.commit()
+            self.stdout.write(self.style.SUCCESS(f"  Successfully updated {rows_updated} rows in {table_name}."))
 
         except Exception as e:
-            self.stderr.write(self.style.ERROR(f"  Import failed: {e}"))
+            self.stderr.write(self.style.ERROR(f"  Import failed for {dataset['name']}: {e}"))
+            with connection.cursor() as cursor:
+                cursor.execute(f"DROP TABLE IF EXISTS temp_shapes_{year};")
 
     def add_arguments(self, parser):
         parser.add_argument("--mode", type=str, help="Mode")
@@ -403,11 +447,11 @@ class Command(BaseCommand):
                 "code_column": "DataZone",
             },
             {
-                "name": "Northern Ireland SOA 2011 Local",
-                "url": "deprivation_scores/shape_files/sa2011.json",
+                "name": "Northern Ireland SOA 2011",
+                "url": "deprivation_scores/shape_files/soa2011_dissolved.json",
                 "table": "deprivation_scores_soa",
                 "django_code_col": "soa_code",
-                "year": 2001,  # Change this from 2011 to 2001
+                "year": 2001,
                 "code_column": "soa2011",
             },
         ]
