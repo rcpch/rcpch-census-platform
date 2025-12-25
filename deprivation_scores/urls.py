@@ -62,6 +62,26 @@ router.register(
     viewset=NorthernIrelandMultipleDeprivationViewSet,
 )
 
+router.register(r"england_wales_lower_layer_super_output_areas", viewset=LSOAViewSet)
+router.register(r"northern_ireland_small_output_areas", viewset=SOAViewSet)
+router.register(r"scotland_data_zones", viewset=DataZoneViewSet)
+router.register(r"green_space", viewset=GreenSpaceViewSet)
+router.register(
+    r"english_indices_of_multiple_deprivation",
+    viewset=EnglishIndexMultipleDeprivationViewSet,
+)
+router.register(
+    r"welsh_indices_of_multiple_deprivation", viewset=WelshMultipleDeprivationViewSet
+)
+router.register(
+    r"scottish_indices_of_multiple_deprivation",
+    viewset=ScottishMultipleDeprivationViewSet,
+)
+router.register(
+    r"northern_ireland_indices_of_multiple_deprivation",
+    viewset=NorthernIrelandMultipleDeprivationViewSet,
+)
+
 router.register(
     "uk_population_density",
     viewset=PopulationDensityViewSet,

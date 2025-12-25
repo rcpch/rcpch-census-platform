@@ -123,6 +123,9 @@ staticfiles/
 # Docker and docker compose
 .pip_cache
 .data
+# Docker and docker compose
+.pip_cache
+.data
 
 build_info.json
 # Ignore large generated/staging geojson and shapefiles
