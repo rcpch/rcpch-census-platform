@@ -94,7 +94,7 @@ class Command(BaseCommand):
     def _run_post_processing_sql(self):
         self.stdout.write(
             self.style.WARNING(
-                "Running PostGIS spatial optimizations and building views..."
+                "\n🚀 Running high-performance PostGIS optimizations and building UK-wide views..."
             )
         )
 
@@ -119,16 +119,8 @@ class Command(BaseCommand):
             """
 
         def get_uk_master_view_sql(view_name, geom_suffix):
-            """
-            Creates the Unified UK View.
-            geom_suffix should be 'simp_z0_4', 'simp_z5_7', or '3857' (for full detail).
-            """
-            # If we want the base geom_3857, we pass '3857'.
-            # If we want simplified, we pass 'simp_z0_4'
-            if geom_suffix == "3857":
-                actual_geom_col = "geom_3857"
-            else:
-                actual_geom_col = f"geom_3857_{geom_suffix}"
+            """Creates Unified UK View (E, W, S, NI)"""
+            actual_geom_col = "geom_3857" if geom_suffix == "3857" else f"geom_3857_{geom_suffix}"
 
             return f"""
             CREATE OR REPLACE VIEW public.{view_name} AS
@@ -156,10 +148,9 @@ class Command(BaseCommand):
             
             UNION ALL
             
-            -- SCOTLAND (6,976 Data Zones)
+            -- SCOTLAND
             SELECT 
                 d.year, d.data_zone_code AS code, d.{actual_geom_col} AS geom, 
-                -- Width bucket creates 10 equal groups from rank 1 to 6976
                 COALESCE(WIDTH_BUCKET(s.imd_rank, 1, 6977, 10), 0) as imd_decile, 
                 COALESCE(s.imd_rank, 0) as imd_rank,
                 'scotland' as nation
@@ -169,7 +160,7 @@ class Command(BaseCommand):
             
             UNION ALL
             
-            -- NORTHERN IRELAND (890 SOAs)
+            -- NORTHERN IRELAND
             SELECT 
                 so.year, so.soa_code AS code, so.{actual_geom_col} AS geom, 
                 COALESCE(WIDTH_BUCKET(ni.imd_rank, 1, 891, 10), 0) as imd_decile, 
@@ -187,11 +178,8 @@ class Command(BaseCommand):
             "DROP VIEW IF EXISTS public.uk_master_tiles_z0_4 CASCADE;",
             "DROP VIEW IF EXISTS public.uk_master_tiles_z5_7 CASCADE;",
             "DROP VIEW IF EXISTS public.uk_master_tiles_z8_10 CASCADE;",
-            "DROP VIEW IF EXISTS public.lsoa_tiles_z0_4 CASCADE;",
-            "DROP VIEW IF EXISTS public.lsoa_tiles_z5_7 CASCADE;",
-            "DROP VIEW IF EXISTS public.lsoa_tiles_z8_10 CASCADE;",
-            "DROP VIEW IF EXISTS public.la_tiles CASCADE;",
-            # 2. SCHEMA: Geometry columns
+
+            # 2. SCHEMA: Ensure columns exist
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
@@ -203,39 +191,45 @@ class Command(BaseCommand):
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
-            # 3. GEOPROCESSING
-            # England/Wales
+
+            # 3. GEOPROCESSING (WGS84 -> Web Mercator 3857)
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            "UPDATE deprivation_scores_localauthority SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+
+            # 4. SIMPLIFICATION (Level of Detail)
+            # NI & Scotland Simplification
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_SimplifyPreserveTopology(geom_3857, 1000) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z5_7 = ST_SimplifyPreserveTopology(geom_3857, 50) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_SimplifyPreserveTopology(geom_3857, 1000) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_SimplifyPreserveTopology(geom_3857, 50) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            # England/Wales Simplification
             "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_SimplifyPreserveTopology(geom_3857, 1000) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
             "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z5_7 = ST_SimplifyPreserveTopology(geom_3857, 50) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
             "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z8_10 = ST_SimplifyPreserveTopology(geom_3857, 2) WHERE geom_3857_simp_z8_10 IS NULL AND geom_3857 IS NOT NULL;",
-            # Scotland & NI Simplification (Crucial for the UK views to work)
-            "UPDATE deprivation_scores_datazone SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_SimplifyPreserveTopology(geom_3857, 1000) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_SimplifyPreserveTopology(geom_3857, 50) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_soa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_SimplifyPreserveTopology(geom_3857, 1000) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_soa SET geom_3857_simp_z5_7 = ST_SimplifyPreserveTopology(geom_3857, 50) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_localauthority SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            # 4. EXECUTE HELPERS: Views
-            # Individual England/Wales views (Expect full column names)
-            get_lsoa_view_sql("lsoa_tiles_z0_4", "geom_3857_simp_z0_4"),
-            get_lsoa_view_sql("lsoa_tiles_z5_7", "geom_3857_simp_z5_7"),
-            get_lsoa_view_sql("lsoa_tiles_z8_10", "geom_3857_simp_z8_10"),
-            # Unified UK Master views (Expect suffixes only, as helper adds 'geom_3857_')
-            get_uk_master_view_sql("uk_master_tiles_z0_4", "simp_z0_4"),
-            get_uk_master_view_sql("uk_master_tiles_z5_7", "simp_z5_7"),
-            get_uk_master_view_sql("uk_master_tiles_z8_10", "3857"),
-            # 5. LOCAL AUTHORITY VIEW
-            """
-            CREATE OR REPLACE VIEW public.la_tiles AS
-            SELECT year, geom_3857 AS geom, local_authority_district_code AS lad_code
-            FROM deprivation_scores_localauthority;
-            """,
-            # 6. PERFORMANCE & PERMISSIONS
+
+            # 5. SPATIAL INDEXING & CLUSTERING (The Core Optimizations)
+            # Create GIST indexes for the primary geometry
             "CREATE INDEX IF NOT EXISTS idx_lsoa_3857 ON deprivation_scores_lsoa USING GIST (geom_3857);",
             "CREATE INDEX IF NOT EXISTS idx_datazone_3857 ON deprivation_scores_datazone USING GIST (geom_3857);",
             "CREATE INDEX IF NOT EXISTS idx_soa_3857 ON deprivation_scores_soa USING GIST (geom_3857);",
+            # Cluster tables (Physically re-order rows by geography)
+            "CLUSTER deprivation_scores_lsoa USING idx_lsoa_3857;",
+            "CLUSTER deprivation_scores_datazone USING idx_datazone_3857;",
+            "CLUSTER deprivation_scores_soa USING idx_soa_3857;",
+
+            # 6. VIEWS
+            get_lsoa_view_sql("lsoa_tiles_z0_4", "geom_3857_simp_z0_4"),
+            get_lsoa_view_sql("lsoa_tiles_z5_7", "geom_3857_simp_z5_7"),
+            get_lsoa_view_sql("lsoa_tiles_z8_10", "geom_3857_simp_z8_10"),
+            get_uk_master_view_sql("uk_master_tiles_z0_4", "simp_z0_4"),
+            get_uk_master_view_sql("uk_master_tiles_z5_7", "simp_z5_7"),
+            get_uk_master_view_sql("uk_master_tiles_z8_10", "3857"),
+            
+            "CREATE OR REPLACE VIEW public.la_tiles AS SELECT year, geom_3857 AS geom, local_authority_district_code AS lad_code FROM deprivation_scores_localauthority;",
+
+            # 7. FINAL HOUSEKEEPING
             "GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;",
             "ANALYZE deprivation_scores_lsoa;",
             "ANALYZE deprivation_scores_datazone;",
@@ -250,6 +244,8 @@ class Command(BaseCommand):
                 except Exception as e:
                     self.stderr.write(self.style.ERROR(f"SQL Error: {e}"))
 
+        self.stdout.write(self.style.SUCCESS("✅ Post-processing and spatial optimizations complete."))
+        
     def _stream_bfc_import(self, dataset, force=False):
         source = dataset["url"]
         table_name = dataset["table"]
@@ -453,6 +449,7 @@ class Command(BaseCommand):
 
             # Run optimizations after all datasets are imported
             self._run_post_processing_sql()
+            
             # test that the tables have the correct number of geometries
             test_geometries()
             return
