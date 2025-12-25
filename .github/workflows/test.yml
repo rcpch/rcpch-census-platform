@@ -1,22 +1,20 @@
-# Runs tests on Pull Requests
-# Requires seeding the database with IMD data before running tests
-
 name: Run Tests
 
 on:
     pull_request:
-        branches:
-            - live
-            - development
+        branches: [live, development]
     workflow_dispatch:
 
 jobs:
     test:
         runs-on: ubuntu-latest
 
+        container:
+            image: python:3.12-bookworm
+
         services:
-            postgres:
-                image: postgis/postgis:15-3.3
+            postgis:
+                image: postgis/postgis:15-3.4
                 env:
                     POSTGRES_USER: rcpchCensususer
                     POSTGRES_PASSWORD: password
@@ -29,34 +27,28 @@ jobs:
                     --health-timeout 5s
                     --health-retries 5
 
+        env:
+            RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER: rcpchCensususer
+            RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD: password
+            RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME: rcpchCensusdb
+            # Use 'postgis' instead of 'localhost' because inside a container job,
+            # services are accessed via their service name
+            RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST: postgis
+            RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT: 5432
+            RCPCH_CENSUS_ENGINE_SECRET_KEY: test-secret-key
+            DEBUG: "True"
+            DJANGO_ALLOWED_HOSTS: localhost
+            POSTCODES_IO_API_URL: https://api.postcodes.io
+
         steps:
             - uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.12"
-                  cache: "pip"
-            - name: Install system packages for PostGIS/GDAL
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y --no-install-recommends \
-                      ca-certificates \
-                      build-essential \
-                      gcc \
-                      gdal-bin \
-                      libgdal-dev \
-                      binutils \
-                      proj-bin \
-                      libproj-dev \
-                      libgeos-dev \
-                      libpq-dev \
-                      postgresql-client
+            # NOTE: setup-python is NOT needed when running inside a python container
 
-            - name: Set GDAL include env
+            - name: Install system packages
               run: |
-                  echo "CPLUS_INCLUDE_PATH=/usr/include/gdal" >> $GITHUB_ENV
-                  echo "C_INCLUDE_PATH=/usr/include/gdal" >> $GITHUB_ENV
+                  apt-get update && apt-get install -y \
+                    gdal-bin libgdal-dev libgeos-dev binutils libproj-dev postgresql-client
 
             - name: Install dependencies
               run: |
@@ -67,45 +59,15 @@ jobs:
             - name: Enable PostGIS extension
               run: |
                   export PGPASSWORD=password
-                  for i in {1..30}; do
-                          psql -h localhost -U rcpchCensususer -d rcpchCensusdb -c "CREATE EXTENSION IF NOT EXISTS postgis;" && break || sleep 2
+                  for i in {1..15}; do
+                    psql -h postgis -U rcpchCensususer -d rcpchCensusdb -c "CREATE EXTENSION IF NOT EXISTS postgis;" && break || sleep 2
                   done
 
             - name: Run migrations
-              env:
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER: rcpchCensususer
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD: password
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME: rcpchCensusdb
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST: localhost
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT: 5432
-                  RCPCH_CENSUS_ENGINE_SECRET_KEY: test-secret-key
-                  DEBUG: "True"
-                  DJANGO_ALLOWED_HOSTS: localhost
-                  POSTCODES_IO_API_URL: https://api.postcodes.io
               run: python manage.py migrate
 
             - name: Seed database
-              env:
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER: rcpchCensususer
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD: password
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME: rcpchCensusdb
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST: localhost
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT: 5432
-                  RCPCH_CENSUS_ENGINE_SECRET_KEY: test-secret-key
-                  DEBUG: "True"
-                  DJANGO_ALLOWED_HOSTS: localhost
-                  POSTCODES_IO_API_URL: https://api.postcodes.io
               run: python manage.py seed --mode='ci_test'
 
             - name: Run tests
-              env:
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER: rcpchCensususer
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD: password
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME: rcpchCensusdb
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST: localhost
-                  RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT: 5432
-                  RCPCH_CENSUS_ENGINE_SECRET_KEY: test-secret-key
-                  DEBUG: "True"
-                  DJANGO_ALLOWED_HOSTS: localhost
-                  POSTCODES_IO_API_URL: https://api.postcodes.io
               run: python -m pytest tests/ -v --tb=short
