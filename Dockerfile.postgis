@@ -1,42 +1,36 @@
-FROM python:3.12
+FROM python:3.12-bookworm
 
-# Prevent Python from writing .pyc files and buffer stdout/stderr
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# Install system dependencies required for GeoDjango/PostGIS support
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     build-essential \
-    gcc \
     gdal-bin \
     libgdal-dev \
-    binutils \
-    proj-bin \
-    libproj-dev \
     libgeos-dev \
+    libproj-dev \
     libpq-dev \
     postgresql-client \
-    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Ensure GDAL include paths are available for Python wheels
+# Ensure headers are found for C extensions
 ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
 ENV C_INCLUDE_PATH=/usr/include/gdal
 
-# Copy requirements (same layout as the main Dockerfile)
-COPY requirements/development-requirements.txt /app/requirements/development-requirements.txt
-COPY requirements/common-requirements.txt /app/requirements/common-requirements.txt
-COPY requirements/postgis-requirements.txt /app/requirements/postgis-requirements.txt
+WORKDIR /app
 
-WORKDIR /app/requirements/
+# Copy requirements first for better layer caching
+COPY requirements/ /app/requirements/
 
-RUN pip install --upgrade pip \
-    && pip install -r /app/requirements/postgis-requirements.txt 
+RUN pip install --no-cache-dir --upgrade pip && \
+    export GDAL_VERSION=$(gdal-config --version) && \
+    pip install --no-cache-dir "GDAL==$GDAL_VERSION.*" && \
+    pip install --no-cache-dir -r requirements/common-requirements.txt && \
+    pip install --no-cache-dir -r requirements/development-requirements.txt
 
-WORKDIR /app/
-
-# Copy project files
+# Copy the rest of the project
 COPY . /app/
 
 EXPOSE 8001

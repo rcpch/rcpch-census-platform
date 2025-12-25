@@ -15,7 +15,6 @@ whitenoise
 # Geo/PostGIS-related Python packages (install after system GDAL/GEOS/PROJ libs)
 # Pin broad compatible versions to reduce binary build issues — adjust if you
 # know the exact system GDAL/GEOS/PROJ versions you will have in the image.
-gdal==3.10.3
 pyproj>=3.5,<5
 shapely>=2.0,<3
 fiona>=1.9,<2
