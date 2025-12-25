@@ -7,6 +7,7 @@ from .views import (
     DataZoneViewSet,
     GreenSpaceViewSet,
     EnglishIndexMultipleDeprivationViewSet,
+    MapDataView,
     WelshMultipleDeprivationViewSet,
     ScottishMultipleDeprivationViewSet,
     NorthernIrelandMultipleDeprivationViewSet,
@@ -27,9 +28,11 @@ class RouterWithBuildInfo(routers.DefaultRouter):
 
         def view_with_build_info(request, *args, **kwargs):
             response = view(request, *args, **kwargs)
-            
+
             build_info = get_build_info()
-            response.headers["X-Git-Revision"] = build_info.get("latest_git_commit", "[latest commit hash not found]")
+            response.headers["X-Git-Revision"] = build_info.get(
+                "latest_git_commit", "[latest commit hash not found]"
+            )
 
             return response
 
@@ -73,15 +76,16 @@ drf_routes = [
         "indices_of_multiple_deprivation",
         view=UKIndexMultipleDeprivationView.as_view(),
     ),
-    path("index_of_multiple_deprivation_quantile",
+    path(
+        "index_of_multiple_deprivation_quantile",
         view=UKIndexMultipleDeprivationQuantileView.as_view(),
     ),
-
+    path("map-data/", MapDataView.as_view(), name="map-data-optimized"),
     # JSON Schema
     path("schema/", SpectacularJSONAPIView.as_view(), name="schema"),
-
     # Swagger UI
-    path("swagger-ui/",
+    path(
+        "swagger-ui/",
         SpectacularSwaggerView.as_view(),
         name="swagger-ui",
     ),

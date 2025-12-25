@@ -120,7 +120,9 @@ class Command(BaseCommand):
 
         def get_uk_master_view_sql(view_name, geom_suffix):
             """Creates Unified UK View (E, W, S, NI)"""
-            actual_geom_col = "geom_3857" if geom_suffix == "3857" else f"geom_3857_{geom_suffix}"
+            actual_geom_col = (
+                "geom_3857" if geom_suffix == "3857" else f"geom_3857_{geom_suffix}"
+            )
 
             return f"""
             CREATE OR REPLACE VIEW public.{view_name} AS
@@ -178,7 +180,6 @@ class Command(BaseCommand):
             "DROP VIEW IF EXISTS public.uk_master_tiles_z0_4 CASCADE;",
             "DROP VIEW IF EXISTS public.uk_master_tiles_z5_7 CASCADE;",
             "DROP VIEW IF EXISTS public.uk_master_tiles_z8_10 CASCADE;",
-
             # 2. SCHEMA: Ensure columns exist
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
@@ -191,13 +192,11 @@ class Command(BaseCommand):
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
-
             # 3. GEOPROCESSING (WGS84 -> Web Mercator 3857)
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_datazone SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_soa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_localauthority SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-
             # 4. SIMPLIFICATION (Level of Detail)
             # NI & Scotland Simplification
             "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_SimplifyPreserveTopology(geom_3857, 1000) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
@@ -208,7 +207,6 @@ class Command(BaseCommand):
             "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_SimplifyPreserveTopology(geom_3857, 1000) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
             "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z5_7 = ST_SimplifyPreserveTopology(geom_3857, 50) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
             "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z8_10 = ST_SimplifyPreserveTopology(geom_3857, 2) WHERE geom_3857_simp_z8_10 IS NULL AND geom_3857 IS NOT NULL;",
-
             # 5. SPATIAL INDEXING & CLUSTERING (The Core Optimizations)
             # Create GIST indexes for the primary geometry
             "CREATE INDEX IF NOT EXISTS idx_lsoa_3857 ON deprivation_scores_lsoa USING GIST (geom_3857);",
@@ -218,7 +216,6 @@ class Command(BaseCommand):
             "CLUSTER deprivation_scores_lsoa USING idx_lsoa_3857;",
             "CLUSTER deprivation_scores_datazone USING idx_datazone_3857;",
             "CLUSTER deprivation_scores_soa USING idx_soa_3857;",
-
             # 6. VIEWS
             get_lsoa_view_sql("lsoa_tiles_z0_4", "geom_3857_simp_z0_4"),
             get_lsoa_view_sql("lsoa_tiles_z5_7", "geom_3857_simp_z5_7"),
@@ -226,9 +223,7 @@ class Command(BaseCommand):
             get_uk_master_view_sql("uk_master_tiles_z0_4", "simp_z0_4"),
             get_uk_master_view_sql("uk_master_tiles_z5_7", "simp_z5_7"),
             get_uk_master_view_sql("uk_master_tiles_z8_10", "3857"),
-            
             "CREATE OR REPLACE VIEW public.la_tiles AS SELECT year, geom_3857 AS geom, local_authority_district_code AS lad_code FROM deprivation_scores_localauthority;",
-
             # 7. FINAL HOUSEKEEPING
             "GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;",
             "ANALYZE deprivation_scores_lsoa;",
@@ -244,8 +239,10 @@ class Command(BaseCommand):
                 except Exception as e:
                     self.stderr.write(self.style.ERROR(f"SQL Error: {e}"))
 
-        self.stdout.write(self.style.SUCCESS("✅ Post-processing and spatial optimizations complete."))
-        
+        self.stdout.write(
+            self.style.SUCCESS("✅ Post-processing and spatial optimizations complete.")
+        )
+
     def _stream_bfc_import(self, dataset, force=False):
         source = dataset["url"]
         table_name = dataset["table"]
@@ -364,6 +361,38 @@ class Command(BaseCommand):
             with connection.cursor() as cursor:
                 cursor.execute(f"DROP TABLE IF EXISTS temp_shapes_{year};")
 
+    def purge_cdn_cache(self):
+        """
+        Tells the CDN to clear the cached map data.
+        """
+        self.stdout.write(self.style.MIGRATE_LABEL("  Requesting CDN Cache Purge..."))
+
+        # Example for Cloudflare
+        zone_id = settings.CLOUDFLARE_ZONE_ID
+        api_token = settings.CLOUDFLARE_API_TOKEN
+
+        url = f"https://api.cloudflare.com/client/v4/zones/{zone_id}/purge_cache"
+        headers = {
+            "Authorization": f"Bearer {api_token}",
+            "Content-Type": "application/json",
+        }
+
+        # We target only the map-data URLs to avoid clearing the whole site
+        data = {"prefixes": [f"{settings.SITE_URL}/api/map-data/"]}
+
+        try:
+            response = requests.post(url, headers=headers, json=data, timeout=10)
+            if response.status_code == 200:
+                self.stdout.write(
+                    self.style.SUCCESS("  ✅ CDN Cache Purged successfully.")
+                )
+            else:
+                self.stdout.write(
+                    self.style.ERROR(f"  ❌ CDN Purge failed: {response.text}")
+                )
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"  ❌ CDN Purge error: {e}"))
+
     def add_arguments(self, parser):
         parser.add_argument("--mode", type=str, help="Mode")
         parser.add_argument(
@@ -449,7 +478,10 @@ class Command(BaseCommand):
 
             # Run optimizations after all datasets are imported
             self._run_post_processing_sql()
-            
+
+            # Warm the local cache and then purge the remote CDN
+            if not settings.DEBUG:  # Only purge in production
+                self.purge_cdn_cache()
             # test that the tables have the correct number of geometries
             test_geometries()
             return
