@@ -37,22 +37,21 @@ jobs:
               with:
                   python-version: "3.12"
                   cache: "pip"
-            - name: Install system packages for PostGIS/GDAL
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y --no-install-recommends \
-                      ca-certificates \
-                      build-essential \
-                      gcc \
-                      gdal-bin \
-                      libgdal-dev \
-                      binutils \
-                      proj-bin \
-                      libproj-dev \
-                      libgeos-dev \
-                      libpq-dev \
-                      postgresql-client
-                  rm -rf /var/lib/apt/lists/*
+                        - name: Install system packages for PostGIS/GDAL
+                            run: |
+                                    sudo apt-get update
+                                    sudo apt-get install -y --no-install-recommends \
+                                        ca-certificates \
+                                        build-essential \
+                                        gcc \
+                                        gdal-bin \
+                                        libgdal-dev \
+                                        binutils \
+                                        proj-bin \
+                                        libproj-dev \
+                                        libgeos-dev \
+                                        libpq-dev \
+                                        postgresql-client
 
             - name: Set GDAL include env
               run: |
