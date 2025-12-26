@@ -50,6 +50,9 @@ services:
   pg_tileserv:
     image: pramsey/pg_tileserv:latest
     environment:
+      # Add these environment variables to pg_tileserv
+      - TS_TILE_EXTENT=8192 # Doubles the resolution within the tile
+      - TS_TILE_BUFFER=256 # Captures features that sit right on the edge of a tile
       - HTTP_CORS_ORIGIN=*
       - DATABASE_URL=postgresql://rcpchCensususer:password@db:5432/rcpchCensusdb
     ports:

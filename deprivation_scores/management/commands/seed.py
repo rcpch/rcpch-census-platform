@@ -100,86 +100,124 @@ class Command(BaseCommand):
 
         # --- Nested SQL Helpers ---
 
-        def get_lsoa_view_sql(view_name, geom_column):
-            """Creates the individual England/Wales View"""
+        def get_lsoa_view_sql(view_name, geom_column, boundary_year):
+            """Creates individual England/Wales Table filtered by boundary year"""
             return f"""
-            CREATE OR REPLACE VIEW public.{view_name} AS
+            -- 1. Clean up both types to prevent the conflict error
+            DROP TABLE IF EXISTS public.{view_name} CASCADE;
+            DROP VIEW IF EXISTS public.{view_name} CASCADE;
+
+            -- 2. Create as a TABLE, not a VIEW
+            CREATE TABLE public.{view_name} AS
             SELECT 
-                l.year as boundary_year, 
-                l.{geom_column} AS geom,
-                l.lsoa_code,
-                COALESCE(e.imd_decile, w.imd_decile, 0) as imd_decile,
-                COALESCE(e.imd_rank, w.imd_rank, 0) as imd_rank
+                l.year::int as year, -- Renamed to 'year' for tileserv compatibility
+                l.{geom_column}::geometry(MultiPolygon, 3857) AS geom,
+                l.lsoa_code::text,
+                COALESCE(e.imd_decile, w.imd_decile, 0)::int as imd_decile,
+                COALESCE(e.imd_rank, w.imd_rank, 0)::int as imd_rank
             FROM deprivation_scores_lsoa l
             LEFT JOIN deprivation_scores_englishindexmultipledeprivation e 
-                ON e.lsoa_id = l.id AND e.year IN (2019, 2025)
+                ON e.lsoa_id = l.id
             LEFT JOIN deprivation_scores_welshindexmultipledeprivation w
-                ON w.lsoa_id = l.id AND w.year = 2019
-            WHERE l.{geom_column} IS NOT NULL;
+                ON w.lsoa_id = l.id
+            WHERE l.{geom_column} IS NOT NULL 
+            AND l.year = {boundary_year};
+
+            -- 3. Index it! (This is what prevents the 500 errors)
+            CREATE INDEX idx_{view_name}_geom ON public.{view_name} USING GIST (geom);
+            ANALYZE public.{view_name};
             """
 
-        def get_uk_master_view_sql(view_name, geom_suffix):
-            """Creates Unified UK View (E, W, S, NI)"""
+        # In your get_uk_master_view_sql helper, add a boundary_year parameter
+        def get_uk_master_view_sql(view_name, geom_suffix, boundary_year, imd_year):
+            """Creates UK Master View combining all 4 nations with IMD data"""
             actual_geom_col = (
                 "geom_3857" if geom_suffix == "3857" else f"geom_3857_{geom_suffix}"
             )
 
             return f"""
-            CREATE OR REPLACE VIEW public.{view_name} AS
+            -- 1. Clean up existing objects (both table and view types)
+            DROP TABLE IF EXISTS public.{view_name} CASCADE;
+            DROP VIEW IF EXISTS public.{view_name} CASCADE;
+
+            -- 2. Materialize the data into a physical TABLE for performance
+            CREATE TABLE public.{view_name} AS
             -- ENGLAND
             SELECT 
-                l.year, l.lsoa_code AS code, l.{actual_geom_col} AS geom, 
-                COALESCE(e.imd_decile, 0) as imd_decile, 
-                COALESCE(e.imd_rank, 0) as imd_rank,
-                'england' as nation
+                l.year::int AS year, 
+                {imd_year}::int AS imd_year, 
+                l.lsoa_code::text AS code, 
+                ST_MakeValid(ST_Multi(l.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
+                'england'::text AS nation,
+                COALESCE(e.imd_decile, 0)::int AS imd_decile
             FROM deprivation_scores_lsoa l
-            LEFT JOIN deprivation_scores_englishindexmultipledeprivation e ON e.lsoa_id = l.id
-            WHERE l.lsoa_code LIKE 'E%' AND l.{actual_geom_col} IS NOT NULL
+            LEFT JOIN deprivation_scores_englishindexmultipledeprivation e 
+                ON e.lsoa_id = l.id AND e.year = {imd_year}
+            WHERE l.lsoa_code LIKE 'E%' AND l.{actual_geom_col} IS NOT NULL AND l.year = {boundary_year}
             
             UNION ALL
             
-            -- WALES
+            -- WALES (Fall back to 2019 IMD as it is the most recent available)
             SELECT 
-                l.year, l.lsoa_code AS code, l.{actual_geom_col} AS geom, 
-                COALESCE(w.imd_decile, 0) as imd_decile, 
-                COALESCE(w.imd_rank, 0) as imd_rank,
-                'wales' as nation
+                l.year::int AS year, 
+                {imd_year}::int AS imd_year, 
+                l.lsoa_code::text AS code, 
+                ST_MakeValid(ST_Multi(l.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
+                'wales'::text AS nation,
+                COALESCE(w.imd_decile, 0)::int AS imd_decile
             FROM deprivation_scores_lsoa l
-            LEFT JOIN deprivation_scores_welshindexmultipledeprivation w ON w.lsoa_id = l.id
-            WHERE l.lsoa_code LIKE 'W%' AND l.{actual_geom_col} IS NOT NULL
-            
+            LEFT JOIN deprivation_scores_welshindexmultipledeprivation w 
+                ON w.lsoa_id = l.id AND w.year = 2019
+            WHERE l.lsoa_code LIKE 'W%' AND l.{actual_geom_col} IS NOT NULL AND l.year = {boundary_year}
+
             UNION ALL
-            
+
             -- SCOTLAND
             SELECT 
-                d.year, d.data_zone_code AS code, d.{actual_geom_col} AS geom, 
-                COALESCE(WIDTH_BUCKET(s.imd_rank, 1, 6977, 10), 0) as imd_decile, 
-                COALESCE(s.imd_rank, 0) as imd_rank,
-                'scotland' as nation
+                d.year::int AS year, 
+                {imd_year}::int AS imd_year, 
+                d.data_zone_code::text AS code, 
+                ST_MakeValid(ST_Multi(d.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
+                'scotland'::text AS nation,
+                COALESCE(WIDTH_BUCKET(s.imd_rank, 1, 6977, 10), 0)::int AS imd_decile
             FROM deprivation_scores_datazone d
             LEFT JOIN deprivation_scores_scottishindexmultipledeprivation s ON s.data_zone_id = d.id
             WHERE d.{actual_geom_col} IS NOT NULL
-            
+
             UNION ALL
-            
+
             -- NORTHERN IRELAND
             SELECT 
-                so.year, so.soa_code AS code, so.{actual_geom_col} AS geom, 
-                COALESCE(WIDTH_BUCKET(ni.imd_rank, 1, 891, 10), 0) as imd_decile, 
-                COALESCE(ni.imd_rank, 0) as imd_rank,
-                'northern_ireland' as nation
+                so.year::int AS year, 
+                {imd_year}::int AS imd_year, 
+                so.soa_code::text AS code, 
+                ST_MakeValid(ST_Multi(so.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
+                'northern_ireland'::text AS nation,
+                COALESCE(WIDTH_BUCKET(ni.imd_rank, 1, 891, 10), 0)::int AS imd_decile
             FROM deprivation_scores_soa so
             LEFT JOIN deprivation_scores_northernirelandindexmultipledeprivation ni ON ni.soa_id = so.id
             WHERE so.{actual_geom_col} IS NOT NULL;
+
+            -- 3. Create Spatial Index (Removes 500 errors by speeding up BBOX queries)
+            CREATE INDEX idx_{view_name}_geom ON public.{view_name} USING GIST (geom);
+            
+            -- 4. Gather statistics for the query planner
+            ANALYZE public.{view_name};
             """
 
         # --- SQL Statement List ---
 
         sql_statements = [
-            # 1. CLEANUP
-            "DROP VIEW IF EXISTS public.uk_master_tiles_z0_4 CASCADE;",
-            "DROP VIEW IF EXISTS public.uk_master_tiles_z5_7 CASCADE;",
-            "DROP VIEW IF EXISTS public.uk_master_tiles_z8_10 CASCADE;",
+            # Section 1: Cleanup
+            "DROP TABLE IF EXISTS public.uk_master_2011_z0_4 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2011_z5_7 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2011_z8_10 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2021_z0_4 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2021_z5_7 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2021_z8_10 CASCADE;",
+            # Also drop the LSOA-specific ones as tables
+            "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z0_4 CASCADE;",
+            "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z0_4 CASCADE;",
             # 2. SCHEMA: Ensure columns exist
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
@@ -193,42 +231,65 @@ class Command(BaseCommand):
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
             # 3. GEOPROCESSING (WGS84 -> Web Mercator 3857)
+            "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_MakeValid(geom_3857) WHERE NOT ST_IsValid(geom_3857);",
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_datazone SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_soa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_localauthority SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            # 4. SIMPLIFICATION (Level of Detail)
-            # NI & Scotland Simplification
-            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_SimplifyPreserveTopology(geom_3857, 1000) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_soa SET geom_3857_simp_z5_7 = ST_SimplifyPreserveTopology(geom_3857, 50) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_SimplifyPreserveTopology(geom_3857, 1000) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_SimplifyPreserveTopology(geom_3857, 50) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
-            # England/Wales Simplification
-            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_SimplifyPreserveTopology(geom_3857, 1000) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z5_7 = ST_SimplifyPreserveTopology(geom_3857, 50) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z8_10 = ST_SimplifyPreserveTopology(geom_3857, 2) WHERE geom_3857_simp_z8_10 IS NULL AND geom_3857 IS NOT NULL;",
+            # 4. SIMPLIFICATION (Robust version with ST_MakeValid to fix strips)
+            # Applied to all regions for z0_4
+            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 25)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 50)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 100)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            # Mid-level simplification (z5_7)
+            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 50)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 50)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 50)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            # 5. SPATIAL INDEXING & CLUSTERING
             # 5. SPATIAL INDEXING & CLUSTERING (The Core Optimizations)
-            # Create GIST indexes for the primary geometry
             "CREATE INDEX IF NOT EXISTS idx_lsoa_3857 ON deprivation_scores_lsoa USING GIST (geom_3857);",
             "CREATE INDEX IF NOT EXISTS idx_datazone_3857 ON deprivation_scores_datazone USING GIST (geom_3857);",
             "CREATE INDEX IF NOT EXISTS idx_soa_3857 ON deprivation_scores_soa USING GIST (geom_3857);",
-            # Cluster tables (Physically re-order rows by geography)
+            # Performance indexes for the Year/IMD joins
+            "CREATE INDEX IF NOT EXISTS idx_lsoa_year_id ON deprivation_scores_lsoa (year, id);",
+            "CREATE INDEX IF NOT EXISTS idx_english_imd_year_lsoa ON deprivation_scores_englishindexmultipledeprivation (year, lsoa_id);",
+            "CREATE INDEX IF NOT EXISTS idx_welsh_imd_year_lsoa ON deprivation_scores_welshindexmultipledeprivation (year, lsoa_id);",
+            # Cluster tables (Physically re-order rows by geography for tile speed)
             "CLUSTER deprivation_scores_lsoa USING idx_lsoa_3857;",
             "CLUSTER deprivation_scores_datazone USING idx_datazone_3857;",
             "CLUSTER deprivation_scores_soa USING idx_soa_3857;",
+            # 6. VIEWS (Split by Boundary Year)
             # 6. VIEWS
-            get_lsoa_view_sql("lsoa_tiles_z0_4", "geom_3857_simp_z0_4"),
-            get_lsoa_view_sql("lsoa_tiles_z5_7", "geom_3857_simp_z5_7"),
-            get_lsoa_view_sql("lsoa_tiles_z8_10", "geom_3857_simp_z8_10"),
-            get_uk_master_view_sql("uk_master_tiles_z0_4", "simp_z0_4"),
-            get_uk_master_view_sql("uk_master_tiles_z5_7", "simp_z5_7"),
-            get_uk_master_view_sql("uk_master_tiles_z8_10", "3857"),
+            # --- 2011 Individual LSOA Views ---
+            get_lsoa_view_sql("lsoa_tiles_2011_z0_4", "geom_3857_simp_z0_4", 2011),
+            get_lsoa_view_sql("lsoa_tiles_2011_z5_7", "geom_3857_simp_z5_7", 2011),
+            get_lsoa_view_sql("lsoa_tiles_2011_z8_10", "geom_3857", 2011),
+            # --- 2021 Individual LSOA Views ---
+            get_lsoa_view_sql("lsoa_tiles_2021_z0_4", "geom_3857_simp_z0_4", 2021),
+            get_lsoa_view_sql("lsoa_tiles_2021_z5_7", "geom_3857_simp_z5_7", 2021),
+            get_lsoa_view_sql("lsoa_tiles_2021_z8_10", "geom_3857", 2021),
+            # --- UK Master Views (The ones your map actually calls) ---
+            # Boundary Year 2011 + IMD 2019
+            get_uk_master_view_sql("uk_master_2011_z0_4", "simp_z0_4", 2011, 2019),
+            get_uk_master_view_sql("uk_master_2011_z5_7", "simp_z5_7", 2011, 2019),
+            get_uk_master_view_sql("uk_master_2011_z8_10", "3857", 2011, 2019),
+            # Boundary Year 2021 + IMD 2025
+            get_uk_master_view_sql("uk_master_2021_z0_4", "simp_z0_4", 2021, 2025),
+            get_uk_master_view_sql("uk_master_2021_z5_7", "simp_z5_7", 2021, 2025),
+            get_uk_master_view_sql("uk_master_2021_z8_10", "3857", 2021, 2025),
             "CREATE OR REPLACE VIEW public.la_tiles AS SELECT year, geom_3857 AS geom, local_authority_district_code AS lad_code FROM deprivation_scores_localauthority;",
             # 7. FINAL HOUSEKEEPING
             "GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;",
             "ANALYZE deprivation_scores_lsoa;",
             "ANALYZE deprivation_scores_datazone;",
             "ANALYZE deprivation_scores_soa;",
+            # Final optimization for the Master Tables
+            "VACUUM ANALYZE public.uk_master_2011_z0_4;",
+            "VACUUM ANALYZE public.uk_master_2011_z5_7;",
+            "VACUUM ANALYZE public.uk_master_2011_z8_10;",
+            "VACUUM ANALYZE public.uk_master_2021_z0_4;",
+            "VACUUM ANALYZE public.uk_master_2021_z5_7;",
+            "VACUUM ANALYZE public.uk_master_2021_z8_10;",
         ]
 
         with connection.cursor() as cursor:
@@ -414,41 +475,50 @@ class Command(BaseCommand):
         )
 
         with connection.cursor() as cursor:
-            # 1. Check the Master View for all nations
+            # 1. Check the 2011 Master View
+            self.stdout.write("Checking 2011 Era (2019 IMD)...")
             cursor.execute(
                 """
                 SELECT nation, COUNT(*) 
-                FROM public.uk_master_tiles_z8_10 
+                FROM public.uk_master_2011_z8_10 
                 GROUP BY nation;
             """
             )
-            results = cursor.fetchall()
-            nations_found = {row[0]: row[1] for row in results}
+            results_2011 = cursor.fetchall()
+            nations_2011 = {row[0]: row[1] for row in results_2011}
+
+            # 2. Check the 2021 Master View
+            self.stdout.write("Checking 2021 Era (2025 IMD)...")
+            cursor.execute(
+                """
+                SELECT nation, COUNT(*) 
+                FROM public.uk_master_2021_z8_10 
+                GROUP BY nation;
+            """
+            )
+            results_2021 = cursor.fetchall()
+            nations_2021 = {row[0]: row[1] for row in results_2021}
 
             expected_nations = ["england", "wales", "scotland", "northern_ireland"]
 
             for nation in expected_nations:
-                count = nations_found.get(nation, 0)
-                if count > 0:
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"  ✅ {nation.replace('_', ' ').title()}: {count} polygons in Master View."
-                        )
-                    )
-                else:
-                    self.stdout.write(
-                        self.style.ERROR(
-                            f"  ❌ {nation.replace('_', ' ').title()}: No data found in Master View!"
-                        )
-                    )
+                count_11 = nations_2011.get(nation, 0)
+                count_21 = nations_2021.get(nation, 0)
 
-            # 2. Coordinate System Verification
-            # Check if one random point from the Master View is actually in Web Mercator (3857)
-            # 3857 coordinates are usually in the millions (e.g., -600000, 7000000)
+                status = "✅" if (count_11 > 0 and count_21 > 0) else "❌"
+                label = nation.replace("_", " ").title()
+
+                self.stdout.write(
+                    f"  {status} {label}: 2011({count_11}) | 2021({count_21}) polygons."
+                )
+
+            # 3. Coordinate System Verification
+            # Using the 2021 view for the sample
             cursor.execute(
-                "SELECT ST_X(ST_Centroid(geom)) FROM uk_master_tiles_z8_10 LIMIT 1;"
+                "SELECT ST_X(ST_Centroid(geom)) FROM public.uk_master_2021_z8_10 LIMIT 1;"
             )
             coord_sample = cursor.fetchone()
+
             if coord_sample and abs(coord_sample[0]) > 180:
                 self.stdout.write(
                     self.style.SUCCESS(
@@ -458,7 +528,7 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(
                     self.style.WARNING(
-                        "  ⚠️ Coordinate System: Might be WGS84. Check ST_Transform logic."
+                        "  ⚠️ Coordinate System: Geometry may be in degrees (WGS84). Check ST_Transform logic."
                     )
                 )
 
@@ -680,11 +750,6 @@ class Command(BaseCommand):
             add_northern_ireland_soas_and_deprivation_domains_with_ranks()
         elif options["mode"] == "test_table_totals":
             test_table_totals()
-        elif options["mode"] == "boundary_files":
-            self.stdout.write(
-                "\n" + G + "Importing boundary GeoJSON files..." + W + "\n"
-            )
-            boundary_files(self, force=options.get("force"))
         else:
             self.stdout.write("No options supplied...")
         self.stdout.write(image())
