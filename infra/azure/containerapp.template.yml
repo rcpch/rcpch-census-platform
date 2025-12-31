@@ -1,0 +1,102 @@
+# Template for az containerapp update/create --yaml.
+#
+# Runs 4 containers in one Container App revision:
+# - proxy (nginx): public ingress on port 80
+# - web (django): DRF API on 8001
+# - db (postgis): persistent volume
+# - tiles (pg_tileserv): vector tiles on 7800
+#
+# Placeholders substituted by the GitHub Action:
+#   __ACR_LOGIN_SERVER__  e.g. myacr.azurecr.io (or docker.io/your-org)
+#   __IMAGE_TAG__         e.g. git SHA
+#   __ENV_STORAGE_NAME__  container apps env storage name for Azure Files
+#   __DJANGO_ALLOWED_HOSTS__
+#   __DJANGO_CSRF_TRUSTED_ORIGINS__
+
+properties:
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 80
+      transport: Auto
+      allowInsecure: false
+  template:
+    scale:
+      minReplicas: 1
+      maxReplicas: 1
+    volumes:
+      - name: pgdata
+        storageType: AzureFile
+        storageName: __ENV_STORAGE_NAME__
+    containers:
+      - name: proxy
+        image: __ACR_LOGIN_SERVER__/rcpch-census-proxy:__IMAGE_TAG__
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+      - name: web
+        image: __ACR_LOGIN_SERVER__/rcpch-census-web:__IMAGE_TAG__
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+        env:
+          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER
+            value: rcpchCensususer
+          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD
+            secretRef: postgres-password
+          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME
+            value: rcpchCensusdb
+          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST
+            value: 127.0.0.1
+          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT
+            value: "5432"
+          - name: RCPCH_CENSUS_ENGINE_SECRET_KEY
+            secretRef: django-secret-key
+          - name: DEBUG
+            value: "False"
+          - name: DJANGO_ALLOWED_HOSTS
+            value: __DJANGO_ALLOWED_HOSTS__
+          - name: DJANGO_CSRF_TRUSTED_ORIGINS
+            value: __DJANGO_CSRF_TRUSTED_ORIGINS__
+          - name: POSTCODES_IO_API_URL
+            value: https://api.postcodes.io
+          - name: POSTCODES_IO_API_KEY
+            secretRef: postcodes-io-api-key
+        command:
+          - sh
+          - -c
+          - >
+            /app/s/wait-for-db.sh &&
+            python -u manage.py collectstatic --noinput &&
+            python -u manage.py migrate &&
+            python -u manage.py runserver 0.0.0.0:8001
+      - name: db
+        image: postgis/postgis:15-3.4
+        resources:
+          cpu: 0.5
+          memory: 2Gi
+        env:
+          - name: POSTGRES_USER
+            value: rcpchCensususer
+          - name: POSTGRES_PASSWORD
+            secretRef: postgres-password
+          - name: POSTGRES_DB
+            value: rcpchCensusdb
+        volumeMounts:
+          - volumeName: pgdata
+            mountPath: /var/lib/postgresql/data
+      - name: tiles
+        image: pramsey/pg_tileserv:latest
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+        env:
+          - name: TS_TILE_EXTENT
+            value: "8192"
+          - name: TS_TILE_BUFFER
+            value: "256"
+          - name: HTTP_CORS_ORIGIN
+            value: "*"
+          - name: DATABASE_URL
+            secretRef: tiles-db-url

@@ -6,6 +6,29 @@ const map = new maplibregl.Map({
   refreshExpired: true, // Helps with local dev updates
 });
 
+function getTilesBaseUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const fromQuery = params.get("tilesBase");
+  if (fromQuery) return fromQuery.replace(/\/+$/, "");
+
+  const meta = document.querySelector('meta[name="rcpch-tiles-base-url"]');
+  const fromMeta = meta?.getAttribute("content")?.trim();
+  if (fromMeta) return fromMeta.replace(/\/+$/, "");
+
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    return "http://localhost:7800";
+  }
+
+  return "";
+}
+
+const TILES_BASE_URL = getTilesBaseUrl();
+if (!TILES_BASE_URL) {
+  console.warn(
+    "No tiles base URL configured. Set ?tilesBase=https://<host>/tiles or the rcpch-tiles-base-url meta tag."
+  );
+}
+
 // State management
 let currentEra = "2021";
 
@@ -17,7 +40,7 @@ function getViewName(era, zoom) {
 
 function updateMapSource() {
   const newLayer = getViewName(currentEra, map.getZoom());
-  const newTiles = [`http://localhost:7800/${newLayer}/{z}/{x}/{y}.pbf`];
+  const newTiles = [`${TILES_BASE_URL}/${newLayer}/{z}/{x}/{y}.pbf`];
 
   const source = map.getSource("deprivation-source");
   if (source) {
@@ -71,7 +94,7 @@ map.on("load", () => {
 
   map.addSource("deprivation-source", {
     type: "vector",
-    tiles: [`http://localhost:7800/${initialLayer}/{z}/{x}/{y}.pbf`],
+    tiles: [`${TILES_BASE_URL}/${initialLayer}/{z}/{x}/{y}.pbf`],
     minzoom: 0,
     maxzoom: 14,
   });

@@ -7,7 +7,6 @@ from .views import (
     DataZoneViewSet,
     GreenSpaceViewSet,
     EnglishIndexMultipleDeprivationViewSet,
-    MapDataView,
     WelshMultipleDeprivationViewSet,
     ScottishMultipleDeprivationViewSet,
     NorthernIrelandMultipleDeprivationViewSet,
@@ -80,7 +79,6 @@ drf_routes = [
         "index_of_multiple_deprivation_quantile",
         view=UKIndexMultipleDeprivationQuantileView.as_view(),
     ),
-    path("map-data/", MapDataView.as_view(), name="map-data-optimized"),
     # JSON Schema
     path("schema/", SpectacularJSONAPIView.as_view(), name="schema"),
     # Swagger UI

@@ -5,14 +5,10 @@ from rest_framework import (
     mixins,
 )
 from rest_framework.decorators import api_view
-from rest_framework.views import APIView, Response
 from rest_framework.exceptions import ParseError, NotFound
-from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.db import connection
+from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
-from django.utils.decorators import method_decorator
-from django.views.decorators.cache import cache_control
 
 from drf_spectacular.utils import (
     extend_schema,
@@ -1050,49 +1046,3 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
             raise ParseError("Postcode not supplied.", code=400)
 
         return Response(response.data)
-
-
-class MapDataView(APIView):
-    """
-    Returns optimized UK-wide deprivation geometries based on zoom level.
-    """
-
-    # This tells the CDN to cache the result for 24 hours (86400 seconds)
-    @method_decorator(cache_control(max_age=86400, public=True))
-    def get(self, request, *args, **kwargs):
-        try:
-            zoom = int(request.query_params.get("z", 7))
-        except ValueError:
-            zoom = 7
-
-        # Traffic control for views
-        if zoom <= 4:
-            db_view = "uk_master_tiles_z0_4"
-        elif zoom <= 7:
-            db_view = "uk_master_tiles_z5_7"
-        else:
-            db_view = "uk_master_tiles_z8_10"
-
-        # High-speed PostGIS GeoJSON generation
-        query = f"""
-            SELECT jsonb_build_object(
-                'type', 'FeatureCollection',
-                'features', COALESCE(jsonb_agg(features.feature), '[]'::jsonb)
-            )
-            FROM (
-              SELECT jsonb_build_object(
-                'type',       'Feature',
-                'geometry',   ST_AsGeoJSON(geom)::jsonb,
-                'properties', jsonb_build_object(
-                    'code', code,
-                    'decile', imd_decile,
-                    'nation', nation
-                )
-              ) AS feature
-              FROM public.{db_view}
-            ) AS features;
-        """
-
-        with connection.cursor() as cursor:
-            cursor.execute(query)
-            return Response(cursor.fetchone()[0])
