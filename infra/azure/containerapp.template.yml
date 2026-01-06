@@ -80,6 +80,8 @@ properties:
         env:
           - name: PGDATA
             value: /var/lib/postgresql/data/pgdata/storage
+          - name: POSTGRES_INITDB_SKIP_CHMOD
+            value: "yes"
           - name: POSTGRES_USER
             value: rcpchCensususer
           - name: POSTGRES_PASSWORD
