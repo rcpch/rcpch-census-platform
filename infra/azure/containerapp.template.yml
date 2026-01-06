@@ -70,7 +70,7 @@ properties:
         image: postgis/postgis:15-3.4
         resources:
           cpu: 0.5
-          memory: 2Gi
+          memory: 1.5Gi
         env:
           - name: POSTGRES_USER
             value: rcpchCensususer
