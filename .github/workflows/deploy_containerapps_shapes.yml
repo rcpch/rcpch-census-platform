@@ -65,12 +65,6 @@ jobs:
           docker build -f Dockerfile.postgis -t "${ACR_LOGIN_SERVER}/${WEB_IMAGE_NAME}:${IMAGE_TAG}" .
           docker push "${ACR_LOGIN_SERVER}/${WEB_IMAGE_NAME}:${IMAGE_TAG}"
 
-      - name: Build and push proxy image
-        shell: bash
-        run: |
-          docker build -f infra/nginx/Dockerfile -t "${ACR_LOGIN_SERVER}/${PROXY_IMAGE_NAME}:${IMAGE_TAG}" infra/nginx
-          docker push "${ACR_LOGIN_SERVER}/${PROXY_IMAGE_NAME}:${IMAGE_TAG}"
-
       # NOTE: This workflow no longer configures registry username/password on the Container App.
       # For runtime pulls from ACR, configure the Container App to use managed identity + AcrPull
       # (do once in Azure). This avoids long-lived registry passwords.

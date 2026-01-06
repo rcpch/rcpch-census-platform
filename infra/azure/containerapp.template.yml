@@ -30,11 +30,6 @@ properties:
         storageType: AzureFile
         storageName: __ENV_STORAGE_NAME__
     containers:
-      - name: proxy
-        image: __ACR_LOGIN_SERVER__/rcpch-census-proxy:__IMAGE_TAG__
-        resources:
-          cpu: 0.5
-          memory: 0.5Gi
       - name: web
         image: __ACR_LOGIN_SERVER__/rcpch-census-web:__IMAGE_TAG__
         resources:
@@ -60,7 +55,7 @@ properties:
           - name: DJANGO_CSRF_TRUSTED_ORIGINS
             value: __DJANGO_CSRF_TRUSTED_ORIGINS__
           - name: POSTCODES_IO_API_URL
-            value: https://api.postcodes.io
+            value: https://api.rcpch.ac.uk/postcodes
           - name: POSTCODES_IO_API_KEY
             secretRef: postcodes-io-api-key
         command:
@@ -70,7 +65,7 @@ properties:
             /app/s/wait-for-db.sh &&
             python -u manage.py collectstatic --noinput &&
             python -u manage.py migrate &&
-            python -u manage.py runserver 0.0.0.0:8001
+            gunicorn rcpch_census_platform.wsgi:application --bind 0.0.0.0:8001
       - name: db
         image: postgis/postgis:15-3.4
         resources:
