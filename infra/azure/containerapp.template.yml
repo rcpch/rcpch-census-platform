@@ -68,12 +68,18 @@ properties:
             gunicorn rcpch_census_platform.wsgi:application --bind 0.0.0.0:8001
       - name: db
         image: postgis/postgis:15-3.4
+        probes:
+          - type: Liveness
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 30
+            periodSeconds: 10
         resources:
           cpu: 0.5
           memory: 1.5Gi
         env:
           - name: PGDATA
-            value: /var/lib/postgresql/data/pgdata
+            value: /var/lib/postgresql/data/pgdata/storage
           - name: POSTGRES_USER
             value: rcpchCensususer
           - name: POSTGRES_PASSWORD
