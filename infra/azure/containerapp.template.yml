@@ -72,6 +72,8 @@ properties:
           cpu: 0.5
           memory: 1.5Gi
         env:
+          - name: PGDATA
+            value: /var/lib/postgresql/data/pgdata
           - name: POSTGRES_USER
             value: rcpchCensususer
           - name: POSTGRES_PASSWORD
