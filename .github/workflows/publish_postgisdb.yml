@@ -37,7 +37,6 @@ jobs:
       - name: Start PostGIS container
         run: |
           docker run -d --name seed-db -e POSTGRES_USER=rcpchCensususer -e POSTGRES_PASSWORD=seedpw -e POSTGRES_DB=rcpchCensusdb $REGISTRY/$ORG/$IMAGE_NAME:base
-          sleep 20  # Wait for DB to start
 
       - name: Run Django seed command
         env:
@@ -53,8 +52,7 @@ jobs:
             -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT=5432 \
             -e DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY \
             $REGISTRY/$ORG/$WEB_IMAGE_NAME:seed \
-            python manage.py seed --mode=__all__ \
-            python manage.py --mode=import_bfc_boundaries
+            sh -c "/app/s/wait-for-db.sh && python manage.py seed --mode=__all__ && python manage.py import_bfc_boundaries --mode=import_bfc_boundaries"
 
       - name: Commit seeded image
         run: |
