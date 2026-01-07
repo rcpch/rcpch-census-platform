@@ -1,31 +1,33 @@
-name: Deploy to Azure Container Apps (live)
+name: Deploy to Azure Container Apps (shapes)
 
 on:
+  push:
+    branches:
+      - live
   workflow_dispatch:
-  # Enable this later when you're ready to deploy Container Apps on merge/push to live.
-  # push:
-  #   branches:
-  #     - live
 
 permissions:
   contents: read
   id-token: write
 
 concurrency:
-  group: deploy-aca-live
+  group: deploy-aca-shapes
   cancel-in-progress: true
 
 env:
-  AZURE_RESOURCE_GROUP: RCPCH-Dev-AuditTools
-  # Update if your production Container App name differs.
-  AZURE_CONTAINERAPP_NAME: rcpch-census-platform
+  AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+  # Update if your Container App name differs.
+  AZURE_CONTAINERAPP_NAME: rcpch-census-platform-v2
 
   # ACR resource name (NOT login server). Example: myregistry
+  # Store as a GitHub Secret (or Variable) named ACR_NAME.
   ACR_NAME: ${{ secrets.ACR_NAME }}
 
   # ACR login server. Example: myregistry.azurecr.io
+  # Store as a GitHub Secret (or Variable) named ACR_LOGIN_SERVER.
   ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
 
+  # Image names
   WEB_IMAGE_NAME: rcpch-census-web
   PROXY_IMAGE_NAME: rcpch-census-proxy
 
@@ -43,17 +45,6 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Ensure Azure Container Apps CLI support
-        shell: bash
-        run: |
-          az version
-          az extension add -n containerapp --upgrade
-
-      - name: Set deploy variables
-        shell: bash
-        run: |
-          echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_ENV"
-
       - name: Login to ACR (OIDC)
         shell: bash
         run: |
@@ -66,32 +57,12 @@ jobs:
       - name: Build and push web image
         shell: bash
         run: |
-          docker build -f Dockerfile.postgis -t "${ACR_LOGIN_SERVER}/${WEB_IMAGE_NAME}:${IMAGE_TAG}" .
-          docker push "${ACR_LOGIN_SERVER}/${WEB_IMAGE_NAME}:${IMAGE_TAG}"
+          docker build -f Dockerfile.postgis -t "${ACR_LOGIN_SERVER}/${WEB_IMAGE_NAME}:${GITHUB_SHA}" .
+          docker push "${ACR_LOGIN_SERVER}/${WEB_IMAGE_NAME}:${GITHUB_SHA}"
 
-      - name: Build and push proxy image
-        shell: bash
-        run: |
-          docker build -f infra/nginx/Dockerfile -t "${ACR_LOGIN_SERVER}/${PROXY_IMAGE_NAME}:${IMAGE_TAG}" infra/nginx
-          docker push "${ACR_LOGIN_SERVER}/${PROXY_IMAGE_NAME}:${IMAGE_TAG}"
-
-      # NOTE: Configure the Container App to pull from ACR using managed identity + AcrPull (one-time in Azure).
-
-      - name: Set/Update Container App secrets
-        shell: bash
-        env:
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
-          POSTCODES_IO_API_KEY: ${{ secrets.POSTCODES_IO_API_KEY }}
-        run: |
-          az containerapp secret set \
-            -n "${AZURE_CONTAINERAPP_NAME}" \
-            -g "${AZURE_RESOURCE_GROUP}" \
-            --secrets \
-              postgres-password="$POSTGRES_PASSWORD" \
-              django-secret-key="$DJANGO_SECRET_KEY" \
-              postcodes-io-api-key="$POSTCODES_IO_API_KEY" \
-              tiles-db-url="postgresql://rcpchCensususer:${POSTGRES_PASSWORD}@127.0.0.1:5432/rcpchCensusdb"
+      # NOTE: This workflow no longer configures registry username/password on the Container App.
+      # For runtime pulls from ACR, configure the Container App to use managed identity + AcrPull
+      # (do once in Azure). This avoids long-lived registry passwords.
 
       - name: Render Container App YAML
         shell: bash
@@ -111,7 +82,7 @@ jobs:
           content = template_path.read_text(encoding='utf-8')
           replacements = {
               '__ACR_LOGIN_SERVER__': os.environ['ACR_LOGIN_SERVER'],
-              '__IMAGE_TAG__': os.environ['IMAGE_TAG'],
+              '__IMAGE_TAG__': os.environ['GITHUB_SHA'],
               '__ENV_STORAGE_NAME__': os.environ['ENV_STORAGE_NAME'],
               '__DJANGO_ALLOWED_HOSTS__': os.environ['DJANGO_ALLOWED_HOSTS'],
               '__DJANGO_CSRF_TRUSTED_ORIGINS__': os.environ['DJANGO_CSRF_TRUSTED_ORIGINS'],

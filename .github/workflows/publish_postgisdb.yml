@@ -1,0 +1,71 @@
+name: Build and Publish Seeded PostGIS DB
+
+on:
+    release:
+        types: [published]
+
+permissions:
+    contents: read
+    packages: write
+
+env:
+    IMAGE_NAME: rcpch-census-postgis
+    REGISTRY: ghcr.io
+    ORG: rcpch
+    WEB_IMAGE_NAME: rcpch-census-web
+
+jobs:
+    build-seed-push:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Log in to GHCR
+              run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            - name: Build base PostGIS image
+              run: |
+                  docker build -t $REGISTRY/$ORG/$IMAGE_NAME:base -f Dockerfile.postgis .
+
+            - name: Build DRF app image
+              run: |
+                  docker build -t $REGISTRY/$ORG/$WEB_IMAGE_NAME:seed -f Dockerfile .
+
+            - name: Start PostGIS container
+              run: |
+                  docker run -d --name seed-db -e POSTGRES_USER=rcpchCensususer -e POSTGRES_PASSWORD=seedpw -e POSTGRES_DB=rcpchCensusdb $REGISTRY/$ORG/$IMAGE_NAME:base
+                  sleep 20  # Wait for DB to start
+
+            - name: Run Django seed command
+              env:
+                  # Add any secrets needed for your Django app here
+                  DJANGO_SECRET_KEY: dummy
+              run: |
+                  docker run --rm \
+                    --network host \
+                    -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER=rcpchCensususer \
+                    -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD=seedpw \
+                    -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME=rcpchCensusdb \
+                    -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST=127.0.0.1 \
+                    -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT=5432 \
+                    -e DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY \
+                    $REGISTRY/$ORG/$WEB_IMAGE_NAME:seed \
+                    python manage.py seed --mode=__all__ \
+                    python manage.py --mode=import_bfc_boundaries
+
+            - name: Commit seeded image
+              run: |
+                  docker commit seed-db $REGISTRY/$ORG/$IMAGE_NAME:${{ github.ref_name }}
+
+            - name: Push seeded image to GHCR
+              run: |
+                  docker push $REGISTRY/$ORG/$IMAGE_NAME:${{ github.ref_name }}
+
+            - name: Cleanup
+              if: always()
+              run: |
+                  docker rm -f seed-db || true
+                  docker rmi $REGISTRY/$ORG/$IMAGE_NAME:base || true
+                  docker rmi $REGISTRY/$ORG/$WEB_IMAGE_NAME:seed || true

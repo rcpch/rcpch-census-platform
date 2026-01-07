@@ -25,10 +25,6 @@ properties:
     scale:
       minReplicas: 1
       maxReplicas: 1
-    volumes:
-      - name: pgdata
-        storageType: AzureFile
-        storageName: __ENV_STORAGE_NAME__
     containers:
       - name: web
         image: __ACR_LOGIN_SERVER__/rcpch-census-web:__IMAGE_TAG__
@@ -67,7 +63,7 @@ properties:
             python -u manage.py migrate &&
             gunicorn rcpch_census_platform.wsgi:application --bind 0.0.0.0:8001
       - name: db
-        image: postgis/postgis:15-3.4
+        image: ghcr.io/rcpch/rcpch-census-postgis:__IMAGE_TAG__
         probes:
           - type: Liveness
             tcpSocket:
@@ -78,19 +74,12 @@ properties:
           cpu: 0.5
           memory: 1.5Gi
         env:
-          - name: PGDATA
-            value: /var/lib/postgresql/data/pgdata/storage
-          - name: POSTGRES_INITDB_SKIP_CHMOD
-            value: "yes"
           - name: POSTGRES_USER
             value: rcpchCensususer
           - name: POSTGRES_PASSWORD
             secretRef: postgres-password
           - name: POSTGRES_DB
             value: rcpchCensusdb
-        volumeMounts:
-          - volumeName: pgdata
-            mountPath: /var/lib/postgresql/data
       - name: tiles
         image: pramsey/pg_tileserv:latest
         resources:
