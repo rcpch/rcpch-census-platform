@@ -27,6 +27,8 @@ jobs:
 
       - name: Build base PostGIS image
         run: |
+          docker pull postgis/postgis:15-3.4
+          docker tag postgis/postgis:15-3.4 $REGISTRY/$ORG/$IMAGE_NAME:base
           docker build -t $REGISTRY/$ORG/$IMAGE_NAME:base -f Dockerfile.postgisdb .
 
       - name: Build DRF app image
