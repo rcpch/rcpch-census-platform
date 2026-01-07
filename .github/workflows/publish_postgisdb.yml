@@ -54,7 +54,7 @@ jobs:
             -e DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY \
             -e PYTHONUNBUFFERED=1 \
             $REGISTRY/$ORG/$WEB_IMAGE_NAME:seed \
-            sh -c "/app/s/wait-for-db.sh && python -u manage.py migrate --noinput && python -u manage.py seed --mode=__all__ && python -u manage.py import_bfc_boundaries --mode=import_bfc_boundaries" | tee seed-run.log
+            sh -c "/app/s/wait-for-db.sh && python -u manage.py migrate --noinput && python -u manage.py seed --mode=__all__ && python -u manage.py seed --mode=import_bfc_boundaries" | tee seed-run.log
 
       - name: Upload seed run logs
         uses: actions/upload-artifact@v4
