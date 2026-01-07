@@ -36,13 +36,14 @@ jobs:
 
       - name: Start PostGIS container
         run: |
-          docker run -d --name seed-db -e POSTGRES_USER=rcpchCensususer -e POSTGRES_PASSWORD=seedpw -e POSTGRES_DB=rcpchCensusdb $REGISTRY/$ORG/$IMAGE_NAME:base
+          docker run -d --name seed-db -p 5432:5432 -e POSTGRES_USER=rcpchCensususer -e POSTGRES_PASSWORD=seedpw -e POSTGRES_DB=rcpchCensusdb $REGISTRY/$ORG/$IMAGE_NAME:base
 
       - name: Run Django seed command
         env:
           # Add any secrets needed for your Django app here
           DJANGO_SECRET_KEY: dummy
         run: |
+          set -o pipefail
           docker run --rm \
             --network host \
             -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER=rcpchCensususer \
@@ -51,8 +52,15 @@ jobs:
             -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST=127.0.0.1 \
             -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT=5432 \
             -e DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY \
+            -e PYTHONUNBUFFERED=1 \
             $REGISTRY/$ORG/$WEB_IMAGE_NAME:seed \
-            sh -c "/app/s/wait-for-db.sh && python manage.py seed --mode=__all__ && python manage.py import_bfc_boundaries --mode=import_bfc_boundaries"
+            sh -c "/app/s/wait-for-db.sh && python -u manage.py seed --mode=__all__ && python -u manage.py import_bfc_boundaries --mode=import_bfc_boundaries" | tee seed-run.log
+
+      - name: Upload seed run logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: seed-run-log
+          path: seed-run.log
 
       - name: Commit seeded image
         run: |
