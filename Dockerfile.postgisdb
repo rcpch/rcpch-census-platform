@@ -1,0 +1,13 @@
+# Use the official PostGIS image as the base
+FROM postgis/postgis:15-3.4
+
+# Optional: Set environment variables for default DB/user (can be overridden at runtime)
+ENV POSTGRES_DB=rcpchCensusdb
+ENV POSTGRES_USER=rcpchCensususer
+ENV POSTGRES_PASSWORD=seedpw
+
+# Copy seed SQL scripts into the image (adjust path as needed)
+# Place your SQL files in a directory called db_seed/ at the repo root
+COPY db_seed/ /docker-entrypoint-initdb.d/
+
+# No CMD needed; the base image will run postgres and execute scripts in /docker-entrypoint-initdb.d/ on first startup
