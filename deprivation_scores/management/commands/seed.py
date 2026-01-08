@@ -802,10 +802,10 @@ class Command(BaseCommand):
             self._run_post_processing_sql()
 
             # Warm the local cache and then purge the remote CDN
-            if not settings.DEBUG:  # Only purge in production
-                self.purge_cdn_cache()
-                # Trigger the CDN to fetch the new data immediately
-                self.warm_cache()
+            # if not settings.DEBUG:  # Only purge in production
+            #     self.purge_cdn_cache()
+            #     # Trigger the CDN to fetch the new data immediately
+            #     self.warm_cache()
 
             # test that the tables have the correct number of geometries
             self.test_geometries()
