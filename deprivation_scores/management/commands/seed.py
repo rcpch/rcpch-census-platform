@@ -209,6 +209,7 @@ class Command(BaseCommand):
 
         sql_statements = [
             # Section 1: Cleanup
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 0.5)), 3));",
             "DROP TABLE IF EXISTS public.uk_master_2011_z0_4 CASCADE;",
             "DROP TABLE IF EXISTS public.uk_master_2011_z5_7 CASCADE;",
             "DROP TABLE IF EXISTS public.uk_master_2011_z8_10 CASCADE;",
@@ -236,15 +237,15 @@ class Command(BaseCommand):
             "UPDATE deprivation_scores_datazone SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_soa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_localauthority SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            # 4. SIMPLIFICATION (Robust version with ST_MakeValid to fix strips)
+            # 4. SIMPLIFICATION (Gentle simplification to preserve detail)
             # Applied to all regions for z0_4
-            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 25)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 50)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 100)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 5)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 0.5)), 3));",
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 20)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
             # Mid-level simplification (z5_7)
-            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 50)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 50)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_soa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 50)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 10)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 10)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 10)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
             # 5. SPATIAL INDEXING & CLUSTERING
             # 5. SPATIAL INDEXING & CLUSTERING (The Core Optimizations)
             "CREATE INDEX IF NOT EXISTS idx_lsoa_3857 ON deprivation_scores_lsoa USING GIST (geom_3857);",
@@ -308,6 +309,7 @@ class Command(BaseCommand):
         source = dataset["url"]
         table_name = dataset["table"]
         year = dataset["year"]
+        chunk_size = dataset.get("chunk_size", 1000)
         specific_code_col = dataset.get("code_column", "").lower()
         django_col = dataset.get("django_code_col")
 
@@ -328,37 +330,142 @@ class Command(BaseCommand):
         try:
             # 2. Remote Download with simple progress log
             if source.startswith("http"):
-                self.stdout.write(f"  Starting download: {source}")
-                response = requests.get(source, stream=True, timeout=300)
-                response.raise_for_status()
+                # Check if this is an ArcGIS REST API endpoint that needs pagination
+                is_arcgis_api = "/FeatureServer/" in source or "/MapServer/" in source
 
-                total_size = int(response.headers.get("content-length", 0))
-                bytes_data = io.BytesIO()
-                downloaded = 0
-                last_percent = -1
+                if is_arcgis_api:
+                    # Pagination for ArcGIS REST API using ObjectID strategy
+                    self.stdout.write(f"  Downloading from ArcGIS REST API: {source}")
 
-                for chunk in response.iter_content(chunk_size=8192):
-                    bytes_data.write(chunk)
-                    if total_size > 0:
-                        downloaded += len(chunk)
-                        percent = int(100 * downloaded / total_size)
-                        if percent % 10 == 0 and percent != last_percent:
-                            self.stdout.write(f"    Download Progress: {percent}%")
-                            last_percent = percent
+                    # Step 1: Get all ObjectIDs (fast, no geometry)
+                    base_url = source.split("?")[0]  # Remove existing query params
+                    separator = "&" if "?" in source else "?"
 
-                self.stdout.write("  Download complete. Parsing JSON into GeoPandas...")
-                bytes_data.seek(0)
-                final_gdf = gpd.read_file(bytes_data)
+                    # Extract query params from original URL if they exist
+                    query_params = {}
+                    if "?" in source:
+                        param_string = source.split("?")[1]
+                        for param in param_string.split("&"):
+                            if "=" in param:
+                                key, value = param.split("=", 1)
+                                query_params[key] = value
+
+                    # Get ObjectIDs only
+                    oid_url = f"{base_url}?where={query_params.get('where', '1=1')}&returnIdsOnly=true&f=json"
+                    self.stdout.write(f"  Fetching ObjectIDs...")
+                    oid_response = requests.get(oid_url, timeout=300)
+                    oid_response.raise_for_status()
+                    oid_data = oid_response.json()
+
+                    if "error" in oid_data:
+                        raise ValueError(
+                            f"API Error: {oid_data['error'].get('message', 'Unknown error')}"
+                        )
+
+                    object_ids = oid_data.get("objectIds", [])
+                    if not object_ids:
+                        raise ValueError("No ObjectIDs returned from API")
+
+                    self.stdout.write(
+                        f"  Found {len(object_ids)} features. Fetching in batches..."
+                    )
+
+                    # Step 2: Fetch features in batches by ObjectID (smaller batches to avoid URL length limits)
+                    all_gdfs = []
+                    batch_size = 100  # Reduced from 1000 to avoid 403 Forbidden due to URL length
+                    log_interval = 1000  # Log progress every 1000 features
+
+                    for i in range(0, len(object_ids), batch_size):
+                        batch_ids = object_ids[i : i + batch_size]
+                        id_list = ",".join(map(str, batch_ids))
+
+                        batch_url = (
+                            f"{base_url}?objectIds={id_list}&outFields=*&f=geojson"
+                        )
+
+                        try:
+                            batch_response = requests.get(batch_url, timeout=300)
+                            batch_response.raise_for_status()
+                        except requests.exceptions.HTTPError as e:
+                            if e.response.status_code == 403:
+                                self.stdout.write(
+                                    f"      403 Forbidden at offset {i} - URL may be too long, skipping batch"
+                                )
+                                continue
+                            self.stdout.write(
+                                f"      HTTP Error at offset {i}: {str(e)}"
+                            )
+                            raise
+
+                        bytes_data = io.BytesIO(batch_response.content)
+                        try:
+                            batch_gdf = gpd.read_file(bytes_data)
+                            all_gdfs.append(batch_gdf)
+
+                            # Only log every 1000 features
+                            if (i + batch_size) % log_interval == 0 or (
+                                i + batch_size
+                            ) >= len(object_ids):
+                                total_fetched = sum(len(gdf) for gdf in all_gdfs)
+                                self.stdout.write(
+                                    f"    Progress: {total_fetched}/{len(object_ids)} features fetched"
+                                )
+                        except Exception as e:
+                            self.stdout.write(
+                                f"      Failed to parse batch at offset {i}: {str(e)}"
+                            )
+                            continue
+
+                    if len(all_gdfs) == 0:
+                        raise ValueError("No features retrieved from API")
+
+                    # Concatenate all batches
+                    final_gdf = gpd.GeoDataFrame(pd.concat(all_gdfs, ignore_index=True))
+                    self.stdout.write(
+                        f"  Download complete. Total features: {len(final_gdf)}"
+                    )
+                else:
+                    # Non-paginated download (e.g., direct JSON files)
+                    self.stdout.write(f"  Starting download: {source}")
+                    response = requests.get(source, stream=True, timeout=300)
+                    response.raise_for_status()
+
+                    total_size = int(response.headers.get("content-length", 0))
+                    bytes_data = io.BytesIO()
+                    downloaded = 0
+                    last_percent = -1
+
+                    for chunk in response.iter_content(chunk_size=chunk_size * 1024):
+                        bytes_data.write(chunk)
+                        if total_size > 0:
+                            downloaded += len(chunk)
+                            percent = int(100 * downloaded / total_size)
+                            if percent % 10 == 0 and percent != last_percent:
+                                self.stdout.write(f"    Download Progress: {percent}%")
+                                last_percent = percent
+
+                    self.stdout.write(
+                        "  Download complete. Parsing JSON into GeoPandas..."
+                    )
+                    bytes_data.seek(0)
+                    final_gdf = gpd.read_file(bytes_data)
             else:
                 self.stdout.write(f"  Loading local file: {source}")
                 final_gdf = gpd.read_file(source)
 
             final_gdf.columns = [c.lower() for c in final_gdf.columns]
 
-            # 3. Geometric Processing
-            if len(final_gdf) > 1000 and specific_code_col in final_gdf.columns:
+            # 3. Geometric Processing (ONLY for Northern Ireland Small Areas that need dissolving)
+            # Northern Ireland downloads ~4500 small areas that need to be dissolved into ~890 SOAs
+            is_ni_small_areas = (
+                table_name == "deprivation_scores_soa"
+                and len(final_gdf) > 1000
+                and specific_code_col in final_gdf.columns
+            )
+
+            if is_ni_small_areas:
                 self.stdout.write(
-                    f"  Condensing {len(final_gdf)} Small Areas into 890 SOAs (Memory Intensive)..."
+                    f"  Condensing {len(final_gdf)} Small Areas into ~890 SOAs (Memory Intensive)..."
                 )
 
                 if final_gdf.crs is None:
@@ -376,16 +483,52 @@ class Command(BaseCommand):
                 )
 
             # 4. Standardize CRS & Geometry Type
-            if final_gdf.crs is None or final_gdf.geometry.iloc[0].centroid.x > 1000:
-                final_gdf.set_crs("EPSG:29903", allow_override=True, inplace=True)
+            # Only apply Irish projection logic to Northern Ireland data
+            if table_name == "deprivation_scores_soa":
+                if (
+                    final_gdf.crs is None
+                    or final_gdf.geometry.iloc[0].centroid.x > 1000
+                ):
+                    final_gdf.set_crs("EPSG:29903", allow_override=True, inplace=True)
 
-            if final_gdf.crs != "EPSG:4326":
-                self.stdout.write("  Reprojecting to WGS84...")
+            # Ensure we have WGS84 (EPSG:4326) for database storage
+            if final_gdf.crs is None:
+                self.stdout.write("  Warning: No CRS detected, assuming WGS84...")
+                final_gdf.set_crs("EPSG:4326", inplace=True)
+            elif final_gdf.crs != "EPSG:4326":
+                self.stdout.write(f"  Reprojecting from {final_gdf.crs} to WGS84...")
                 final_gdf = final_gdf.to_crs("EPSG:4326")
 
-            final_gdf["geometry"] = final_gdf["geometry"].map(
-                lambda g: g if g.geom_type == "MultiPolygon" else MultiPolygon([g])
-            )
+            # Convert to MultiPolygon only if needed (preserve valid geometries)
+            def ensure_multipolygon(geom):
+                if geom.geom_type == "MultiPolygon":
+                    return geom
+                elif geom.geom_type == "Polygon":
+                    return MultiPolygon([geom])
+                else:
+                    # For other types, try to extract polygons
+                    return MultiPolygon(
+                        [g for g in geom.geoms if g.geom_type == "Polygon"]
+                    )
+
+            final_gdf["geometry"] = final_gdf["geometry"].map(ensure_multipolygon)
+
+            # DEBUG: Check geometry point counts before database insert
+            sample_geom = final_gdf["geometry"].iloc[0] if len(final_gdf) > 0 else None
+            if sample_geom:
+                from shapely import wkt
+
+                point_count = (
+                    len(sample_geom.exterior.coords)
+                    if hasattr(sample_geom, "exterior")
+                    else sum(len(p.exterior.coords) for p in sample_geom.geoms)
+                )
+                self.stdout.write(
+                    f"  DEBUG: Sample geometry has {point_count} points before database insert"
+                )
+                self.stdout.write(
+                    f"  DEBUG: CRS = {final_gdf.crs}, Geometry type = {sample_geom.geom_type}"
+                )
 
             # 5. Database Merge
             db = settings.DATABASES["default"]
@@ -400,16 +543,53 @@ class Command(BaseCommand):
                 temp_table, engine, if_exists="replace", index=False
             )
 
+            # DEBUG: Check temp table geometry after to_postgis
             with connection.cursor() as cursor:
                 cursor.execute(
+                    f"SELECT ST_NPoints(geometry) FROM {temp_table} LIMIT 1;"
+                )
+                temp_points = cursor.fetchone()[0]
+                cursor.execute(
+                    f"SELECT ST_GeometryType(geometry), ST_SRID(geometry) FROM {temp_table} LIMIT 1;"
+                )
+                temp_type, temp_srid = cursor.fetchone()
+                self.stdout.write(
+                    f"  DEBUG: Temp table - {temp_points} points, type={temp_type}, SRID={temp_srid}"
+                )
+
+                cursor.execute(
+                    f"SELECT ST_GeometryType(geom), ST_SRID(geom) FROM {table_name} WHERE year = %s LIMIT 1;",
+                    [year],
+                )
+                result = cursor.fetchone()
+                if result:
+                    main_type, main_srid = result
+                    self.stdout.write(
+                        f"  DEBUG: Main table - type={main_type}, SRID={main_srid}"
+                    )
+
+            with connection.cursor() as cursor:
+                # Use explicit geometry cast to prevent any implicit simplification
+                cursor.execute(
                     f"""
-                    UPDATE {table_name} SET geom = t.geometry
+                    UPDATE {table_name} SET geom = t.geometry::geometry(MultiPolygon, 4326)
                     FROM {temp_table} t
                     WHERE {table_name}.{django_col} = t.{specific_code_col} AND {table_name}.year = %s;
                 """,
                     [year],
                 )
                 count = cursor.rowcount
+
+                # DEBUG: Check main table immediately after UPDATE
+                cursor.execute(
+                    f"SELECT ST_NPoints(geom) FROM {table_name} WHERE year = %s LIMIT 1;",
+                    [year],
+                )
+                main_points = cursor.fetchone()[0]
+                self.stdout.write(
+                    f"  DEBUG: Main table has {main_points} points immediately after UPDATE"
+                )
+
                 cursor.execute(f"DROP TABLE IF EXISTS {temp_table};")
                 connection.commit()
 
@@ -549,7 +729,7 @@ class Command(BaseCommand):
         BFC_DATASETS = [
             {
                 "name": "LSOA 2011 BFC",
-                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Lower_layer_Super_Output_Areas_Dec_2011_Boundaries_Full_Clipped_BFC_EW_V3_2022/FeatureServer/0/query",
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Lower_layer_Super_Output_Areas_Dec_2011_Boundaries_Full_Clipped_BFC_EW_V3_2022/FeatureServer/0/query?where=1=1&outFields=*&f=geojson",
                 "table": "deprivation_scores_lsoa",
                 "django_code_col": "lsoa_code",
                 "year": 2011,
@@ -557,7 +737,7 @@ class Command(BaseCommand):
             },
             {
                 "name": "LSOA 2021 BFC",
-                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LSOA_2021_EW_BFE_V10_RUC/FeatureServer/3/query",
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LSOA_2021_EW_BFE_V10_RUC/FeatureServer/3/query?where=1=1&outFields=*&f=geojson",
                 "table": "deprivation_scores_lsoa",
                 "django_code_col": "lsoa_code",
                 "year": 2021,
@@ -565,7 +745,7 @@ class Command(BaseCommand):
             },
             {
                 "name": "LAD 2024 BFC",
-                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_May_2024_Boundaries_UK_BFC/FeatureServer/0/query",
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_May_2024_Boundaries_UK_BFC/FeatureServer/0/query?where=1=1&outFields=*&f=geojson",
                 "table": "deprivation_scores_localauthority",
                 "django_code_col": "local_authority_district_code",
                 "year": 2024,
@@ -575,7 +755,7 @@ class Command(BaseCommand):
             {
                 "name": "LAD 2019 BFC",
                 # Note the _2022 suffix and the /0/query at the end
-                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LAD_Dec_2019_Boundaries_UK_BFC_2022/FeatureServer/0/query",
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LAD_Dec_2019_Boundaries_UK_BFC_2022/FeatureServer/0/query?where=1=1&outFields=*&f=geojson",
                 "table": "deprivation_scores_localauthority",
                 "django_code_col": "local_authority_district_code",
                 "year": 2019,
@@ -584,11 +764,12 @@ class Command(BaseCommand):
             },
             {
                 "name": "Scotland DataZones 2011 BFC",
-                "url": "https://maps.gov.scot/server/rest/services/ScotGov/StatisticalUnits/MapServer/2/query",
+                "url": "https://maps.gov.scot/server/rest/services/ScotGov/StatisticalUnits/MapServer/2/query?where=1=1&outFields=*&f=geojson",
                 "table": "deprivation_scores_datazone",
-                "django_code_col": "data_zone_code",  # Matched to model
+                "django_code_col": "data_zone_code",
                 "year": 2011,
                 "code_column": "DataZone",
+                "chunk_size": 100,
             },
             {
                 "name": "Northern Ireland SOA 2011 (Auto-Processed)",
