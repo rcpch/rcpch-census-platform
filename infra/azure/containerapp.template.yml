@@ -8,16 +8,7 @@ properties:
       targetPort: 8000
       transport: auto
       allowInsecure: false
-    secrets:
-      - name: db-password
-      - name: django-secret-key
-      - name: postgres-db-host
-      - name: postgres-db-name
-      - name: postgres-db-password
-      - name: postgres-db-port
-      - name: postgres-db-user
-      - name: tiles-db-url
-      - name: postcodes-io-api-key
+        # secrets section removed; rely on existing secrets set in Azure
   template:
     containers:
       # PostgreSQL with PostGIS - runs as sidecar
