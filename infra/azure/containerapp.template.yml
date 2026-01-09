@@ -1,96 +1,139 @@
-# Template for az containerapp update/create --yaml.
-#
-# Runs 4 containers in one Container App revision:
-# - proxy (nginx): public ingress on port 80
-# - web (django): DRF API on 8001
-# - db (postgis): persistent volume
-# - tiles (pg_tileserv): vector tiles on 7800
-#
-# Placeholders substituted by the GitHub Action:
-#   __ACR_LOGIN_SERVER__  e.g. myacr.azurecr.io (or docker.io/your-org)
-#   __IMAGE_TAG__         e.g. git SHA
-#   __ENV_STORAGE_NAME__  container apps env storage name for Azure Files
-#   __DJANGO_ALLOWED_HOSTS__
-#   __DJANGO_CSRF_TRUSTED_ORIGINS__
-
+# infra/azure/containerapp.template.yml
 properties:
+  environmentId: resourceId('Microsoft.App/managedEnvironments', '__ENV_STORAGE_NAME__')
   configuration:
     activeRevisionsMode: Single
     ingress:
       external: true
-      targetPort: 80
-      transport: Auto
+      targetPort: 8000
+      transport: auto
       allowInsecure: false
+    secrets:
+      - name: db-password
+        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postgres-password
+        identity: system
+      - name: django-secret-key
+        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/django-secret-key
+        identity: system
+      - name: postgres-db-host
+        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postgres-db-host
+        identity: system
+      - name: postgres-db-name
+        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postgres-db-name
+        identity: system
+      - name: postgres-db-password
+        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postgres-db-password
+        identity: system
+      - name: postgres-db-port
+        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postgres-db-port
+        identity: system
+      - name: postgres-db-user
+        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postgres-db-user
+        identity: system
+      - name: sentry-dsn
+        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/sentry-dsn
+        identity: system
+      - name: tiles-db-url
+        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/tiles-db-url
+        identity: system
+      - name: postcodes-io-api-key
+        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postcodes-io-api-key
+        identity: system
+
   template:
-    scale:
-      minReplicas: 1
-      maxReplicas: 1
     containers:
+      # PostgreSQL with PostGIS - runs as sidecar
+      - name: db
+        image: postgis/postgis:15-3.4
+        env:
+          - name: POSTGRES_USER
+            secretRef: postgres-db-user
+          - name: POSTGRES_PASSWORD
+            secretRef: postgres-db-password
+          - name: POSTGRES_DB
+            secretRef: postgres-db-name
+          - name: DB_DUMP_VERSION
+            value: "__DB_DUMP_VERSION__"
+          - name: PGDATA
+            value: "/var/lib/postgresql/data/pgdata"
+        command:
+          - /bin/bash
+          - -c
+          - |
+            # Download init script from GitHub
+            mkdir -p /docker-entrypoint-initdb.d
+            wget -O /docker-entrypoint-initdb.d/01-init.sh \
+              https://raw.githubusercontent.com/rcpch/rcpch-census-platform/shapes/init-db/01-download-and-restore.sh
+            chmod +x /docker-entrypoint-initdb.d/01-init.sh
+            
+            # Start PostgreSQL
+            exec docker-entrypoint.sh postgres
+        resources:
+          cpu: 2.0
+          memory: 4Gi
+
+      # Django Web App
       - name: web
         image: __ACR_LOGIN_SERVER__/rcpch-census-web:__IMAGE_TAG__
+        env:
+          - name: DJANGO_ALLOWED_HOSTS
+            value: "__DJANGO_ALLOWED_HOSTS__"
+          - name: DJANGO_CSRF_TRUSTED_ORIGINS
+            value: "__DJANGO_CSRF_TRUSTED_ORIGINS__"
+          - name: DJANGO_SECRET_KEY
+            secretRef: django-secret-key
+          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST
+            value: "localhost"
+          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME
+            secretRef: postgres-db-name
+          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD
+            secretRef: postgres-db-password
+          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT
+            value: "5432"
+          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER
+            secretRef: postgres-db-user
+          - name: POSTCODES_IO_API_KEY
+            secretRef: postcodes-io-api-key
+          - name: SENTRY_DSN
+            secretRef: sentry-dsn
+          - name: SENTRY_ENVIRONMENT
+            value: "shapes"
+          - name: SENTRY_TRACES_SAMPLE_RATE
+            value: "0.1"
+        probes:
+          - type: Startup
+            httpGet:
+              path: /health/
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 60
+          - type: Liveness
+            httpGet:
+              path: /health/
+              port: 8000
+            periodSeconds: 30
+            failureThreshold: 3
+          - type: Readiness
+            httpGet:
+              path: /health/
+              port: 8000
+            periodSeconds: 10
+            failureThreshold: 3
+        resources:
+          cpu: 1.0
+          memory: 2Gi
+
+      # pg_tileserv for vector tiles
+      - name: tiles
+        image: pramsey/pg_tileserv:latest
+        env:
+          - name: DATABASE_URL
+            secretRef: tiles-db-url
         resources:
           cpu: 0.5
           memory: 1Gi
-        env:
-          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER
-            value: rcpchCensususer
-          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD
-            secretRef: postgres-password
-          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME
-            value: rcpchCensusdb
-          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST
-            value: 127.0.0.1
-          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT
-            value: "5432"
-          - name: RCPCH_CENSUS_ENGINE_SECRET_KEY
-            secretRef: django-secret-key
-          - name: DEBUG
-            value: "False"
-          - name: DJANGO_ALLOWED_HOSTS
-            value: __DJANGO_ALLOWED_HOSTS__
-          - name: DJANGO_CSRF_TRUSTED_ORIGINS
-            value: __DJANGO_CSRF_TRUSTED_ORIGINS__
-          - name: POSTCODES_IO_API_URL
-            value: https://api.rcpch.ac.uk/postcodes
-          - name: POSTCODES_IO_API_KEY
-            secretRef: postcodes-io-api-key
-        command:
-          - sh
-          - -c
-          - >
-            /app/s/wait-for-db.sh &&
-            python -u manage.py collectstatic --noinput &&
-            python -u manage.py migrate &&
-            gunicorn rcpch_census_platform.wsgi:application --bind 0.0.0.0:8001
-      - name: db
-        image: ghcr.io/rcpch/rcpch-census-postgis:__IMAGE_TAG__
-        probes:
-          - type: Liveness
-            tcpSocket:
-              port: 5432
-            initialDelaySeconds: 30
-            periodSeconds: 10
-        resources:
-          cpu: 0.5
-          memory: 1.5Gi
-        env:
-          - name: POSTGRES_USER
-            value: rcpchCensususer
-          - name: POSTGRES_PASSWORD
-            secretRef: postgres-password
-          - name: POSTGRES_DB
-            value: rcpchCensusdb
-      - name: tiles
-        image: pramsey/pg_tileserv:latest
-        resources:
-          cpu: 0.5
-          memory: 0.5Gi
-        env:
-          - name: TS_TILE_EXTENT
-            value: "8192"
-          - name: TS_TILE_BUFFER
-            value: "256"
-          - name: HTTP_CORS_ORIGIN
-            value: "*"
-          - name: DATABASE_URL
-            secretRef: tiles-db-url
+
+    scale:
+      minReplicas: 1
+      maxReplicas: 1

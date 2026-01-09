@@ -3,7 +3,7 @@ name: Deploy to Azure Container Apps (shapes)
 on:
   push:
     branches:
-      - live
+      - shapes
   workflow_dispatch:
 
 permissions:
@@ -16,20 +16,11 @@ concurrency:
 
 env:
   AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
-  # Update if your Container App name differs.
   AZURE_CONTAINERAPP_NAME: rcpch-census-platform-v2
-
-  # ACR resource name (NOT login server). Example: myregistry
-  # Store as a GitHub Secret (or Variable) named ACR_NAME.
   ACR_NAME: ${{ secrets.ACR_NAME }}
-
-  # ACR login server. Example: myregistry.azurecr.io
-  # Store as a GitHub Secret (or Variable) named ACR_LOGIN_SERVER.
   ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
-
-  # Image names
   WEB_IMAGE_NAME: rcpch-census-web
-  PROXY_IMAGE_NAME: rcpch-census-proxy
+  DB_DUMP_VERSION: v1.1.0
 
 jobs:
   deploy:
@@ -60,17 +51,15 @@ jobs:
           docker build -f Dockerfile.postgis -t "${ACR_LOGIN_SERVER}/${WEB_IMAGE_NAME}:${GITHUB_SHA}" .
           docker push "${ACR_LOGIN_SERVER}/${WEB_IMAGE_NAME}:${GITHUB_SHA}"
 
-      # NOTE: This workflow no longer configures registry username/password on the Container App.
-      # For runtime pulls from ACR, configure the Container App to use managed identity + AcrPull
-      # (do once in Azure). This avoids long-lived registry passwords.
-
       - name: Render Container App YAML
         shell: bash
         env:
           ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
-          ENV_STORAGE_NAME: ${{ secrets.ACA_ENV_STORAGE_NAME }}
           DJANGO_ALLOWED_HOSTS: ${{ secrets.DJANGO_ALLOWED_HOSTS }}
           DJANGO_CSRF_TRUSTED_ORIGINS: ${{ secrets.DJANGO_CSRF_TRUSTED_ORIGINS }}
+          DB_DUMP_VERSION: ${{ env.DB_DUMP_VERSION }}
+          KEY_VAULT_NAME: ${{ secrets.KEY_VAULT_NAME }}
+          ENV_STORAGE_NAME: ${{ secrets.ENV_STORAGE_NAME }}
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -83,9 +72,11 @@ jobs:
           replacements = {
               '__ACR_LOGIN_SERVER__': os.environ['ACR_LOGIN_SERVER'],
               '__IMAGE_TAG__': os.environ['GITHUB_SHA'],
-              '__ENV_STORAGE_NAME__': os.environ['ENV_STORAGE_NAME'],
               '__DJANGO_ALLOWED_HOSTS__': os.environ['DJANGO_ALLOWED_HOSTS'],
               '__DJANGO_CSRF_TRUSTED_ORIGINS__': os.environ['DJANGO_CSRF_TRUSTED_ORIGINS'],
+              '__DB_DUMP_VERSION__': os.environ['DB_DUMP_VERSION'],
+              '__KEY_VAULT_NAME__': os.environ['KEY_VAULT_NAME'],
+              '__ENV_STORAGE_NAME__': os.environ['ENV_STORAGE_NAME'],
           }
 
           for k, v in replacements.items():
@@ -106,4 +97,5 @@ jobs:
       - name: Show FQDN
         shell: bash
         run: |
-          az containerapp show -n "${AZURE_CONTAINERAPP_NAME}" -g "${AZURE_RESOURCE_GROUP}" --query properties.configuration.ingress.fqdn -o tsv
+          FQDN=$(az containerapp show -n "${AZURE_CONTAINERAPP_NAME}" -g "${AZURE_RESOURCE_GROUP}" --query properties.configuration.ingress.fqdn -o tsv)
+          echo "Application URL: https://${FQDN}"
