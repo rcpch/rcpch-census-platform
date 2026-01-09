@@ -10,23 +10,14 @@ properties:
       allowInsecure: false
     secrets:
       - name: db-password
-        secretRef: postgres-password
       - name: django-secret-key
-        secretRef: django-secret-key
       - name: postgres-db-host
-        secretRef: postgres-db-host
       - name: postgres-db-name
-        secretRef: postgres-db-name
       - name: postgres-db-password
-        secretRef: postgres-db-password
       - name: postgres-db-port
-        secretRef: postgres-db-port
       - name: postgres-db-user
-        secretRef: postgres-db-user 
       - name: tiles-db-url
-        secretRef: tiles-db-url
       - name: postcodes-io-api-key
-        secretRef: postcodes-io-api-key
   template:
     containers:
       # PostgreSQL with PostGIS - runs as sidecar
