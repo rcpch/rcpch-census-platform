@@ -294,11 +294,44 @@ class Command(BaseCommand):
             "VACUUM ANALYZE public.uk_master_2021_z8_10;",
         ]
 
+        def table_or_view_exists(cursor, name):
+            # Accepts schema-qualified names like public.foo
+            if '.' in name:
+                schema, rel = name.split('.', 1)
+            else:
+                schema, rel = 'public', name
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables WHERE table_schema=%s AND table_name=%s
+                    UNION
+                    SELECT 1 FROM information_schema.views WHERE table_schema=%s AND table_name=%s
+                )
+            """, [schema, rel, schema, rel])
+            return cursor.fetchone()[0]
+
         with connection.cursor() as cursor:
             for statement in sql_statements:
+                stmt = statement.strip()
+                # Check for ANALYZE, VACUUM, CLUSTER, etc. that require table/view existence
+                skip = False
+                for op in ["ANALYZE", "VACUUM", "CLUSTER", "GRANT", "CREATE INDEX", "DROP INDEX"]:
+                    if stmt.startswith(op):
+                        # Extract table/view name (naive split, works for your patterns)
+                        tokens = stmt.split()
+                        # e.g. ANALYZE public.uk_master_2011_z8_10;
+                        for t in tokens[1:]:
+                            t = t.strip(';')
+                            if '.' in t or t.isidentifier():
+                                if not table_or_view_exists(cursor, t):
+                                    self.stdout.write(self.style.WARNING(f"  Skipping '{op}' for missing table/view: {t}"))
+                                    skip = True
+                                break
+                        break
+                if skip:
+                    continue
                 try:
-                    if statement.strip():
-                        cursor.execute(statement)
+                    if stmt:
+                        cursor.execute(stmt)
                 except Exception as e:
                     self.stderr.write(self.style.ERROR(f"SQL Error: {e}"))
 
