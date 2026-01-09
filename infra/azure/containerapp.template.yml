@@ -10,36 +10,23 @@ properties:
       allowInsecure: false
     secrets:
       - name: db-password
-        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postgres-password
-        identity: system
+        secretRef: postgres-password
       - name: django-secret-key
-        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/django-secret-key
-        identity: system
+        secretRef: django-secret-key
       - name: postgres-db-host
-        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postgres-db-host
-        identity: system
+        secretRef: postgres-db-host
       - name: postgres-db-name
-        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postgres-db-name
-        identity: system
+        secretRef: postgres-db-name
       - name: postgres-db-password
-        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postgres-db-password
-        identity: system
+        secretRef: postgres-db-password
       - name: postgres-db-port
-        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postgres-db-port
-        identity: system
+        secretRef: postgres-db-port
       - name: postgres-db-user
-        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postgres-db-user
-        identity: system
-      - name: sentry-dsn
-        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/sentry-dsn
-        identity: system
+        secretRef: postgres-db-user 
       - name: tiles-db-url
-        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/tiles-db-url
-        identity: system
+        secretRef: tiles-db-url
       - name: postcodes-io-api-key
-        keyVaultUrl: https://__KEY_VAULT_NAME__.vault.azure.net/secrets/postcodes-io-api-key
-        identity: system
-
+        secretRef: postcodes-io-api-key
   template:
     containers:
       # PostgreSQL with PostGIS - runs as sidecar
@@ -94,12 +81,6 @@ properties:
             secretRef: postgres-db-user
           - name: POSTCODES_IO_API_KEY
             secretRef: postcodes-io-api-key
-          - name: SENTRY_DSN
-            secretRef: sentry-dsn
-          - name: SENTRY_ENVIRONMENT
-            value: "shapes"
-          - name: SENTRY_TRACES_SAMPLE_RATE
-            value: "0.1"
         probes:
           - type: Startup
             httpGet:
