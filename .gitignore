@@ -131,4 +131,10 @@ build_info.json
 # Ignore large generated/staging geojson and shapefiles
 deprivation_scores/geojson/
 deprivation_scores/shape_files/
-rcpch_census_seeded.dump
+postgis_dump_files/
+
+rcpch-census-v1.1.0.dump
+rcpch-census-v1.1.0.dump.part-aa
+rcpch-census-v1.1.0.dump.part-ab
+rcpch-census-v1.1.0.dump.part-ac
+rcpch-census.dump

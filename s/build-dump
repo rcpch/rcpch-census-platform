@@ -1,0 +1,157 @@
+#!/bin/bash
+# s/build-dump.sh
+# Creates a database dump file locally
+
+set -e
+
+DUMP_DIR="postgis_dump_files"
+DUMP_FILE="${DUMP_DIR}/rcpch-census.dump"
+CONTAINER_NAME="census-build-db"
+
+echo "=========================================="
+echo "RCPCH Census Database Dump Builder"
+echo "=========================================="
+echo ""
+
+# Create dump directory if it doesn't exist
+mkdir -p "$DUMP_DIR"
+
+# Check if dump already exists (either single file or split files)
+EXISTING_DUMP=false
+if [ -f "$DUMP_FILE" ]; then
+    EXISTING_DUMP=true
+    DUMP_TYPE="single file"
+elif ls ${DUMP_DIR}/rcpch-census.dump.part-* 1> /dev/null 2>&1; then
+    EXISTING_DUMP=true
+    DUMP_TYPE="split files ($(ls ${DUMP_DIR}/rcpch-census.dump.part-* | wc -l) parts)"
+fi
+
+if [ "$EXISTING_DUMP" = true ]; then
+    echo "⚠ Dump already exists: $DUMP_TYPE"
+    read -p "Do you want to rebuild it? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Using existing dump."
+        exit 0
+    fi
+    echo "Rebuilding dump..."
+    rm -f "$DUMP_FILE"
+    rm -f ${DUMP_DIR}/rcpch-census.dump.part-*
+fi
+
+# Check if build container is already running
+if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Cleaning up existing build container..."
+    docker rm -f "$CONTAINER_NAME" || true
+fi
+
+# Start PostGIS container
+echo ""
+echo "Starting PostGIS container..."
+docker run -d --name "$CONTAINER_NAME" \
+  -e POSTGRES_USER=rcpchCensususer \
+  -e POSTGRES_PASSWORD=buildpass \
+  -e POSTGRES_DB=rcpchCensusdb \
+  -p 5432:5432 \
+  postgis/postgis:15-3.4
+
+# Wait for database to be ready
+echo "Waiting for database to be ready..."
+for i in {1..60}; do
+  if docker exec "$CONTAINER_NAME" pg_isready -U rcpchCensususer > /dev/null 2>&1; then
+    echo "✓ Database is ready"
+    break
+  fi
+  if [ $i -eq 60 ]; then
+    echo "✗ Database failed to start in time"
+    docker rm -f "$CONTAINER_NAME"
+    exit 1
+  fi
+  sleep 2
+done
+
+# Build Django image if needed
+echo ""
+echo "Building Django seeder image..."
+DJANGO_IMAGE=$(docker build -q -f Dockerfile.postgis .)
+
+# Run seeding commands
+echo ""
+echo "Running database migrations and seeding..."
+echo "This may take a while (15-30 minutes for large datasets)..."
+echo ""
+
+docker run --rm --network host \
+  -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER=rcpchCensususer \
+  -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD=buildpass \
+  -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME=rcpchCensusdb \
+  -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST=127.0.0.1 \
+  -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT=5432 \
+  -e DJANGO_SECRET_KEY=dummy-build-key \
+  -e PYTHONUNBUFFERED=1 \
+  "$DJANGO_IMAGE" \
+  sh -c "/app/s/wait-for-db.sh && \
+         python manage.py migrate --noinput && \
+         python manage.py seed --mode=__all__ && \
+         python manage.py seed --mode=import_bfc_boundaries"
+
+if [ $? -ne 0 ]; then
+    echo "✗ Seeding failed"
+    docker rm -f "$CONTAINER_NAME"
+    exit 1
+fi
+
+echo ""
+echo "✓ Seeding completed successfully"
+
+# Create dump file
+echo ""
+echo "Creating database dump (this may take several minutes)..."
+docker exec "$CONTAINER_NAME" pg_dump \
+  -U rcpchCensususer \
+  -Fc -Z 9 \
+  -f /tmp/rcpch-census.dump \
+  rcpchCensusdb
+
+# Copy dump to local filesystem
+docker cp "${CONTAINER_NAME}:/tmp/rcpch-census.dump" "./${DUMP_FILE}"
+
+# Get file size
+SIZE=$(du -h "$DUMP_FILE" | cut -f1)
+echo "✓ Dump created: $DUMP_FILE ($SIZE)"
+
+# Test restore in a separate container
+echo ""
+echo "Testing dump restore..."
+TEST_CONTAINER="census-test-db"
+
+docker run -d --name "$TEST_CONTAINER" \
+  -e POSTGRES_USER=testuser \
+  -e POSTGRES_PASSWORD=testpass \
+  -e POSTGRES_DB=testdb \
+  -p 5433:5432 \
+  postgis/postgis:15-3.4
+
+sleep 10
+
+if docker exec -i "$TEST_CONTAINER" pg_restore \
+  -U testuser \
+  -d testdb \
+  --no-owner < "$DUMP_FILE" > /dev/null 2>&1; then
+    echo "✓ Restore test successful"
+else
+    echo "⚠ Restore test had warnings (this may be normal)"
+fi
+
+# Cleanup
+echo ""
+echo "Cleaning up containers..."
+docker rm -f "$TEST_CONTAINER" > /dev/null 2>&1
+docker rm -f "$CONTAINER_NAME" > /dev/null 2>&1
+
+echo ""
+echo "=========================================="
+echo "✓ Dump file ready: $DUMP_FILE ($SIZE)"
+echo "=========================================="
+echo ""
+echo "Run './s/release-dump.sh' to create a GitHub release"
