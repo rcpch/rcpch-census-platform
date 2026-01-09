@@ -309,9 +309,11 @@ class Command(BaseCommand):
             """, [schema, rel, schema, rel])
             return cursor.fetchone()[0]
 
+        print("[POSTPROCESS] Starting SQL post-processing...")
         with connection.cursor() as cursor:
             for statement in sql_statements:
                 stmt = statement.strip()
+                print(f"[POSTPROCESS] Executing: {stmt}")
                 # Check for ANALYZE, VACUUM, CLUSTER, etc. that require table/view existence
                 skip = False
                 for op in ["ANALYZE", "VACUUM", "CLUSTER", "GRANT", "CREATE INDEX", "DROP INDEX"]:
@@ -323,7 +325,9 @@ class Command(BaseCommand):
                             t = t.strip(';')
                             if '.' in t or t.isidentifier():
                                 if not table_or_view_exists(cursor, t):
-                                    self.stdout.write(self.style.WARNING(f"  Skipping '{op}' for missing table/view: {t}"))
+                                    msg = f"  Skipping '{op}' for missing table/view: {t}"
+                                    self.stdout.write(self.style.WARNING(msg))
+                                    print(f"[POSTPROCESS] WARNING: {msg}")
                                     skip = True
                                 break
                         break
@@ -332,8 +336,12 @@ class Command(BaseCommand):
                 try:
                     if stmt:
                         cursor.execute(stmt)
+                        print(f"[POSTPROCESS] Success: {stmt}")
                 except Exception as e:
-                    self.stderr.write(self.style.ERROR(f"SQL Error: {e}"))
+                    err_msg = f"SQL Error: {e}"
+                    self.stderr.write(self.style.ERROR(err_msg))
+                    print(f"[POSTPROCESS] ERROR: {err_msg}")
+        print("[POSTPROCESS] SQL post-processing complete.")
 
         self.stdout.write(
             self.style.SUCCESS("✅ Post-processing and spatial optimizations complete.")
@@ -700,30 +708,51 @@ class Command(BaseCommand):
             self.style.MIGRATE_LABEL("\n🔍 Validating Spatial Data & Views...")
         )
 
+
+        def view_exists(cursor, name):
+            if '.' in name:
+                schema, rel = name.split('.', 1)
+            else:
+                schema, rel = 'public', name
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.views WHERE table_schema=%s AND table_name=%s
+                )
+            """, [schema, rel])
+            return cursor.fetchone()[0]
+
         with connection.cursor() as cursor:
             # 1. Check the 2011 Master View
             self.stdout.write("Checking 2011 Era (2019 IMD)...")
-            cursor.execute(
+            if view_exists(cursor, "uk_master_2011_z8_10"):
+                cursor.execute(
+                    """
+                    SELECT nation, COUNT(*) 
+                    FROM public.uk_master_2011_z8_10 
+                    GROUP BY nation;
                 """
-                SELECT nation, COUNT(*) 
-                FROM public.uk_master_2011_z8_10 
-                GROUP BY nation;
-            """
-            )
-            results_2011 = cursor.fetchall()
-            nations_2011 = {row[0]: row[1] for row in results_2011}
+                )
+                results_2011 = cursor.fetchall()
+                nations_2011 = {row[0]: row[1] for row in results_2011}
+            else:
+                self.stdout.write(self.style.WARNING("  Skipping 2011 view check: public.uk_master_2011_z8_10 does not exist."))
+                nations_2011 = {}
 
             # 2. Check the 2021 Master View
             self.stdout.write("Checking 2021 Era (2025 IMD)...")
-            cursor.execute(
+            if view_exists(cursor, "uk_master_2021_z8_10"):
+                cursor.execute(
+                    """
+                    SELECT nation, COUNT(*) 
+                    FROM public.uk_master_2021_z8_10 
+                    GROUP BY nation;
                 """
-                SELECT nation, COUNT(*) 
-                FROM public.uk_master_2021_z8_10 
-                GROUP BY nation;
-            """
-            )
-            results_2021 = cursor.fetchall()
-            nations_2021 = {row[0]: row[1] for row in results_2021}
+                )
+                results_2021 = cursor.fetchall()
+                nations_2021 = {row[0]: row[1] for row in results_2021}
+            else:
+                self.stdout.write(self.style.WARNING("  Skipping 2021 view check: public.uk_master_2021_z8_10 does not exist."))
+                nations_2021 = {}
 
             expected_nations = ["england", "wales", "scotland", "northern_ireland"]
 
@@ -740,23 +769,26 @@ class Command(BaseCommand):
 
             # 3. Coordinate System Verification
             # Using the 2021 view for the sample
-            cursor.execute(
-                "SELECT ST_X(ST_Centroid(geom)) FROM public.uk_master_2021_z8_10 LIMIT 1;"
-            )
-            coord_sample = cursor.fetchone()
+            if view_exists(cursor, "uk_master_2021_z8_10"):
+                cursor.execute(
+                    "SELECT ST_X(ST_Centroid(geom)) FROM public.uk_master_2021_z8_10 LIMIT 1;"
+                )
+                coord_sample = cursor.fetchone()
 
-            if coord_sample and abs(coord_sample[0]) > 180:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        "  ✅ Coordinate System: Web Mercator (EPSG:3857) confirmed."
+                if coord_sample and abs(coord_sample[0]) > 180:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            "  ✅ Coordinate System: Web Mercator (EPSG:3857) confirmed."
+                        )
                     )
-                )
+                else:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            "  ⚠️ Coordinate System: Geometry may be in degrees (WGS84). Check ST_Transform logic."
+                        )
+                    )
             else:
-                self.stdout.write(
-                    self.style.WARNING(
-                        "  ⚠️ Coordinate System: Geometry may be in degrees (WGS84). Check ST_Transform logic."
-                    )
-                )
+                self.stdout.write(self.style.WARNING("  Skipping coordinate system check: public.uk_master_2021_z8_10 does not exist."))
 
         self.stdout.write(self.style.SUCCESS("✨ Validation Complete.\n"))
 
