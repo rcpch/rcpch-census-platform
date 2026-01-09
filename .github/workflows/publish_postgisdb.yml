@@ -30,7 +30,7 @@ jobs:
           docker pull postgis/postgis:15-3.4
           docker tag postgis/postgis:15-3.4 $REGISTRY/$ORG/$IMAGE_NAME:base
 
-      - name: Build DRF app image
+      - name: Build DRF app image (for seeding only)
         run: |
           docker build -t $REGISTRY/$ORG/$WEB_IMAGE_NAME:seed -f Dockerfile.postgis .
 
@@ -38,9 +38,17 @@ jobs:
         run: |
           docker run -d --name seed-db -p 5432:5432 -e POSTGRES_USER=rcpchCensususer -e POSTGRES_PASSWORD=seedpw -e POSTGRES_DB=rcpchCensusdb $REGISTRY/$ORG/$IMAGE_NAME:base
 
-      - name: Run Django seed command
+      - name: Wait for DB to be ready
+        run: |
+          for i in {1..30}; do
+            docker exec seed-db pg_isready -U rcpchCensususer && exit 0
+            sleep 2
+          done
+          echo "Database did not become ready in time" >&2
+          exit 1
+
+      - name: Run Django seed commands (one-shot)
         env:
-          # Add any secrets needed for your Django app here
           DJANGO_SECRET_KEY: dummy
         run: |
           set -o pipefail
@@ -55,6 +63,8 @@ jobs:
             -e PYTHONUNBUFFERED=1 \
             $REGISTRY/$ORG/$WEB_IMAGE_NAME:seed \
             sh -c "/app/s/wait-for-db.sh && python -u manage.py migrate --noinput && python -u manage.py seed --mode=__all__ && python -u manage.py seed --mode=import_bfc_boundaries" | tee seed-run.log
+
+      # At this point, the seed-db container has the seeded database. Commit it as the final image.
 
       - name: Upload seed run logs
         uses: actions/upload-artifact@v4
