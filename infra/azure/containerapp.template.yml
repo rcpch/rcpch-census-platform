@@ -1,6 +1,6 @@
 # infra/azure/containerapp.template.yml
 properties:
-  environmentId: resourceId('Microsoft.App/managedEnvironments', '__ENV_STORAGE_NAME__')
+  environmentId: __AZURE_ENVIRONMENT_ID__
   configuration:
     activeRevisionsMode: Single
     ingress:

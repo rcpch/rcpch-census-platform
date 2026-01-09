@@ -21,6 +21,7 @@ env:
   ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
   WEB_IMAGE_NAME: rcpch-census-web
   DB_DUMP_VERSION: v1.1.0
+  AZURE_ENVIRONMENT_ID: ${{ secrets.AZURE_ENVIRONMENT_ID }}
 
 jobs:
   deploy:
@@ -77,6 +78,7 @@ jobs:
               '__DB_DUMP_VERSION__': os.environ['DB_DUMP_VERSION'],
               '__KEY_VAULT_NAME__': os.environ['KEY_VAULT_NAME'],
               '__ENV_STORAGE_NAME__': os.environ['ENV_STORAGE_NAME'],
+              '__AZURE_ENVIRONMENT_ID__': os.environ['AZURE_ENVIRONMENT_ID'],
           }
 
           for k, v in replacements.items():
