@@ -209,17 +209,7 @@ class Command(BaseCommand):
 
         sql_statements = [
             # Section 1: Cleanup
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 0.5)), 3));",
-            "DROP TABLE IF EXISTS public.uk_master_2011_z0_4 CASCADE;",
-            "DROP TABLE IF EXISTS public.uk_master_2011_z5_7 CASCADE;",
-            "DROP TABLE IF EXISTS public.uk_master_2011_z8_10 CASCADE;",
-            "DROP TABLE IF EXISTS public.uk_master_2021_z0_4 CASCADE;",
-            "DROP TABLE IF EXISTS public.uk_master_2021_z5_7 CASCADE;",
-            "DROP TABLE IF EXISTS public.uk_master_2021_z8_10 CASCADE;",
-            # Also drop the LSOA-specific ones as tables
-            "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z0_4 CASCADE;",
-            "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z0_4 CASCADE;",
-            # 2. SCHEMA: Ensure columns exist
+            # 2. SCHEMA: Ensure columns exist FIRST
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
@@ -230,6 +220,17 @@ class Command(BaseCommand):
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
+            # Now do updates and drops
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 0.5)), 3));",
+            "DROP TABLE IF EXISTS public.uk_master_2011_z0_4 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2011_z5_7 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2011_z8_10 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2021_z0_4 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2021_z5_7 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2021_z8_10 CASCADE;",
+            # Also drop the LSOA-specific ones as tables
+            "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z0_4 CASCADE;",
+            "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z0_4 CASCADE;",
             "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
             # 3. GEOPROCESSING (WGS84 -> Web Mercator 3857)
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_MakeValid(geom_3857) WHERE NOT ST_IsValid(geom_3857);",
@@ -244,7 +245,7 @@ class Command(BaseCommand):
             "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 20)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
             # Mid-level simplification (z5_7)
             "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 10)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 10)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 2)), 3));",
             "UPDATE deprivation_scores_soa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 10)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
             # 5. SPATIAL INDEXING & CLUSTERING
             # 5. SPATIAL INDEXING & CLUSTERING (The Core Optimizations)
@@ -375,46 +376,93 @@ class Command(BaseCommand):
                     batch_size = 100  # Reduced from 1000 to avoid 403 Forbidden due to URL length
                     log_interval = 1000  # Log progress every 1000 features
 
-                    for i in range(0, len(object_ids), batch_size):
-                        batch_ids = object_ids[i : i + batch_size]
-                        id_list = ",".join(map(str, batch_ids))
+                    import time
+                    from requests.exceptions import (
+                        ChunkedEncodingError,
+                        ConnectionError,
+                        ReadTimeout,
+                        HTTPError,
+                    )
 
+                    max_retries = 4
+                    retry_delay = 5
+
+                    def fetch_batch(batch_ids, depth=0):
+                        id_list = ",".join(map(str, batch_ids))
                         batch_url = (
                             f"{base_url}?objectIds={id_list}&outFields=*&f=geojson"
                         )
-
-                        try:
-                            batch_response = requests.get(batch_url, timeout=300)
-                            batch_response.raise_for_status()
-                        except requests.exceptions.HTTPError as e:
-                            if e.response.status_code == 403:
+                        for attempt in range(max_retries):
+                            try:
+                                indent = "  " * (depth + 1)
                                 self.stdout.write(
-                                    f"      403 Forbidden at offset {i} - URL may be too long, skipping batch"
+                                    f"{indent}Downloading batch {batch_ids[0]}-{batch_ids[-1]} (attempt {attempt+1})..."
                                 )
-                                continue
-                            self.stdout.write(
-                                f"      HTTP Error at offset {i}: {str(e)}"
-                            )
-                            raise
-
-                        bytes_data = io.BytesIO(batch_response.content)
-                        try:
-                            batch_gdf = gpd.read_file(bytes_data)
-                            all_gdfs.append(batch_gdf)
-
-                            # Only log every 1000 features
-                            if (i + batch_size) % log_interval == 0 or (
-                                i + batch_size
-                            ) >= len(object_ids):
-                                total_fetched = sum(len(gdf) for gdf in all_gdfs)
+                                batch_response = requests.get(
+                                    batch_url, stream=True, timeout=300
+                                )
+                                batch_response.raise_for_status()
+                                total_bytes = 0
+                                bytes_data = io.BytesIO()
+                                for chunk in batch_response.iter_content(
+                                    chunk_size=1024 * 1024
+                                ):
+                                    if chunk:
+                                        bytes_data.write(chunk)
+                                        total_bytes += len(chunk)
                                 self.stdout.write(
-                                    f"    Progress: {total_fetched}/{len(object_ids)} features fetched"
+                                    f"{indent}Downloaded {total_bytes/1e6:.2f} MB for batch {batch_ids[0]}-{batch_ids[-1]}"
                                 )
-                        except Exception as e:
+                                bytes_data.seek(0)
+                                batch_gdf = gpd.read_file(bytes_data)
+                                all_gdfs.append(batch_gdf)
+                                return True
+                            except HTTPError as e:
+                                if e.response.status_code == 504 and len(batch_ids) > 1:
+                                    self.stdout.write(
+                                        f"{indent}504 Gateway Timeout for batch {batch_ids[0]}-{batch_ids[-1]}. Splitting batch..."
+                                    )
+                                    mid = len(batch_ids) // 2
+                                    fetch_batch(batch_ids[:mid], depth + 1)
+                                    fetch_batch(batch_ids[mid:], depth + 1)
+                                    return True
+                                else:
+                                    self.stdout.write(
+                                        f"{indent}HTTP Error for batch {batch_ids[0]}-{batch_ids[-1]}: {str(e)}"
+                                    )
+                                    break
+                            except (
+                                ChunkedEncodingError,
+                                ConnectionError,
+                                ReadTimeout,
+                            ) as e:
+                                self.stdout.write(
+                                    f"{indent}Connection error: {e}. Retrying ({attempt+1}/{max_retries})..."
+                                )
+                                time.sleep(retry_delay)
+                            except Exception as e:
+                                self.stdout.write(
+                                    f"{indent}Failed to parse batch {batch_ids[0]}-{batch_ids[-1]}: {str(e)}"
+                                )
+                                break
+                        else:
                             self.stdout.write(
-                                f"      Failed to parse batch at offset {i}: {str(e)}"
+                                f"{indent}Failed to download batch {batch_ids[0]}-{batch_ids[-1]} after {max_retries} attempts. Skipping."
                             )
-                            continue
+                        return False
+
+                    for i in range(0, len(object_ids), batch_size):
+                        batch_ids = object_ids[i : i + batch_size]
+                        fetch_batch(batch_ids)
+
+                    # Only log every 1000 features
+                    total_fetched = sum(len(gdf) for gdf in all_gdfs)
+                    if total_fetched % log_interval == 0 or total_fetched >= len(
+                        object_ids
+                    ):
+                        self.stdout.write(
+                            f"    Progress: {total_fetched}/{len(object_ids)} features fetched"
+                        )
 
                     if len(all_gdfs) == 0:
                         raise ValueError("No features retrieved from API")
@@ -513,23 +561,6 @@ class Command(BaseCommand):
 
             final_gdf["geometry"] = final_gdf["geometry"].map(ensure_multipolygon)
 
-            # DEBUG: Check geometry point counts before database insert
-            sample_geom = final_gdf["geometry"].iloc[0] if len(final_gdf) > 0 else None
-            if sample_geom:
-                from shapely import wkt
-
-                point_count = (
-                    len(sample_geom.exterior.coords)
-                    if hasattr(sample_geom, "exterior")
-                    else sum(len(p.exterior.coords) for p in sample_geom.geoms)
-                )
-                self.stdout.write(
-                    f"  DEBUG: Sample geometry has {point_count} points before database insert"
-                )
-                self.stdout.write(
-                    f"  DEBUG: CRS = {final_gdf.crs}, Geometry type = {sample_geom.geom_type}"
-                )
-
             # 5. Database Merge
             db = settings.DATABASES["default"]
             engine = create_engine(
@@ -548,25 +579,11 @@ class Command(BaseCommand):
                 cursor.execute(
                     f"SELECT ST_NPoints(geometry) FROM {temp_table} LIMIT 1;"
                 )
-                temp_points = cursor.fetchone()[0]
-                cursor.execute(
-                    f"SELECT ST_GeometryType(geometry), ST_SRID(geometry) FROM {temp_table} LIMIT 1;"
-                )
-                temp_type, temp_srid = cursor.fetchone()
-                self.stdout.write(
-                    f"  DEBUG: Temp table - {temp_points} points, type={temp_type}, SRID={temp_srid}"
-                )
 
                 cursor.execute(
                     f"SELECT ST_GeometryType(geom), ST_SRID(geom) FROM {table_name} WHERE year = %s LIMIT 1;",
                     [year],
                 )
-                result = cursor.fetchone()
-                if result:
-                    main_type, main_srid = result
-                    self.stdout.write(
-                        f"  DEBUG: Main table - type={main_type}, SRID={main_srid}"
-                    )
 
             with connection.cursor() as cursor:
                 # Use explicit geometry cast to prevent any implicit simplification
@@ -584,10 +601,6 @@ class Command(BaseCommand):
                 cursor.execute(
                     f"SELECT ST_NPoints(geom) FROM {table_name} WHERE year = %s LIMIT 1;",
                     [year],
-                )
-                main_points = cursor.fetchone()[0]
-                self.stdout.write(
-                    f"  DEBUG: Main table has {main_points} points immediately after UPDATE"
                 )
 
                 cursor.execute(f"DROP TABLE IF EXISTS {temp_table};")
@@ -750,7 +763,7 @@ class Command(BaseCommand):
                 "django_code_col": "local_authority_district_code",
                 "year": 2024,
                 "code_column": "LAD24CD",
-                "chunk_size": 100,  # Fewer LAs
+                "chunk_size": 1,  # Fewer LAs
             },
             {
                 "name": "LAD 2019 BFC",
@@ -799,7 +812,7 @@ class Command(BaseCommand):
                 )
 
             # Run optimizations after all datasets are imported
-            self._run_post_processing_sql()
+            # self._run_post_processing_sql()
 
             # Warm the local cache and then purge the remote CDN
             # if not settings.DEBUG:  # Only purge in production
