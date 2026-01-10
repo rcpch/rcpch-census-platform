@@ -13,6 +13,10 @@ echo "Release version: ${RELEASE_VERSION}"
 echo "Target user: ${POSTGRES_USER}"
 echo "Target database: ${POSTGRES_DB}"
 
+# Debug: Show what's in the database
+echo "Checking current database state..."
+psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt" || echo "No tables yet"
+
 # Wait for PostgreSQL to be fully ready
 echo "Waiting for PostgreSQL to be ready..."
 until pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -q; do
