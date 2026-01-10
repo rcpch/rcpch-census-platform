@@ -83,7 +83,7 @@ properties:
           - name: POSTGRES_USER
             secretRef: postgres-db-user
           - name: POSTCODES_IO_API_URL
-            value: postcode-io-api-url
+            secretRef: postcode-io-api-url
           - name: POSTCODES_IO_API_KEY
             secretRef: postcodes-io-api-key
           - name: WAIT_FOR_POPULATION
