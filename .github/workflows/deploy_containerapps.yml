@@ -47,6 +47,12 @@ jobs:
           docker build -f Dockerfile.postgis -t "ghcr.io/rcpch/rcpch-census-web:${GITHUB_SHA}" .
           docker push "ghcr.io/rcpch/rcpch-census-web:${GITHUB_SHA}"
 
+      - name: Build and push nginx image
+        shell: bash
+        run: |
+          docker build -f infra/nginx/Dockerfile -t "ghcr.io/rcpch/rcpch-census-nginx:${GITHUB_SHA}" infra/nginx
+          docker push "ghcr.io/rcpch/rcpch-census-nginx:${GITHUB_SHA}"
+
       - name: Set Container App Secrets
         shell: bash
         run: |
@@ -58,6 +64,7 @@ jobs:
               postgres-db-password="${{ secrets.POSTGRES_PASSWORD }}" \
               postgres-db-name="${{ secrets.POSTGRES_DB }}" \
               django-secret-key="${{ secrets.DJANGO_SECRET_KEY }}" \
+              postcodes-io-api-url="${{ secrets.POSTCODES_IO_API_URL }}" \
               postcodes-io-api-key="${{ secrets.POSTCODES_IO_API_KEY }}" \
               tiles-db-url="${{ secrets.TILES_DB_URL }}"
 

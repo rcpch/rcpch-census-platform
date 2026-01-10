@@ -28,6 +28,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Inject PUBLIC_TILES_URL config
+        run: |
+          echo "window.PUBLIC_TILES_URL = '${{ secrets.PUBLIC_TILES_URL }}';" > site/config.js
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 

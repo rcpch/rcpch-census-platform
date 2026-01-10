@@ -5,12 +5,18 @@ properties:
     activeRevisionsMode: Single
     ingress:
       external: true
-      targetPort: 8000
+      targetPort: 80
       transport: auto
       allowInsecure: false
     # No secrets section - secrets managed separately
   template:
     containers:
+      # Nginx Reverse Proxy
+      - name: nginx
+        image: ghcr.io/rcpch/rcpch-census-nginx:__IMAGE_TAG__
+        resources:
+          cpu: 0.25
+          memory: 0.25Gi
       # PostgreSQL with PostGIS - runs as sidecar
       - name: db
         image: postgis/postgis:15-3.4
@@ -53,8 +59,8 @@ properties:
             echo "Starting PostgreSQL with init scripts..."
             exec docker-entrypoint.sh postgres
         resources:
-          cpu: 2.5
-          memory: 6Gi
+          cpu: 2.25
+          memory: 6.5Gi
 
       # Django Web App - pulling from GHCR
       - name: web
@@ -76,30 +82,12 @@ properties:
             value: "5432"
           - name: POSTGRES_USER
             secretRef: postgres-db-user
+          - name: POSTCODES_IO_API_URL
+            value: postcode-io-api-url
           - name: POSTCODES_IO_API_KEY
             secretRef: postcodes-io-api-key
           - name: WAIT_FOR_POPULATION
             value: "true"
-        probes:
-          - type: Startup
-            httpGet:
-              path: /health/
-              port: 8000
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            failureThreshold: 60
-          - type: Liveness
-            httpGet:
-              path: /health/
-              port: 8000
-            periodSeconds: 30
-            failureThreshold: 3
-          - type: Readiness
-            httpGet:
-              path: /health/
-              port: 8000
-            periodSeconds: 10
-            failureThreshold: 3
         command:
           - gunicorn
           - rcpch_census_platform.asgi:application
@@ -109,7 +97,7 @@ properties:
           - 0.0.0.0:8000
         resources:
           cpu: 1.0
-          memory: 1.5Gi
+          memory: 1.0Gi
 
       # pg_tileserv for vector tiles
       - name: tiles
@@ -119,7 +107,7 @@ properties:
             secretRef: tiles-db-url
         resources:
           cpu: 0.5
-          memory: 0.5Gi
+          memory: 0.25Gi
 
     scale:
       minReplicas: 1

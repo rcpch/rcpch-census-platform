@@ -9,11 +9,16 @@ const map = new maplibregl.Map({
 function getTilesBaseUrl() {
   const params = new URLSearchParams(window.location.search);
   const fromQuery = params.get("tilesBase");
-  if (fromQuery) return fromQuery.replace(/\/+$/, "");
+  if (fromQuery) return fromQuery.replace(/\/+$|/, "");
 
   const meta = document.querySelector('meta[name="rcpch-tiles-base-url"]');
   const fromMeta = meta?.getAttribute("content")?.trim();
-  if (fromMeta) return fromMeta.replace(/\/+$/, "");
+  if (fromMeta) return fromMeta.replace(/\/+$|/, "");
+
+  // Use injected config if present (from config.js)
+  if (typeof window.PUBLIC_TILES_URL === "string" && window.PUBLIC_TILES_URL) {
+    return window.PUBLIC_TILES_URL.replace(/\/+$|/, "");
+  }
 
   if (
     window.location.hostname === "localhost" ||
@@ -28,7 +33,7 @@ function getTilesBaseUrl() {
 const TILES_BASE_URL = getTilesBaseUrl();
 if (!TILES_BASE_URL) {
   console.warn(
-    "No tiles base URL configured. Set ?tilesBase=https://<host>/tiles or the rcpch-tiles-base-url meta tag."
+    "No tiles base URL configured. Set ?tilesBase=https://<host>/tiles, the rcpch-tiles-base-url meta tag, or inject window.PUBLIC_TILES_URL."
   );
 }
 
