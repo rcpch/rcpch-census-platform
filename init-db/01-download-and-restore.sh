@@ -67,10 +67,22 @@ else
   wget -q "${BASE_URL}/${DUMP_FILE}"
 fi
 
+
+# Check dump file exists and is not empty
+if [ ! -f "$DUMP_FILE" ]; then
+  echo "ERROR: Dump file $DUMP_FILE not found. Aborting restore."
+  exit 1
+fi
+if [ ! -s "$DUMP_FILE" ]; then
+  echo "ERROR: Dump file $DUMP_FILE is empty. Aborting restore."
+  exit 1
+fi
+
 echo "Restoring database (this may take 5-10 minutes)..."
 echo "Using pg_restore with --no-owner and --role=${POSTGRES_USER}"
 
 # Restore with explicit role assignment
+set +e
 pg_restore \
   -U "$POSTGRES_USER" \
   -d "$POSTGRES_DB" \
@@ -78,7 +90,13 @@ pg_restore \
   --no-acl \
   --role="$POSTGRES_USER" \
   -v \
-  ${DUMP_FILE} 2>&1 | grep -v "^$" || true
+  "$DUMP_FILE" 2>&1 | grep -v "^$"
+RESTORE_EXIT_CODE=${PIPESTATUS[0]}
+set -e
+if [ $RESTORE_EXIT_CODE -ne 0 ]; then
+  echo "ERROR: pg_restore failed with exit code $RESTORE_EXIT_CODE. The dump file may be corrupt or incompatible."
+  exit $RESTORE_EXIT_CODE
+fi
 
 # Grant all privileges on restored objects to the role
 echo "Setting permissions on restored objects..."
