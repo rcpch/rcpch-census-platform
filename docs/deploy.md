@@ -1,98 +1,61 @@
-# Azure & CDN Setup for UK Deprivation Map
 
-This document outlines the production architecture for deploying the Django REST Framework (DRF) API and the `pg_tileserv` vector tile server to Azure, using **Azure Front Door** and **API Management** for high-performance spatial data delivery.
+# Deployment & Serving Tiles: UK Deprivation Map
 
-## 1. Database: Azure Database for PostgreSQL (Flexible Server)
+This document describes the workflow for database seeding, application deployment, and serving vector tiles for the UK Deprivation Map project.
 
-Both services must connect to the same database instance.
+## 1. Database Seeding & Dumping
 
-* **Create Server**: Select the **Flexible Server** option in the Azure Portal.
-* **Enable PostGIS**: Navigate to **Server Parameters**, search for `azure.extensions`, and add `POSTGIS`.
-* **Spatial Optimization**: After running your Python build scripts, you must physically reorder the data rows to match the spatial index. This reduces disk I/O for tile requests:
-  
-    ```sql
-    CLUSTER public.uk_master_2021_z5_7 USING idx_uk_master_2021_z5_7_geom;
-    ANALYZE public.uk_master_2021_z5_7;
-    ```
+1. **Seed the database locally**: Run the database and Django app in development mode. Populate the database as needed.
+2. **Dump the database**: Use `pg_dump` to export the seeded database to the `postgis_dump_files` folder at the project root (this folder is gitignored).
+3. **Publish the dump**: Use the convenience script in the `s/` folder to upload the dump file as a GitHub Release asset.
 
-## 2. Service A: Django API (Azure App Service)
+## 2. Application Deployment (Azure Container Apps)
 
-The Django application handles authentication, metadata, and the **Table Materialization Logic**.
+Deployment is managed as a sidecar container arrangement:
 
-* **Service**: Azure App Service (Linux).
-* **Build Strategy**: Your Python scripts should create **Physical Tables** with **GIST Indexes** rather than Views to prevent 500 Internal Server Errors in production.
-* **Seed Command**:
-  
-    ```bash
-    python manage.py run_spatial_script --mode production
-    ```
+- On push to the `shapes` branch (and in future, merge to `live`), a GitHub Actions workflow builds and pushes the Django app image to `ghcr.io`.
+- The Azure deployment template pulls:
+  - The Django app image from GHCR
+  - The database dump from GitHub Releases
+  - The `pg_tileserv` and `postgis` images from open source
+- The containers are deployed together to Azure Container Apps:
+  - Django app (port 8000)
+  - PostGIS database (port 5432, internal)
+  - pg_tileserv (port 7800)
 
-## 3. Service B: Tile Server (Azure Container Apps)
+## 3. Serving Vector Tiles to the Static Client
 
-`pg_tileserv` is deployed as a lightweight container. 
+The static client (in the `site/` folder, deployed via GitHub Pages) needs to access both the Django API and the vector tile server.
 
-* **Service**: Azure Container Apps (ACA).
-* **Performance**: Because we use indexed tables, `pg_tileserv` can remain on a low-consumption tier (0.5 vCPU).
-* **Environment Variables**:
-  * `DATABASE_URL`: Your PostgreSQL connection string.
-  * `HTTP_PORT`: `7800`
+- **Django API**: Exposed on port 8000 via Azure ingress.
+- **pg_tileserv**: By default, serves on port 7800. To make this accessible externally:
+  - Expose port 7800 in your Azure Container Apps ingress configuration, or
+  - Use Azure Front Door or API Management to route `/tiles/*` to the tileserv container.
+- **CORS**: Ensure CORS headers are set to allow requests from your GitHub Pages domain.
 
-## 4. Gateway: Azure API Management (APIM)
+**Example:**
 
-In production, APIM sits between your CDN and your services to handle security and protocol translation. Apply the following **Inbound Policy** to handle CORS and internal caching:
+If your Azure Container App is at `https://myapp.azurecontainerapps.io`, and you expose both ports:
 
-```xml
-<policies>
-    <inbound>
-        <base />
-        <cors allow-credentials="false">
-            <allowed-origins>
-                <origin>[https://your-username.github.io](https://your-username.github.io)</origin>
-            </allowed-origins>
-            <allowed-methods>
-                <method>GET</method>
-                <method>OPTIONS</method>
-            </allowed-methods>
-            <allowed-headers>
-                <header>*</header>
-            </allowed-headers>
-        </cors>
-        <cache-lookup vary-by-developer="false" vary-by-developer-groups="false" downstream-caching-type="public" must-revalidate="true" caching-type="internal">
-            <vary-by-query-parameter>x</vary-by-query-parameter>
-            <vary-by-query-parameter>y</vary-by-query-parameter>
-            <vary-by-query-parameter>z</vary-by-query-parameter>
-        </cache-lookup>
-    </inbound>
-    <outbound>
-        <base />
-        <cache-store duration="86400" />
-    </outbound>
-</policies>
-```
+- Django API: `https://myapp.azurecontainerapps.io/api/`
+- Tiles: `https://myapp.azurecontainerapps.io:7800/tiles/{z}/{x}/{y}.pbf`
 
-## 5. Global Entry: Azure Front Door (CDN)
+Or, if using a single ingress and path-based routing:
 
-Azure Front Door provides global caching and SSL termination.
+- Django API: `https://myapp.azurecontainerapps.io/api/`
+- Tiles: `https://myapp.azurecontainerapps.io/tiles/{z}/{x}/{y}.pbf`
 
-Routing & Caching Configuration
-Origin Group: Point to your APIM Gateway Endpoint.
+Update your `site/map-logic.js` to point to the correct tiles URL.
 
-Path Patterns:
+## 4. Notes on Production
 
-/api/* (Django)
+- In production, you may use Azure Front Door or API Management for SSL, caching, and routing.
+- Remember to invalidate CDN caches after updating spatial tables or redeploying.
 
-/tiles/* (pg_tileserv)
-
-Query String Behavior: Set to "Include all query strings". This is mandatory so that the CDN treats every unique tile coordinate (x, y, z) as a unique cache entry.
-
-Compression: Enable Brotli and Gzip. Vector tiles (.pbf) are highly compressible.
-
-## 6. Deployment Workflow & Cache Purging
-
-Whenever the underlying spatial tables are updated/rebuilt by your Python script, the CDN and APIM caches must be invalidated.
+## 5. Cache Purging Example
 
 ```bash
 # Purge logic for Azure Front Door
 az network front-door endpoint purge --content-paths "/tiles/*" \
     --profile-name MyFrontDoorProfile --resource-group MyResourceGroup
-  ```
+```
