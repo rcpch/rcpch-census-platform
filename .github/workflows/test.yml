@@ -16,7 +16,7 @@ jobs:
             postgis:
                 image: postgis/postgis:15-3.4
                 env:
-                    POSTGRES_USER: rcpchCensususer
+                    POSTGRES_USER: rcpchCensusUser
                     POSTGRES_PASSWORD: password
                     POSTGRES_DB: rcpchCensusdb
                 ports:
@@ -29,7 +29,7 @@ jobs:
 
         # Define global env for all steps
         env:
-            POSTGRES_USER: rcpchCensususer
+            POSTGRES_USER: rcpchCensusUser
             POSTGRES_PASSWORD: password
             POSTGRES_DB: rcpchCensusdb
             POSTGRES_DB_HOST: postgis # Connect to service name
@@ -61,7 +61,7 @@ jobs:
               run: |
                   export PGPASSWORD=password
                   for i in {1..15}; do
-                      psql -h postgis -U rcpchCensususer -d rcpchCensusdb -c "CREATE EXTENSION IF NOT EXISTS postgis;" && break || sleep 2
+                      psql -h postgis -U rcpchCensusUser -d rcpchCensusdb -c "CREATE EXTENSION IF NOT EXISTS postgis;" && break || sleep 2
                   done
 
             - name: Run migrations

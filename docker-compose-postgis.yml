@@ -8,7 +8,7 @@ services:
     volumes:
       - .:/app
     environment:
-      - POSTGRES_USER=rcpchCensususer
+      - POSTGRES_USER=rcpchCensusUser
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=rcpchCensusdb
       - POSTGRES_DB_HOST=db
@@ -34,7 +34,7 @@ services:
     volumes:
       - "datadb_postgis:/var/lib/postgresql/data"
     environment:
-      - POSTGRES_USER=rcpchCensususer
+      - POSTGRES_USER=rcpchCensusUser
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=rcpchCensusdb
     ports:
@@ -54,7 +54,7 @@ services:
       - TS_TILE_EXTENT=8192 # Doubles the resolution within the tile
       - TS_TILE_BUFFER=256 # Captures features that sit right on the edge of a tile
       - HTTP_CORS_ORIGIN=*
-      - DATABASE_URL=postgresql://rcpchCensususer:password@db:5432/rcpchCensusdb
+      - DATABASE_URL=postgresql://rcpchCensusUser:password@db:5432/rcpchCensusdb
     ports:
       - 7800:7800
     depends_on:

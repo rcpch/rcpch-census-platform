@@ -304,7 +304,7 @@ services:
   db:
     image: postgis/postgis:15-3.4
     environment:
-      POSTGRES_USER: rcpchCensususer
+      POSTGRES_USER: rcpchCensusUser
       POSTGRES_PASSWORD: \${DB_PASSWORD}
       POSTGRES_DB: rcpchCensusdb
     volumes:
@@ -347,7 +347,7 @@ ${DOWNLOAD_INSTRUCTIONS}
 
 # Start PostGIS container
 docker run -d --name census-db \\
-  -e POSTGRES_USER=rcpchCensususer \\
+  -e POSTGRES_USER=rcpchCensusUser \\
   -e POSTGRES_PASSWORD=yourpassword \\
   -e POSTGRES_DB=rcpchCensusdb \\
   -p 5432:5432 \\
@@ -359,7 +359,7 @@ sleep 10
 
 # Restore the dump
 docker exec -i census-db pg_restore \\
-  -U rcpchCensususer \\
+  -U rcpchCensusUser \\
   -d rcpchCensusdb \\
   --no-owner < rcpch-census-${VERSION}.dump
 

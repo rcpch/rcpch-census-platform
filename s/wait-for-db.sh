@@ -5,7 +5,7 @@ set -euo pipefail
 # Uses environment variables if set, otherwise defaults
 : ${POSTGRES_DB_HOST:=db}
 : ${POSTGRES_DB_PORT:=5432}
-: ${POSTGRES_USER:=rcpchCensususer}
+: ${POSTGRES_USER:=rcpchCensusUser}
 : ${POSTGRES_DB:=rcpchCensusdb}
 : ${WAIT_FOR_POPULATION:=false}  # Set to 'true' in production
 
