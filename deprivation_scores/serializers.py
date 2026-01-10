@@ -215,7 +215,7 @@ class SOASerializer(serializers.HyperlinkedModelSerializer):
                 "idaopi_score": "0.012",
                 "idaopi_rank": 32820,
                 "idaopi_decile": 10,
-                "lsoa": "http://localhost:8001/england_wales_lower_layer_super_output_areas/28110/",
+                "lsoa": "http://localhost:8000/england_wales_lower_layer_super_output_areas/28110/",
             },
             response_only=True,
         )

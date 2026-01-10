@@ -146,7 +146,7 @@ To run the tests without:
 
 This repository includes a Docker Compose development stack with:
 
-- `web`: Django/DRF API (runs on port `8001`)
+- `web`: Django/DRF API (runs on port `8000`)
 - `db`: PostGIS (runs on port `5432`)
 - `pg_tileserv`: vector tile server backed by PostGIS (runs on port `7800`)
 
@@ -167,10 +167,10 @@ Steps:
 
 Useful URLs:
 
-- API: `http://localhost:8001/rcpch-census-platform/api/v1/`
+- API: `http://localhost:8000/rcpch-census-platform/api/v1/`
 - Tileserver (pg_tileserv): `http://localhost:7800/`
 
-Note: the nginx reverse-proxy container is used in the Azure Container Apps deployment to route `/tiles/*` and the API under a single public ingress. For local development you can usually hit Django (`:8001`) and pg_tileserv (`:7800`) directly.
+Note: the nginx reverse-proxy container is used in the Azure Container Apps deployment to route `/tiles/*` and the API under a single public ingress. For local development you can usually hit Django (`:8000`) and pg_tileserv (`:7800`) directly.
 
 ### Demo map site (GitHub Pages + local dev)
 

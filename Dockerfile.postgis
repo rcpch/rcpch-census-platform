@@ -37,4 +37,4 @@ RUN chmod +x /app/s/wait-for-db.sh
 # Copy the rest of the project
 COPY . /app/
 
-EXPOSE 8001
+EXPOSE 8000
