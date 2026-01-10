@@ -56,9 +56,9 @@ properties:
           cpu: 2.0
           memory: 4Gi
 
-      # Django Web App
+      # Django Web App - pulling from GHCR
       - name: web
-        image: __ACR_LOGIN_SERVER__/rcpch-census-web:__IMAGE_TAG__
+        image: ghcr.io/rcpch/rcpch-census-web:__IMAGE_TAG__
         env:
           - name: DJANGO_ALLOWED_HOSTS
             value: "__DJANGO_ALLOWED_HOSTS__"
