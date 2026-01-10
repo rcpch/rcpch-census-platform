@@ -100,6 +100,13 @@ properties:
               port: 8000
             periodSeconds: 10
             failureThreshold: 3
+        command:
+          - gunicorn
+          - rcpch_census_platform.asgi:application
+          - -k
+          - uvicorn.workers.UvicornWorker
+          - --bind
+          - 0.0.0.0:8000
         resources:
           cpu: 1.0
           memory: 2Gi
