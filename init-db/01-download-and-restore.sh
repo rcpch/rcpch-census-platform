@@ -6,6 +6,7 @@ RELEASE_VERSION="${DB_DUMP_VERSION}"
 GITHUB_REPO="rcpch/rcpch-census-platform"
 BASE_URL="https://github.com/${GITHUB_REPO}/releases/download/${RELEASE_VERSION}"
 DUMP_FILE="rcpch-census-${RELEASE_VERSION}.dump"
+WORK_DIR="/tmp"  # Use /tmp for write access
 
 echo "=== Starting database initialization ==="
 echo "Release version: ${RELEASE_VERSION}"
@@ -33,6 +34,9 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
 EOSQL
 
 echo "Downloading database dump ${RELEASE_VERSION}..."
+
+# Change to working directory
+cd "$WORK_DIR"
 
 # Check if dump is split
 PART_AA="${DUMP_FILE}.part-aa"
@@ -88,6 +92,6 @@ EOSQL
 
 echo "Database restored successfully"
 echo "Cleaning up dump file..."
-rm ${DUMP_FILE}
+rm -f ${WORK_DIR}/${DUMP_FILE}
 
 echo "=== Database initialization complete ==="
