@@ -15,11 +15,11 @@ properties:
       - name: db
         image: postgis/postgis:15-3.4
         env:
-          - name: POSTGRES_DB_USER
+          - name: POSTGRES_USER
             secretRef: postgres-db-user
-          - name: POSTGRES_DB_PASSWORD
+          - name: POSTGRES_PASSWORD
             secretRef: postgres-db-password
-          - name: POSTGRES_DB_NAME
+          - name: POSTGRES_DB
             secretRef: postgres-db-name
           - name: DB_DUMP_VERSION
             value: "__DB_DUMP_VERSION__"
@@ -29,9 +29,9 @@ properties:
           - /bin/bash
           - -c
           - |
-            # Download init script from GitHub
+            # Download init script from GitHub using curl (wget not available)
             mkdir -p /docker-entrypoint-initdb.d
-            wget -O /docker-entrypoint-initdb.d/01-init.sh \
+            curl -fsSL -o /docker-entrypoint-initdb.d/01-init.sh \
               https://raw.githubusercontent.com/rcpch/rcpch-census-platform/shapes/init-db/01-download-and-restore.sh
             chmod +x /docker-entrypoint-initdb.d/01-init.sh
             
@@ -53,13 +53,13 @@ properties:
             secretRef: django-secret-key
           - name: POSTGRES_DB_HOST
             value: "localhost"
-          - name: POSTGRES_DB_NAME
+          - name: POSTGRES_DB
             secretRef: postgres-db-name
-          - name: POSTGRES_DB_PASSWORD
+          - name: POSTGRES_PASSWORD
             secretRef: postgres-db-password
           - name: POSTGRES_DB_PORT
             value: "5432"
-          - name: POSTGRES_DB_USER
+          - name: POSTGRES_USER
             secretRef: postgres-db-user
           - name: POSTCODES_IO_API_KEY
             secretRef: postcodes-io-api-key

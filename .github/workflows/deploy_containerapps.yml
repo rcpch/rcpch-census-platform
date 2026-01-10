@@ -59,9 +59,9 @@ jobs:
             -n "${AZURE_CONTAINERAPP_NAME}" \
             -g "${AZURE_RESOURCE_GROUP}" \
             --secrets \
-              postgres-db-user="${{ secrets.POSTGRES_DB_USER }}" \
-              postgres-db-password="${{ secrets.POSTGRES_DB_PASSWORD }}" \
-              postgres-db-name="${{ secrets.POSTGRES_DB_NAME }}" \
+              postgres-db-user="${{ secrets.POSTGRES_USER }}" \
+              postgres-db-password="${{ secrets.POSTGRES_PASSWORD }}" \
+              postgres-db-name="${{ secrets.POSTGRES_DB }}" \
               django-secret-key="${{ secrets.DJANGO_SECRET_KEY }}" \
               postcodes-io-api-key="${{ secrets.POSTCODES_IO_API_KEY }}" \
               tiles-db-url="${{ secrets.TILES_DB_URL }}"

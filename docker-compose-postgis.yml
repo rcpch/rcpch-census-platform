@@ -8,9 +8,9 @@ services:
     volumes:
       - .:/app
     environment:
-      - POSTGRES_DB_USER=rcpchCensususer
-      - POSTGRES_DB_PASSWORD=password
-      - POSTGRES_DB_NAME=rcpchCensusdb
+      - POSTGRES_USER=rcpchCensususer
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=rcpchCensusdb
       - RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST=db
       - RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT=5432
       - RCPCH_CENSUS_ENGINE_SECRET_KEY=mysecretkey
@@ -34,17 +34,13 @@ services:
     volumes:
       - "datadb_postgis:/var/lib/postgresql/data"
     environment:
-      - POSTGRES_DB_USER=rcpchCensususer
-      - POSTGRES_DB_PASSWORD=password
-      - POSTGRES_DB_NAME=rcpchCensusdb
+      - POSTGRES_USER=rcpchCensususer
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=rcpchCensusdb
     ports:
       - 5432:5432
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U $${POSTGRES_DB_USER} -d $${POSTGRES_DB_NAME}",
-        ]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 20

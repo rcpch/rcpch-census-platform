@@ -11,7 +11,7 @@ echo "=== Starting database initialization ==="
 echo "Release version: ${RELEASE_VERSION}"
 
 # Check if database is already populated
-if psql -U "$POSTGRES_DB_USER" -d "$POSTGRES_DB_NAME" -tAc "SELECT 1 FROM pg_tables WHERE tablename='deprivation_scores_lsoa'" | grep -q 1; then
+if psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT 1 FROM pg_tables WHERE tablename='deprivation_scores_lsoa'" | grep -q 1; then
   echo "Database already initialized, skipping restore"
   exit 0
 fi
@@ -44,7 +44,7 @@ else
 fi
 
 echo "Restoring database (this may take 5-10 minutes)..."
-pg_restore -U "$POSTGRES_DB_USER" -d "$POSTGRES_DB_NAME" --no-owner --no-acl ${DUMP_FILE} || true
+pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl ${DUMP_FILE} || true
 
 echo "Database restored successfully"
 rm ${DUMP_FILE}
