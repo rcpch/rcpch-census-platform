@@ -304,9 +304,9 @@ services:
   db:
     image: postgis/postgis:15-3.4
     environment:
-      POSTGRES_USER: rcpchCensususer
-      POSTGRES_PASSWORD: \${DB_PASSWORD}
-      POSTGRES_DB: rcpchCensusdb
+      POSTGRES_DB_USER: rcpchCensususer
+      POSTGRES_DB_PASSWORD: \${DB_PASSWORD}
+      POSTGRES_DB_NAME: rcpchCensusdb
     volumes:
       - ./init-db:/docker-entrypoint-initdb.d
       - pgdata:/var/lib/postgresql/data
@@ -329,7 +329,7 @@ cat > restore.sh << 'EOF'
 #!/bin/bash
 set -e
 echo \"Restoring database from dump...\"
-pg_restore -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" --no-owner /docker-entrypoint-initdb.d/rcpch-census-${VERSION}.dump
+pg_restore -U \"\$POSTGRES_DB_USER\" -d \"\$POSTGRES_DB_NAME\" --no-owner /docker-entrypoint-initdb.d/rcpch-census-${VERSION}.dump
 echo \"Database restored successfully\"
 EOF
 
@@ -347,9 +347,9 @@ ${DOWNLOAD_INSTRUCTIONS}
 
 # Start PostGIS container
 docker run -d --name census-db \\
-  -e POSTGRES_USER=rcpchCensususer \\
-  -e POSTGRES_PASSWORD=yourpassword \\
-  -e POSTGRES_DB=rcpchCensusdb \\
+  -e POSTGRES_DB_USER=rcpchCensususer \\
+  -e POSTGRES_DB_PASSWORD=yourpassword \\
+  -e POSTGRES_DB_NAME=rcpchCensusdb \\
   -p 5432:5432 \\
   -v census-data:/var/lib/postgresql/data \\
   postgis/postgis:15-3.4

@@ -8,18 +8,18 @@ properties:
       targetPort: 8000
       transport: auto
       allowInsecure: false
-        # secrets section removed; rely on existing secrets set in Azure
+    # No secrets section - secrets managed separately
   template:
     containers:
       # PostgreSQL with PostGIS - runs as sidecar
       - name: db
         image: postgis/postgis:15-3.4
         env:
-          - name: POSTGRES_USER
+          - name: POSTGRES_DB_USER
             secretRef: postgres-db-user
-          - name: POSTGRES_PASSWORD
+          - name: POSTGRES_DB_PASSWORD
             secretRef: postgres-db-password
-          - name: POSTGRES_DB
+          - name: POSTGRES_DB_NAME
             secretRef: postgres-db-name
           - name: DB_DUMP_VERSION
             value: "__DB_DUMP_VERSION__"
@@ -51,15 +51,15 @@ properties:
             value: "__DJANGO_CSRF_TRUSTED_ORIGINS__"
           - name: DJANGO_SECRET_KEY
             secretRef: django-secret-key
-          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST
+          - name: POSTGRES_DB_HOST
             value: "localhost"
-          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME
+          - name: POSTGRES_DB_NAME
             secretRef: postgres-db-name
-          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD
+          - name: POSTGRES_DB_PASSWORD
             secretRef: postgres-db-password
-          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT
+          - name: POSTGRES_DB_PORT
             value: "5432"
-          - name: RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER
+          - name: POSTGRES_DB_USER
             secretRef: postgres-db-user
           - name: POSTCODES_IO_API_KEY
             secretRef: postcodes-io-api-key

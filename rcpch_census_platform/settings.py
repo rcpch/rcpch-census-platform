@@ -102,11 +102,11 @@ WSGI_APPLICATION = "rcpch_census_platform.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME"),
-        "USER": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER"),
-        "PASSWORD": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD"),
-        "HOST": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST"),
-        "PORT": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT"),
+        "NAME": os.environ.get("POSTGRES_DB_NAME"),
+        "USER": os.environ.get("POSTGRES_DB_USER"),
+        "PASSWORD": os.environ.get("POSTGRES_DB_PASSWORD"),
+        "HOST": os.environ.get("POSTGRES_DB_HOST"),
+        "PORT": os.environ.get("POSTGRES_DB_PORT"),
         "ATOMIC_REQUESTS": False,
     }
 }

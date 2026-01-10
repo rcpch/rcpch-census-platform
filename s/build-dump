@@ -49,9 +49,9 @@ fi
 echo ""
 echo "Starting PostGIS container..."
 docker run -d --name "$CONTAINER_NAME" \
-  -e POSTGRES_USER=rcpchCensususer \
-  -e POSTGRES_PASSWORD=buildpass \
-  -e POSTGRES_DB=rcpchCensusdb \
+  -e POSTGRES_DB_USER=rcpchCensususer \
+  -e POSTGRES_DB_PASSWORD=buildpass \
+  -e POSTGRES_DB_NAME=rcpchCensusdb \
   -p 5432:5432 \
   postgis/postgis:15-3.4
 
@@ -82,10 +82,10 @@ echo "This may take a while (15-30 minutes for large datasets)..."
 echo ""
 
 docker run --rm --network host \
-  -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER=rcpchCensususer \
-  -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD=buildpass \
-  -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME=rcpchCensusdb \
-  -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST=127.0.0.1 \
+  -e POSTGRES_DB_USER=rcpchCensususer \
+  -e POSTGRES_DB_PASSWORD=buildpass \
+  -e POSTGRES_DB_NAME=rcpchCensusdb \
+  -e POSTGRES_DB_HOST=127.0.0.1 \
   -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT=5432 \
   -e DJANGO_SECRET_KEY=dummy-build-key \
   -e PYTHONUNBUFFERED=1 \
@@ -126,9 +126,9 @@ echo "Testing dump restore..."
 TEST_CONTAINER="census-test-db"
 
 docker run -d --name "$TEST_CONTAINER" \
-  -e POSTGRES_USER=testuser \
-  -e POSTGRES_PASSWORD=testpass \
-  -e POSTGRES_DB=testdb \
+  -e POSTGRES_DB_USER=testuser \
+  -e POSTGRES_DB_PASSWORD=testpass \
+  -e POSTGRES_DB_NAME=testdb \
   -p 5433:5432 \
   postgis/postgis:15-3.4
 
