@@ -8,7 +8,9 @@ django
 djangorestframework
 drf-spectacular
 django-filter
+gunicorn
 psycopg2-binary
+uvicorn
 whitenoise
 # RCPCH imports
 
