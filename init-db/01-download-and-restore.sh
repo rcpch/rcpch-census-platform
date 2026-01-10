@@ -27,12 +27,13 @@ fi
 
 # Ensure the target role exists and has necessary privileges
 echo "Ensuring database role '${POSTGRES_USER}' exists..."
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
-  -- Ensure role exists (PostgreSQL container should have created it, but double-check)
+psql -v ON_ERROR_STOP=1 --username "postgres" --dbname "$POSTGRES_DB" <<-EOSQL
+  -- Ensure role exists (use lowercase or quoted to preserve case)
   DO \$\$
   BEGIN
+    -- Use the exact username provided, quoted to preserve case
     IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${POSTGRES_USER}') THEN
-      CREATE ROLE ${POSTGRES_USER} WITH LOGIN PASSWORD '${POSTGRES_PASSWORD}';
+      CREATE ROLE "${POSTGRES_USER}" WITH LOGIN PASSWORD '${POSTGRES_PASSWORD}';
       RAISE NOTICE 'Created role: ${POSTGRES_USER}';
     ELSE
       RAISE NOTICE 'Role already exists: ${POSTGRES_USER}';
@@ -40,9 +41,9 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
   END
   \$\$;
 
-  -- Ensure role has necessary privileges
-  ALTER ROLE ${POSTGRES_USER} WITH CREATEDB CREATEROLE;
-  GRANT ALL PRIVILEGES ON DATABASE ${POSTGRES_DB} TO ${POSTGRES_USER};
+  -- Ensure role has necessary privileges (quote the role name)
+  ALTER ROLE "${POSTGRES_USER}" WITH CREATEDB CREATEROLE;
+  GRANT ALL PRIVILEGES ON DATABASE "${POSTGRES_DB}" TO "${POSTGRES_USER}";
 EOSQL
 
 echo "Downloading database dump ${RELEASE_VERSION}..."
