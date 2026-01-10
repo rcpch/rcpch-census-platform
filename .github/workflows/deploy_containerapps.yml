@@ -36,12 +36,12 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Fetch latest DB dump release tag
+      - name: Fetch latest DB dump release tag (by date)
         id: fetch_db_dump_version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          LATEST_TAG=$(gh release list --repo rcpch/rcpch-census-platform --limit 1 --json tagName --jq '.[0].tagName')
+          LATEST_TAG=$(gh api repos/rcpch/rcpch-census-platform/releases --jq 'sort_by(.created_at) | reverse | .[0].tag_name')
           echo "Latest DB dump tag: $LATEST_TAG"
           echo "DB_DUMP_VERSION=$LATEST_TAG" >> $GITHUB_ENV
 
