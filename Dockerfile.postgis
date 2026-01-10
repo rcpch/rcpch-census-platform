@@ -30,6 +30,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements/common-requirements.txt && \
     pip install --no-cache-dir -r requirements/development-requirements.txt
 
+# Copy wait-for-db script
+COPY wait-for-db.sh /app/wait-for-db.sh
+RUN chmod +x /app/wait-for-db.sh
+
 # Copy the rest of the project
 COPY . /app/
 

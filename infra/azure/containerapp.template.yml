@@ -63,6 +63,8 @@ properties:
             secretRef: postgres-db-user
           - name: POSTCODES_IO_API_KEY
             secretRef: postcodes-io-api-key
+          - name: WAIT_FOR_POPULATION
+            value: "true"
         probes:
           - type: Startup
             httpGet:

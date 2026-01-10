@@ -86,8 +86,9 @@ docker run --rm --network host \
   -e POSTGRES_PASSWORD=buildpass \
   -e POSTGRES_DB=rcpchCensusdb \
   -e POSTGRES_DB_HOST=127.0.0.1 \
-  -e RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT=5432 \
+  -e POSTGRES_DB_PORT=5432 \
   -e DJANGO_SECRET_KEY=dummy-build-key \
+  -e WAIT_FOR_POPULATION=false \
   -e PYTHONUNBUFFERED=1 \
   "$DJANGO_IMAGE" \
   sh -c "/app/s/wait-for-db.sh && \
