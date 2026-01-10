@@ -95,6 +95,19 @@ psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<-EOSQL
 EOSQL
 
 echo "Database restored successfully"
+
+# Log table and row counts for verification
+echo "=== Post-restore verification ==="
+echo "Tables in database:"
+psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt"
+
+# Log row count for a key table (deprivation_scores_lsoa)
+if psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT COUNT(*) FROM deprivation_scores_lsoa;" 2>/dev/null; then
+  echo "Row count for deprivation_scores_lsoa table logged above."
+else
+  echo "Could not log row count for deprivation_scores_lsoa (table may not exist)."
+fi
+
 echo "Cleaning up dump file..."
 rm -f ${WORK_DIR}/${DUMP_FILE}
 

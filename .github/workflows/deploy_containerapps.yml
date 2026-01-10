@@ -21,9 +21,7 @@ env:
   ACR_NAME: ${{ secrets.ACR_NAME }}
   ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
   WEB_IMAGE_NAME: rcpch-census-web
-  DB_DUMP_VERSION: v1.1.0
   AZURE_ENVIRONMENT_ID: ${{ secrets.AZURE_ENVIRONMENT_ID }}
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -37,6 +35,13 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Fetch latest DB dump release tag
+        id: fetch_db_dump_version
+        run: |
+          LATEST_TAG=$(gh release list --repo rcpch/rcpch-census-platform --limit 1 --json tagName --jq '.[0].tagName')
+          echo "Latest DB dump tag: $LATEST_TAG"
+          echo "DB_DUMP_VERSION=$LATEST_TAG" >> $GITHUB_ENV
 
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin

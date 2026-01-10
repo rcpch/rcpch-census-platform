@@ -88,6 +88,8 @@ properties:
             secretRef: postcodes-io-api-key
           - name: WAIT_FOR_POPULATION
             value: "true"
+          - name: DB_DUMP_VERSION
+            value: "v1.1.0"
         command:
           - gunicorn
           - rcpch_census_platform.asgi:application
