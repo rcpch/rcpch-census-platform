@@ -54,7 +54,7 @@ properties:
             exec docker-entrypoint.sh postgres
         resources:
           cpu: 2.0
-          memory: 4Gi
+          memory: 8Gi
 
       # Django Web App - pulling from GHCR
       - name: web
