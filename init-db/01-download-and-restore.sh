@@ -42,8 +42,10 @@ psql -v ON_ERROR_STOP=1 --username "postgres" --dbname "$POSTGRES_DB" <<-EOSQL
   \$\$;
 
   -- Ensure role has necessary privileges (quote the role name)
+  echo "Ensuring database role '${POSTGRES_USER}' has necessary privileges..."
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+  -- User already exists from container initialization
   ALTER ROLE "${POSTGRES_USER}" WITH CREATEDB CREATEROLE;
-  GRANT ALL PRIVILEGES ON DATABASE "${POSTGRES_DB}" TO "${POSTGRES_USER}";
 EOSQL
 
 echo "Downloading database dump ${RELEASE_VERSION}..."
