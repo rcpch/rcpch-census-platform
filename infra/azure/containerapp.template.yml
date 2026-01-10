@@ -29,13 +29,23 @@ properties:
           - /bin/bash
           - -c
           - |
-            # Download init script from GitHub using curl (wget not available)
+            echo "=========================================="
+            echo "Downloading init script..."
+            echo "=========================================="
             mkdir -p /docker-entrypoint-initdb.d
-            curl -fsSL -o /docker-entrypoint-initdb.d/01-init.sh \
+            curl -fsSL -o /docker-entrypoint-initdb.d/01-download-and-restore.sh \
               https://raw.githubusercontent.com/rcpch/rcpch-census-platform/shapes/init-db/01-download-and-restore.sh
-            chmod +x /docker-entrypoint-initdb.d/01-init.sh
             
-            # Start PostgreSQL
+            if [ -f /docker-entrypoint-initdb.d/01-download-and-restore.sh ]; then
+              echo "✓ Init script downloaded successfully"
+              chmod +x /docker-entrypoint-initdb.d/01-download-and-restore.sh
+              ls -lh /docker-entrypoint-initdb.d/
+            else
+              echo "✗ Failed to download init script"
+              exit 1
+            fi
+            
+            echo "Starting PostgreSQL with init scripts..."
             exec docker-entrypoint.sh postgres
         resources:
           cpu: 2.0
