@@ -11,8 +11,8 @@ services:
       - POSTGRES_USER=rcpchCensususer
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=rcpchCensusdb
-      - RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST=db
-      - RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT=5432
+      - POSTGRES_DB_HOST=db
+      - POSTGRES_DB_PORT=5432
       - RCPCH_CENSUS_ENGINE_SECRET_KEY=mysecretkey
       - DEBUG=True
       - DJANGO_ALLOWED_HOSTS=0.0.0.0
