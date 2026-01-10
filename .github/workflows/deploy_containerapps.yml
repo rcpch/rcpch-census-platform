@@ -38,6 +38,8 @@ jobs:
 
       - name: Fetch latest DB dump release tag
         id: fetch_db_dump_version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           LATEST_TAG=$(gh release list --repo rcpch/rcpch-census-platform --limit 1 --json tagName --jq '.[0].tagName')
           echo "Latest DB dump tag: $LATEST_TAG"
