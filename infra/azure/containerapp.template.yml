@@ -33,6 +33,11 @@ properties:
             echo "Downloading init script..."
             echo "=========================================="
             mkdir -p /docker-entrypoint-initdb.d
+            
+            # Use cat with /dev/tcp for pure bash download (no external tools needed)
+            # But that's tricky, so let's install wget first
+            apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+            
             wget -q -O /docker-entrypoint-initdb.d/01-download-and-restore.sh \
               https://raw.githubusercontent.com/rcpch/rcpch-census-platform/shapes/init-db/01-download-and-restore.sh
             
