@@ -53,8 +53,8 @@ properties:
             echo "Starting PostgreSQL with init scripts..."
             exec docker-entrypoint.sh postgres
         resources:
-          cpu: 2.0
-          memory: 8Gi
+          cpu: 2.5
+          memory: 6Gi
 
       # Django Web App - pulling from GHCR
       - name: web
@@ -109,7 +109,7 @@ properties:
           - 0.0.0.0:8000
         resources:
           cpu: 1.0
-          memory: 2Gi
+          memory: 1.5Gi
 
       # pg_tileserv for vector tiles
       - name: tiles
@@ -119,7 +119,7 @@ properties:
             secretRef: tiles-db-url
         resources:
           cpu: 0.5
-          memory: 1Gi
+          memory: 0.5Gi
 
     scale:
       minReplicas: 1
