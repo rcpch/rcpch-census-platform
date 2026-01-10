@@ -33,7 +33,7 @@ properties:
             echo "Downloading init script..."
             echo "=========================================="
             mkdir -p /docker-entrypoint-initdb.d
-            curl -fsSL -o /docker-entrypoint-initdb.d/01-download-and-restore.sh \
+            wget -q -O /docker-entrypoint-initdb.d/01-download-and-restore.sh \
               https://raw.githubusercontent.com/rcpch/rcpch-census-platform/shapes/init-db/01-download-and-restore.sh
             
             if [ -f /docker-entrypoint-initdb.d/01-download-and-restore.sh ]; then
