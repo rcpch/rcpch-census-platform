@@ -110,7 +110,7 @@ class Command(BaseCommand):
             -- 2. Create as a TABLE, not a VIEW
             CREATE TABLE public.{view_name} AS
             SELECT 
-                l.year::int as year, -- Renamed to 'year' for tileserv compatibility
+                l.year::int as year,
                 l.{geom_column}::geometry(MultiPolygon, 3857) AS geom,
                 l.lsoa_code::text,
                 COALESCE(e.imd_decile, w.imd_decile, 0)::int as imd_decile,
@@ -123,17 +123,38 @@ class Command(BaseCommand):
             WHERE l.{geom_column} IS NOT NULL 
             AND l.year = {boundary_year};
 
-            -- 3. Index it! (This is what prevents the 500 errors)
+            -- 3. Index it!
             CREATE INDEX idx_{view_name}_geom ON public.{view_name} USING GIST (geom);
             ANALYZE public.{view_name};
             """
 
-        # In your get_uk_master_view_sql helper, add a boundary_year parameter
         def get_uk_master_view_sql(view_name, geom_suffix, boundary_year, imd_year):
-            """Creates UK Master View combining all 4 nations with IMD data"""
+            """
+            Creates UK Master View combining all 4 nations with IMD data.
+            
+            Boundary year mapping:
+            - England/Wales LSOAs: 2011 (for IMD 2019) or 2021 (for IMD 2025)
+            - Scotland datazones: Always 2011
+            - N. Ireland SOAs: Always 2001
+            
+            IMD year mapping:
+            - England: 2019 or 2025 (passed as imd_year)
+            - Wales: Always 2019
+            - Scotland: Always 2020
+            - Northern Ireland: Always 2017
+            """
             actual_geom_col = (
                 "geom_3857" if geom_suffix == "3857" else f"geom_3857_{geom_suffix}"
             )
+            
+            # Fixed boundary years for Scotland and NI
+            scotland_boundary_year = 2011
+            ni_boundary_year = 2001
+            
+            # Fixed IMD years for Wales, Scotland and NI
+            wales_imd_year = 2019
+            scotland_imd_year = 2020
+            ni_imd_year = 2017
 
             return f"""
             -- 1. Clean up existing objects (both table and view types)
@@ -153,50 +174,58 @@ class Command(BaseCommand):
             FROM deprivation_scores_lsoa l
             LEFT JOIN deprivation_scores_englishindexmultipledeprivation e 
                 ON e.lsoa_id = l.id AND e.year = {imd_year}
-            WHERE l.lsoa_code LIKE 'E%' AND l.{actual_geom_col} IS NOT NULL AND l.year = {boundary_year}
+            WHERE l.lsoa_code LIKE 'E%' 
+                AND l.{actual_geom_col} IS NOT NULL 
+                AND l.year = {boundary_year}
             
             UNION ALL
             
-            -- WALES (Fall back to 2019 IMD as it is the most recent available)
+            -- WALES (Always uses 2019 IMD)
             SELECT 
                 l.year::int AS year, 
-                {imd_year}::int AS imd_year, 
+                {wales_imd_year}::int AS imd_year, 
                 l.lsoa_code::text AS code, 
                 ST_MakeValid(ST_Multi(l.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'wales'::text AS nation,
                 COALESCE(w.imd_decile, 0)::int AS imd_decile
             FROM deprivation_scores_lsoa l
             LEFT JOIN deprivation_scores_welshindexmultipledeprivation w 
-                ON w.lsoa_id = l.id AND w.year = 2019
-            WHERE l.lsoa_code LIKE 'W%' AND l.{actual_geom_col} IS NOT NULL AND l.year = {boundary_year}
+                ON w.lsoa_id = l.id AND w.year = {wales_imd_year}
+            WHERE l.lsoa_code LIKE 'W%' 
+                AND l.{actual_geom_col} IS NOT NULL 
+                AND l.year = {boundary_year}
 
             UNION ALL
 
-            -- SCOTLAND
+            -- SCOTLAND (Always uses 2011 boundaries and 2020 IMD)
             SELECT 
                 d.year::int AS year, 
-                {imd_year}::int AS imd_year, 
+                {scotland_imd_year}::int AS imd_year, 
                 d.data_zone_code::text AS code, 
                 ST_MakeValid(ST_Multi(d.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'scotland'::text AS nation,
                 COALESCE(WIDTH_BUCKET(s.imd_rank, 1, 6977, 10), 0)::int AS imd_decile
             FROM deprivation_scores_datazone d
-            LEFT JOIN deprivation_scores_scottishindexmultipledeprivation s ON s.data_zone_id = d.id
-            WHERE d.{actual_geom_col} IS NOT NULL
+            LEFT JOIN deprivation_scores_scottishindexmultipledeprivation s 
+                ON s.data_zone_id = d.id AND s.year = {scotland_imd_year}
+            WHERE d.{actual_geom_col} IS NOT NULL 
+                AND d.year = {scotland_boundary_year}
 
             UNION ALL
 
-            -- NORTHERN IRELAND
+            -- NORTHERN IRELAND (Always uses 2001 boundaries and 2017 IMD)
             SELECT 
                 so.year::int AS year, 
-                {imd_year}::int AS imd_year, 
+                {ni_imd_year}::int AS imd_year, 
                 so.soa_code::text AS code, 
                 ST_MakeValid(ST_Multi(so.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'northern_ireland'::text AS nation,
                 COALESCE(WIDTH_BUCKET(ni.imd_rank, 1, 891, 10), 0)::int AS imd_decile
             FROM deprivation_scores_soa so
-            LEFT JOIN deprivation_scores_northernirelandindexmultipledeprivation ni ON ni.soa_id = so.id
-            WHERE so.{actual_geom_col} IS NOT NULL;
+            LEFT JOIN deprivation_scores_northernirelandindexmultipledeprivation ni 
+                ON ni.soa_id = so.id AND ni.year = {ni_imd_year}
+            WHERE so.{actual_geom_col} IS NOT NULL 
+                AND so.year = {ni_boundary_year};
 
             -- 3. Create Spatial Index (Removes 500 errors by speeding up BBOX queries)
             CREATE INDEX idx_{view_name}_geom ON public.{view_name} USING GIST (geom);
@@ -208,8 +237,7 @@ class Command(BaseCommand):
         # --- SQL Statement List ---
 
         sql_statements = [
-            # Section 1: Cleanup
-            # 2. SCHEMA: Ensure columns exist FIRST
+            # Section 1: Schema setup
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
@@ -220,72 +248,67 @@ class Command(BaseCommand):
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
-            # Now do updates and drops
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 0.5)), 3));",
+            "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            
+            # Section 2: Cleanup
             "DROP TABLE IF EXISTS public.uk_master_2011_z0_4 CASCADE;",
             "DROP TABLE IF EXISTS public.uk_master_2011_z5_7 CASCADE;",
             "DROP TABLE IF EXISTS public.uk_master_2011_z8_10 CASCADE;",
             "DROP TABLE IF EXISTS public.uk_master_2021_z0_4 CASCADE;",
             "DROP TABLE IF EXISTS public.uk_master_2021_z5_7 CASCADE;",
             "DROP TABLE IF EXISTS public.uk_master_2021_z8_10 CASCADE;",
-            # Also drop the LSOA-specific ones as tables
             "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z0_4 CASCADE;",
             "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z0_4 CASCADE;",
-            "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
-            # 3. GEOPROCESSING (WGS84 -> Web Mercator 3857)
+            
+            # Section 3: Geoprocessing (WGS84 -> Web Mercator 3857)
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_MakeValid(geom_3857) WHERE NOT ST_IsValid(geom_3857);",
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_datazone SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_soa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_localauthority SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            # 4. SIMPLIFICATION (Gentle simplification to preserve detail)
-            # Applied to all regions for z0_4
+            
+            # Section 4: Simplification
             "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 5)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 0.5)), 3));",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 0.5)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
             "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 20)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
-            # Mid-level simplification (z5_7)
             "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 10)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 2)), 3));",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 2)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
             "UPDATE deprivation_scores_soa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 10)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
-            # 5. SPATIAL INDEXING & CLUSTERING
-            # 5. SPATIAL INDEXING & CLUSTERING (The Core Optimizations)
+            
+            # Section 5: Spatial indexing & clustering
             "CREATE INDEX IF NOT EXISTS idx_lsoa_3857 ON deprivation_scores_lsoa USING GIST (geom_3857);",
             "CREATE INDEX IF NOT EXISTS idx_datazone_3857 ON deprivation_scores_datazone USING GIST (geom_3857);",
             "CREATE INDEX IF NOT EXISTS idx_soa_3857 ON deprivation_scores_soa USING GIST (geom_3857);",
-            # Performance indexes for the Year/IMD joins
             "CREATE INDEX IF NOT EXISTS idx_lsoa_year_id ON deprivation_scores_lsoa (year, id);",
             "CREATE INDEX IF NOT EXISTS idx_english_imd_year_lsoa ON deprivation_scores_englishindexmultipledeprivation (year, lsoa_id);",
             "CREATE INDEX IF NOT EXISTS idx_welsh_imd_year_lsoa ON deprivation_scores_welshindexmultipledeprivation (year, lsoa_id);",
-            # Cluster tables (Physically re-order rows by geography for tile speed)
             "CLUSTER deprivation_scores_lsoa USING idx_lsoa_3857;",
             "CLUSTER deprivation_scores_datazone USING idx_datazone_3857;",
             "CLUSTER deprivation_scores_soa USING idx_soa_3857;",
-            # 6. VIEWS (Split by Boundary Year)
-            # 6. VIEWS
-            # --- 2011 Individual LSOA Views ---
+            
+            # Section 6: LSOA Views
             get_lsoa_view_sql("lsoa_tiles_2011_z0_4", "geom_3857_simp_z0_4", 2011),
             get_lsoa_view_sql("lsoa_tiles_2011_z5_7", "geom_3857_simp_z5_7", 2011),
             get_lsoa_view_sql("lsoa_tiles_2011_z8_10", "geom_3857", 2011),
-            # --- 2021 Individual LSOA Views ---
             get_lsoa_view_sql("lsoa_tiles_2021_z0_4", "geom_3857_simp_z0_4", 2021),
             get_lsoa_view_sql("lsoa_tiles_2021_z5_7", "geom_3857_simp_z5_7", 2021),
             get_lsoa_view_sql("lsoa_tiles_2021_z8_10", "geom_3857", 2021),
-            # --- UK Master Views (The ones your map actually calls) ---
-            # Boundary Year 2011 + IMD 2019
+            
+            # Section 7: UK Master Views
             get_uk_master_view_sql("uk_master_2011_z0_4", "simp_z0_4", 2011, 2019),
             get_uk_master_view_sql("uk_master_2011_z5_7", "simp_z5_7", 2011, 2019),
             get_uk_master_view_sql("uk_master_2011_z8_10", "3857", 2011, 2019),
-            # Boundary Year 2021 + IMD 2025
             get_uk_master_view_sql("uk_master_2021_z0_4", "simp_z0_4", 2021, 2025),
             get_uk_master_view_sql("uk_master_2021_z5_7", "simp_z5_7", 2021, 2025),
             get_uk_master_view_sql("uk_master_2021_z8_10", "3857", 2021, 2025),
+            
             "CREATE OR REPLACE VIEW public.la_tiles AS SELECT year, geom_3857 AS geom, local_authority_district_code AS lad_code FROM deprivation_scores_localauthority;",
-            # 7. FINAL HOUSEKEEPING
+            
+            # Section 8: Final housekeeping
             "GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;",
             "ANALYZE deprivation_scores_lsoa;",
             "ANALYZE deprivation_scores_datazone;",
             "ANALYZE deprivation_scores_soa;",
-            # Final optimization for the Master Tables
             "VACUUM ANALYZE public.uk_master_2011_z0_4;",
             "VACUUM ANALYZE public.uk_master_2011_z5_7;",
             "VACUUM ANALYZE public.uk_master_2011_z8_10;",
@@ -294,53 +317,23 @@ class Command(BaseCommand):
             "VACUUM ANALYZE public.uk_master_2021_z8_10;",
         ]
 
-        def table_or_view_exists(cursor, name):
-            # Accepts schema-qualified names like public.foo
-            if '.' in name:
-                schema, rel = name.split('.', 1)
-            else:
-                schema, rel = 'public', name
-            cursor.execute("""
-                SELECT EXISTS (
-                    SELECT 1 FROM information_schema.tables WHERE table_schema=%s AND table_name=%s
-                    UNION
-                    SELECT 1 FROM information_schema.views WHERE table_schema=%s AND table_name=%s
-                )
-            """, [schema, rel, schema, rel])
-            return cursor.fetchone()[0]
-
         print("[POSTPROCESS] Starting SQL post-processing...")
         with connection.cursor() as cursor:
             for statement in sql_statements:
                 stmt = statement.strip()
-                print(f"[POSTPROCESS] Executing: {stmt}")
-                # Check for ANALYZE, VACUUM, CLUSTER, etc. that require table/view existence
-                skip = False
-                for op in ["ANALYZE", "VACUUM", "CLUSTER", "GRANT", "CREATE INDEX", "DROP INDEX"]:
-                    if stmt.startswith(op):
-                        # Extract table/view name (naive split, works for your patterns)
-                        tokens = stmt.split()
-                        # e.g. ANALYZE public.uk_master_2011_z8_10;
-                        for t in tokens[1:]:
-                            t = t.strip(';')
-                            if '.' in t or t.isidentifier():
-                                if not table_or_view_exists(cursor, t):
-                                    msg = f"  Skipping '{op}' for missing table/view: {t}"
-                                    self.stdout.write(self.style.WARNING(msg))
-                                    print(f"[POSTPROCESS] WARNING: {msg}")
-                                    skip = True
-                                break
-                        break
-                if skip:
+                if not stmt:
                     continue
+                    
+                print(f"[POSTPROCESS] Executing: {stmt[:100]}...")
+                
                 try:
-                    if stmt:
-                        cursor.execute(stmt)
-                        print(f"[POSTPROCESS] Success: {stmt}")
+                    cursor.execute(stmt)
+                    print(f"[POSTPROCESS] Success")
                 except Exception as e:
                     err_msg = f"SQL Error: {e}"
                     self.stderr.write(self.style.ERROR(err_msg))
                     print(f"[POSTPROCESS] ERROR: {err_msg}")
+                    
         print("[POSTPROCESS] SQL post-processing complete.")
 
         self.stdout.write(
@@ -704,27 +697,33 @@ class Command(BaseCommand):
                 self.stdout.write(f"    ⚠️ Could not warm zoom {z}: {e}")
 
     def test_geometries(self):
+        """
+        Test to ensure that the spatial data and views are correctly set up.
+        """
         self.stdout.write(
             self.style.MIGRATE_LABEL("\n🔍 Validating Spatial Data & Views...")
         )
 
-
-        def view_exists(cursor, name):
+        def table_or_view_exists(cursor, name):
             if '.' in name:
                 schema, rel = name.split('.', 1)
             else:
                 schema, rel = 'public', name
             cursor.execute("""
                 SELECT EXISTS (
-                    SELECT 1 FROM information_schema.views WHERE table_schema=%s AND table_name=%s
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_schema=%s AND table_name=%s
+                    UNION
+                    SELECT 1 FROM information_schema.views 
+                    WHERE table_schema=%s AND table_name=%s
                 )
-            """, [schema, rel])
+            """, [schema, rel, schema, rel])
             return cursor.fetchone()[0]
 
         with connection.cursor() as cursor:
             # 1. Check the 2011 Master View
             self.stdout.write("Checking 2011 Era (2019 IMD)...")
-            if view_exists(cursor, "uk_master_2011_z8_10"):
+            if table_or_view_exists(cursor, "uk_master_2011_z8_10"):
                 cursor.execute(
                     """
                     SELECT nation, COUNT(*) 
@@ -740,7 +739,7 @@ class Command(BaseCommand):
 
             # 2. Check the 2021 Master View
             self.stdout.write("Checking 2021 Era (2025 IMD)...")
-            if view_exists(cursor, "uk_master_2021_z8_10"):
+            if table_or_view_exists(cursor, "uk_master_2021_z8_10"):
                 cursor.execute(
                     """
                     SELECT nation, COUNT(*) 
@@ -768,8 +767,7 @@ class Command(BaseCommand):
                 )
 
             # 3. Coordinate System Verification
-            # Using the 2021 view for the sample
-            if view_exists(cursor, "uk_master_2021_z8_10"):
+            if table_or_view_exists(cursor, "uk_master_2021_z8_10"):
                 cursor.execute(
                     "SELECT ST_X(ST_Centroid(geom)) FROM public.uk_master_2021_z8_10 LIMIT 1;"
                 )
@@ -877,7 +875,7 @@ class Command(BaseCommand):
                 )
 
             # Run optimizations after all datasets are imported
-            # self._run_post_processing_sql()
+            self._run_post_processing_sql()
 
             # Warm the local cache and then purge the remote CDN
             # if not settings.DEBUG:  # Only purge in production
@@ -886,6 +884,21 @@ class Command(BaseCommand):
             #     self.warm_cache()
 
             # test that the tables have the correct number of geometries
+            self.test_geometries()
+            return
+        if options.get("mode") == "process_geometries":
+            self.stdout.write(
+                "\n"
+                + self.style.SUCCESS(
+                    "Starting SQL post-processing and spatial optimizations..."
+                )
+                + "\n"
+            )
+            self._run_post_processing_sql()
+            self.test_geometries()
+            return
+        
+        if options["mode"] == "test_geometries":
             self.test_geometries()
             return
 
