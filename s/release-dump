@@ -80,7 +80,9 @@ fi
 echo "Total dump size: $SIZE ($SIZE_MB MB)"
 
 # Get latest release version
-LATEST_VERSION=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "")
+
+# Get all release tags, sort by semver, and pick the latest
+LATEST_VERSION=$(gh release list --json tagName --jq '.[].tagName' 2>/dev/null | grep -E '^v[0-9]+(\.[0-9]+){2}$' | sed 's/^v//' | sort -V | tail -n1)
 
 if [ -z "$LATEST_VERSION" ]; then
     echo "No previous releases found."
@@ -88,15 +90,10 @@ if [ -z "$LATEST_VERSION" ]; then
     SUGGESTED_MINOR="v0.1.0"
     SUGGESTED_PATCH="v0.0.1"
 else
-    echo "Latest release: $LATEST_VERSION"
+    echo "Latest release: v$LATEST_VERSION"
     echo ""
-    
-    # Strip 'v' prefix for processing
-    VERSION_NUM="${LATEST_VERSION#v}"
-    
     # Split into major.minor.patch
-    IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION_NUM"
-    
+    IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_VERSION"
     # Calculate next versions
     SUGGESTED_MAJOR="v$((MAJOR + 1)).0.0"
     SUGGESTED_MINOR="v${MAJOR}.$((MINOR + 1)).0"
