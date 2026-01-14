@@ -82,8 +82,6 @@ jobs:
           DJANGO_ALLOWED_HOSTS: ${{ secrets.DJANGO_ALLOWED_HOSTS }}
           DJANGO_CSRF_TRUSTED_ORIGINS: ${{ secrets.DJANGO_CSRF_TRUSTED_ORIGINS }}
           DB_DUMP_VERSION: ${{ env.DB_DUMP_VERSION }}
-          KEY_VAULT_NAME: ${{ secrets.KEY_VAULT_NAME }}
-          ENV_STORAGE_NAME: ${{ secrets.ENV_STORAGE_NAME }}
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -99,8 +97,6 @@ jobs:
               '__DJANGO_ALLOWED_HOSTS__': os.environ['DJANGO_ALLOWED_HOSTS'],
               '__DJANGO_CSRF_TRUSTED_ORIGINS__': os.environ['DJANGO_CSRF_TRUSTED_ORIGINS'],
               '__DB_DUMP_VERSION__': os.environ['DB_DUMP_VERSION'],
-              '__KEY_VAULT_NAME__': os.environ['KEY_VAULT_NAME'],
-              '__ENV_STORAGE_NAME__': os.environ['ENV_STORAGE_NAME'],
               '__AZURE_ENVIRONMENT_ID__': os.environ['AZURE_ENVIRONMENT_ID'],
           }
 

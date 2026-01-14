@@ -9,18 +9,19 @@ properties:
       transport: auto
       allowInsecure: false
   template:
-    # Required for the Web App to "talk" to the DB via Entra ID
     identity:
       type: UserAssigned
       userAssignedIdentities:
         "__IDENTITY_ID__": {}
     containers:
+      # Nginx Reverse Proxy
       - name: nginx
         image: ghcr.io/rcpch/rcpch-census-nginx:__IMAGE_TAG__
         resources:
           cpu: 0.25
-          memory: 0.25Gi
+          memory: 0.5Gi # Increased to help hit total ratio
 
+      # Django Web App
       - name: web
         image: ghcr.io/rcpch/rcpch-census-web:__IMAGE_TAG__
         env:
@@ -37,16 +38,16 @@ properties:
           - name: DJANGO_SETTINGS_MODULE
             value: "rcpch_census_platform.settings"
         resources:
-          cpu: 1.0
-          memory: 1.0Gi
+          cpu: 1.25 # Increased for DRF processing
+          memory: 2.5Gi
 
+      # pg_tileserv for vector tiles
       - name: tiles
         image: pramsey/pg_tileserv:latest
         env:
-          # pg_tileserv requires a full URL. 
-          # Note: pg_tileserv doesn't natively refresh tokens.
           - name: DATABASE_URL
             secretRef: tiles-db-url
         resources:
           cpu: 0.5
-          memory: 0.25Gi
+          memory: 1.0Gi # Increased for geometry caching
+  
