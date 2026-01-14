@@ -98,6 +98,7 @@ jobs:
               '__DJANGO_CSRF_TRUSTED_ORIGINS__': os.environ['DJANGO_CSRF_TRUSTED_ORIGINS'],
               '__DB_DUMP_VERSION__': os.environ['DB_DUMP_VERSION'],
               '__AZURE_ENVIRONMENT_ID__': os.environ['AZURE_ENVIRONMENT_ID'],
+              '__TILES_SECRET_NAME__': 'tiles-db-url' 
           }
 
           for k, v in replacements.items():
@@ -106,6 +107,15 @@ jobs:
           out_path.write_text(content, encoding='utf-8')
           print(f"Wrote {out_path}")
           PY
+
+      - name: Force link tiles secret
+        shell: bash
+        run: |
+          az containerapp update \
+            -n "${AZURE_CONTAINERAPP_NAME}" \
+            -g "${AZURE_RESOURCE_GROUP}" \
+            --container-name "tiles" \
+            --set-env-vars "DATABASE_URL=secretref:tiles-db-url"
 
       - name: Deploy Container App revision
         shell: bash
