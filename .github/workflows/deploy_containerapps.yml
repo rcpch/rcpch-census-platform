@@ -98,7 +98,9 @@ jobs:
               '__DJANGO_CSRF_TRUSTED_ORIGINS__': os.environ['DJANGO_CSRF_TRUSTED_ORIGINS'],
               '__DB_DUMP_VERSION__': os.environ['DB_DUMP_VERSION'],
               '__AZURE_ENVIRONMENT_ID__': os.environ['AZURE_ENVIRONMENT_ID'],
-              '__TILES_SECRET_NAME__': 'tiles-db-url' 
+              '__TILES_SECRET_NAME__': 'tiles-db-url' ,
+              '__AZURE_POSTGRES_HOST__': 'rcpch-census-platform-db', 
+              '__MANAGED_IDENTITY_NAME__': os.environ.get('AZURE_CLIENT_ID', 'identity-name')
           }
 
           for k, v in replacements.items():
