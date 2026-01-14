@@ -102,7 +102,7 @@ def get_db_password():
     a dynamic Entra ID token for production.
     """
     if DEBUG:
-        return os.environ.get("POSTGRES_DB_PASSWORD")
+        return os.environ.get("POSTGRES_PASSWORD")
 
     # If not in Debug, fetch token from Azure
     try:
@@ -113,7 +113,7 @@ def get_db_password():
     except Exception as e:
         # Fallback or log error for production debugging
         print(f"Error fetching Entra ID token: {e}")
-        return os.environ.get("POSTGRES_DB_PASSWORD")
+        return os.environ.get("POSTGRES_PASSWORD")
 
 
 # Database
@@ -128,6 +128,7 @@ DATABASES = {
         "HOST": os.environ.get("POSTGRES_DB_HOST"),
         "PORT": os.environ.get("POSTGRES_DB_PORT"),
         "ATOMIC_REQUESTS": False,
+        "options": {"sslmode": "require" if not DEBUG else "disable"},
     }
 }
 

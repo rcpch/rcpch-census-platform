@@ -100,7 +100,8 @@ jobs:
               '__AZURE_ENVIRONMENT_ID__': os.environ['AZURE_ENVIRONMENT_ID'],
               '__TILES_SECRET_NAME__': 'tiles-db-url' ,
               '__AZURE_POSTGRES_HOST__': 'rcpch-census-platform-db', 
-              '__MANAGED_IDENTITY_NAME__': os.environ.get('AZURE_CLIENT_ID', 'identity-name')
+              '__MANAGED_IDENTITY_NAME__': 'rcpch-census-platform-v2', 
+              '__DB_NAME__': 'postgres'
           }
 
           for k, v in replacements.items():
