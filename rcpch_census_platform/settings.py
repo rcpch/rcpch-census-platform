@@ -16,7 +16,7 @@ import os
 
 # third party imports
 from django.core.management.utils import get_random_secret_key
-
+from azure.identity import DefaultAzureCredential
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -94,6 +94,26 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "rcpch_census_platform.wsgi.application"
+
+
+def get_db_password():
+    """
+    Returns the static password for local dev or
+    a dynamic Entra ID token for production.
+    """
+    if DEBUG:
+        return os.environ.get("POSTGRES_DB_PASSWORD")
+
+    # If not in Debug, fetch token from Azure
+    try:
+        scope = "https://ossrdbms-aad.database.windows.net/.default"
+        credential = DefaultAzureCredential()
+        token = credential.get_token(scope)
+        return token.token
+    except Exception as e:
+        # Fallback or log error for production debugging
+        print(f"Error fetching Entra ID token: {e}")
+        return os.environ.get("POSTGRES_DB_PASSWORD")
 
 
 # Database

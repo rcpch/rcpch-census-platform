@@ -1,0 +1,103 @@
+name: Seed Managed Azure Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      db_dump_version:
+        description: "Database dump version tag (e.g., v1.1.0)"
+        required: false
+        default: "latest"
+        type: string
+      force_reseed:
+        description: "Force re-seed even if database is already populated"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  seed-database:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Determine DB dump version
+        id: fetch_version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ inputs.db_dump_version }}" = "latest" ]; then
+            TAG=$(gh api repos/rcpch/rcpch-census-platform/releases --jq '[.[] | select(.draft==false and .prerelease==false)] | sort_by(.published_at) | reverse | .[0].tag_name')
+            echo "DB_DUMP_VERSION=$TAG" >> $GITHUB_OUTPUT
+          else
+            echo "DB_DUMP_VERSION=${{ inputs.db_dump_version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate Entra ID Token
+        id: get_config
+        run: |
+          # Fetch Token (The "Password" for Entra ID)
+          TOKEN=$(az account get-access-token --resource-type https://ossrdbms-aad.database.windows.net --query 'accessToken' --output tsv)
+
+          echo "::add-mask::$TOKEN"
+          echo "POSTGRES_PASSWORD=$TOKEN" >> $GITHUB_OUTPUT
+
+          # Map other standard variables from secrets
+          echo "POSTGRES_DB_HOST=${{ secrets.POSTGRES_DB_HOST }}" >> $GITHUB_OUTPUT
+          echo "POSTGRES_DB_PORT=${{ secrets.POSTGRES_DB_PORT || '5432' }}" >> $GITHUB_OUTPUT
+          echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}" >> $GITHUB_OUTPUT
+          echo "POSTGRES_USER=${{ secrets.POSTGRES_USER }}" >> $GITHUB_OUTPUT
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-15
+
+      - name: Download database dump
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.fetch_version.outputs.DB_DUMP_VERSION }}
+        run: |
+          DUMP_FILE="rcpch-census-${VERSION}.dump"
+          gh release download "$VERSION" -p "${DUMP_FILE}*"
+
+          if ls ${DUMP_FILE}.part-* 1> /dev/null 2>&1; then
+            cat ${DUMP_FILE}.part-* > ${DUMP_FILE}
+            rm ${DUMP_FILE}.part-*
+          fi
+          echo "DUMP_FILE=$DUMP_FILE" >> $GITHUB_ENV
+
+      - name: Restore database dump
+        env:
+          POSTGRES_DB_HOST: ${{ steps.get_config.outputs.POSTGRES_DB_HOST }}
+          POSTGRES_DB_PORT: ${{ steps.get_config.outputs.POSTGRES_DB_PORT }}
+          POSTGRES_DB: ${{ steps.get_config.outputs.POSTGRES_DB }}
+          POSTGRES_USER: ${{ steps.get_config.outputs.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ steps.get_config.outputs.POSTGRES_PASSWORD }}
+          PGSSLMODE: require
+        run: |
+          # Construct connection string using standard variables
+          CONN="host=$POSTGRES_DB_HOST port=$POSTGRES_DB_PORT user=$POSTGRES_USER dbname=$POSTGRES_DB sslmode=require"
+
+          echo "Ensuring PostGIS extension..."
+          psql "$CONN" -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+
+          if [ "${{ inputs.force_reseed }}" = "true" ]; then
+            echo "Force reseed: dropping public schema..."
+            psql "$CONN" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;"
+          fi
+
+          echo "Restoring database dump..."
+          pg_restore --dbname="$CONN" --no-owner --no-acl -v "$DUMP_FILE"

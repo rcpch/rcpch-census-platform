@@ -8,109 +8,45 @@ properties:
       targetPort: 80
       transport: auto
       allowInsecure: false
-    # No secrets section - secrets managed separately
   template:
+    # Required for the Web App to "talk" to the DB via Entra ID
+    identity:
+      type: UserAssigned
+      userAssignedIdentities:
+        "__IDENTITY_ID__": {}
     containers:
-      # Nginx Reverse Proxy
       - name: nginx
         image: ghcr.io/rcpch/rcpch-census-nginx:__IMAGE_TAG__
         resources:
           cpu: 0.25
           memory: 0.25Gi
-      # PostgreSQL with PostGIS - runs as sidecar
-      - name: db
-        image: postgis/postgis:15-3.4
-        env:
-          - name: POSTGRES_USER
-            secretRef: postgres-db-user
-          - name: POSTGRES_PASSWORD
-            secretRef: postgres-db-password
-          - name: POSTGRES_DB
-            secretRef: postgres-db-name
-          - name: DB_DUMP_VERSION
-            value: "__DB_DUMP_VERSION__"
-          - name: PGDATA
-            value: "/var/lib/postgresql/data/pgdata"
-        command:
-          - /bin/bash
-          - -c
-          - |
-            echo "=========================================="
-            echo "Downloading init script..."
-            echo "=========================================="
-            mkdir -p /docker-entrypoint-initdb.d
-            
-            # Use cat with /dev/tcp for pure bash download (no external tools needed)
-            # But that's tricky, so let's install wget first
-            apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
-            
-            wget -q -O /docker-entrypoint-initdb.d/01-download-and-restore.sh \
-              https://raw.githubusercontent.com/rcpch/rcpch-census-platform/shapes/init-db/01-download-and-restore.sh
-            
-            if [ -f /docker-entrypoint-initdb.d/01-download-and-restore.sh ]; then
-              echo "✓ Init script downloaded successfully"
-              chmod +x /docker-entrypoint-initdb.d/01-download-and-restore.sh
-              ls -lh /docker-entrypoint-initdb.d/
-            else
-              echo "✗ Failed to download init script"
-              exit 1
-            fi
-            
-            echo "Starting PostgreSQL with init scripts..."
-            exec docker-entrypoint.sh postgres
-        resources:
-          cpu: 2.25
-          memory: 6.5Gi
 
-      # Django Web App - pulling from GHCR
       - name: web
         image: ghcr.io/rcpch/rcpch-census-web:__IMAGE_TAG__
         env:
-          - name: DJANGO_ALLOWED_HOSTS
-            value: "__DJANGO_ALLOWED_HOSTS__"
-          - name: DJANGO_CSRF_TRUSTED_ORIGINS
-            value: "__DJANGO_CSRF_TRUSTED_ORIGINS__"
-          - name: DJANGO_SECRET_KEY
-            secretRef: django-secret-key
+          - name: DEBUG
+            value: "False"
           - name: POSTGRES_DB_HOST
-            value: "localhost"
-          - name: POSTGRES_DB
-            secretRef: postgres-db-name
-          - name: POSTGRES_PASSWORD
-            secretRef: postgres-db-password
+            value: "__AZURE_POSTGRES_HOST__.postgres.database.azure.com"
           - name: POSTGRES_DB_PORT
             value: "5432"
+          - name: POSTGRES_DB
+            value: "__DB_NAME__"
           - name: POSTGRES_USER
-            secretRef: postgres-db-user
-          - name: POSTCODES_IO_API_URL
-            secretRef: postcodes-io-api-url
-          - name: POSTCODES_IO_API_KEY
-            secretRef: postcodes-io-api-key
-          - name: WAIT_FOR_POPULATION
-            value: "true"
-          - name: DB_DUMP_VERSION
-            value: "v1.1.0"
-        command:
-          - gunicorn
-          - rcpch_census_platform.asgi:application
-          - -k
-          - uvicorn.workers.UvicornWorker
-          - --bind
-          - 0.0.0.0:8000
+            value: "__MANAGED_IDENTITY_NAME__"
+          - name: DJANGO_SETTINGS_MODULE
+            value: "rcpch_census_platform.settings"
         resources:
           cpu: 1.0
           memory: 1.0Gi
 
-      # pg_tileserv for vector tiles
       - name: tiles
         image: pramsey/pg_tileserv:latest
         env:
+          # pg_tileserv requires a full URL. 
+          # Note: pg_tileserv doesn't natively refresh tokens.
           - name: DATABASE_URL
-            secretRef: tiles-db-url
+            secretRef: postgres-tiles-connection-string
         resources:
           cpu: 0.5
           memory: 0.25Gi
-
-    scale:
-      minReplicas: 1
-      maxReplicas: 1

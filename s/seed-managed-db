@@ -1,0 +1,76 @@
+#!/bin/bash
+# seed-managed-db.sh
+
+set -e
+
+echo "=========================================="
+echo "RCPCH Census - Database Seeder"
+echo "=========================================="
+
+# 1. Load local .env if it exists
+if [ -f .env ]; then
+    echo "Loading variables from .env..."
+    export $(grep -v '^#' .env | xargs)
+fi
+
+# 2. Strict Variable Validation
+# The :? syntax will exit the script and print the error if the variable is unset/empty
+: "${POSTGRES_DB_HOST:?Environment variable POSTGRES_DB_HOST is required}"
+: "${POSTGRES_DB_PORT:?Environment variable POSTGRES_DB_PORT is required}"
+: "${POSTGRES_DB:?Environment variable POSTGRES_DB is required}"
+: "${POSTGRES_USER:?Environment variable POSTGRES_USER is required}"
+
+# Handle Password: local dev needs POSTGRES_PASSWORD, 
+# but Prod will overwrite this with an Entra Token.
+DB_PASS=$POSTGRES_PASSWORD
+
+# 3. Azure Entra ID Token Logic
+if [[ "$POSTGRES_DB_HOST" == *"postgres.database.azure.com"* ]]; then
+    echo "Azure host detected. Checking Azure authentication..."
+    
+    if ! az account show &> /dev/null; then
+        echo "✗ Not authenticated with Azure. Running 'az login'..."
+        az login
+    fi
+
+    echo "Generating Entra ID access token..."
+    DB_PASS=$(az account get-access-token --resource-type https://ossrdbms-aad.database.windows.net --query 'accessToken' --output tsv)
+    echo "✓ Token generated successfully"
+fi
+
+# 4. Global PG variables for tools
+export PGPASSWORD="$DB_PASS"
+export PGSSLMODE="require"
+
+# 5. Version Resolution
+VERSION=${1:-"latest"}
+if [ "$VERSION" = "latest" ]; then
+    VERSION=$(gh api repos/rcpch/rcpch-census-platform/releases --jq '[.[] | select(.draft==false and .prerelease==false)] | sort_by(.published_at) | reverse | .[0].tag_name')
+fi
+
+# 6. Temporary Workspace
+DUMP_FILE="rcpch-census-${VERSION}.dump"
+WORK_DIR="./tmp_seed_$(date +%s)"
+mkdir -p "$WORK_DIR" && cd "$WORK_DIR"
+
+# 7. Download and Restore
+gh release download "$VERSION" -p "${DUMP_FILE}*"
+
+if ls ${DUMP_FILE}.part-* 1> /dev/null 2>&1; then
+    cat ${DUMP_FILE}.part-* > "$DUMP_FILE"
+fi
+
+# Construct connection string
+CONN="host=$POSTGRES_DB_HOST port=$POSTGRES_DB_PORT user=$POSTGRES_USER dbname=$POSTGRES_DB sslmode=require"
+
+echo "Ensuring PostGIS..."
+psql "$CONN" -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+
+echo "Restoring database..."
+pg_restore --dbname="$CONN" --no-owner --no-acl --clean --if-exists -v "$DUMP_FILE"
+
+# 8. Cleanup
+cd ..
+rm -rf "$WORK_DIR"
+
+echo "✓ Database seeding complete!"

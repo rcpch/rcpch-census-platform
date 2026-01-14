@@ -24,3 +24,4 @@ geopandas==1.1.2
 pandas==2.3.3
 SQLAlchemy==2.0.45
 GeoAlchemy2==0.18.1
+azure-identity==1.25.1
