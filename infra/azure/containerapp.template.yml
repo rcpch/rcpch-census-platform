@@ -36,7 +36,7 @@ properties:
           - name: POSTGRES_USER
             value: "__MANAGED_IDENTITY_NAME__"
           - name: DJANGO_SETTINGS_MODULE
-            value: "rcpch_census_platform.settings",
+            value: "rcpch_census_platform.settings"
           - name: DJANGO_ALLOWED_HOSTS
             value: "__DJANGO_ALLOWED_HOSTS__"
           - name: DJANGO_CSRF_TRUSTED_ORIGINS
