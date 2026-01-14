@@ -37,6 +37,14 @@ properties:
             value: "__MANAGED_IDENTITY_NAME__"
           - name: DJANGO_SETTINGS_MODULE
             value: "rcpch_census_platform.settings"
+        command:
+            - sh
+            - -c
+            - |
+              /app/s/wait-for-db.sh && \
+              python -u manage.py collectstatic --noinput && \
+              python -u manage.py migrate && \
+              gunicorn rcpch_census_platform.wsgi:application --bind 0.0.0.0:8000 --workers 4
         resources:
           cpu: 1.25 # Increased for DRF processing
           memory: 2.5Gi
