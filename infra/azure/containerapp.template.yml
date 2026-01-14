@@ -46,7 +46,7 @@ properties:
           # pg_tileserv requires a full URL. 
           # Note: pg_tileserv doesn't natively refresh tokens.
           - name: DATABASE_URL
-            secretRef: postgres-tiles-connection-string
+            secretRef: tiles-db-url
         resources:
           cpu: 0.5
           memory: 0.25Gi
