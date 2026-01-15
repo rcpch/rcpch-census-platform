@@ -1,76 +1,82 @@
 #!/bin/bash
-# seed-managed-db.sh
-
 set -e
 
 echo "=========================================="
 echo "RCPCH Census - Database Seeder"
 echo "=========================================="
 
-# 1. Load local .env if it exists
-if [ -f .env ]; then
+# 1. Load local .env if it exists (Skip in CI/Cloud)
+if [ -f .env ] && [ -z "$KUBERNETES_SERVICE_HOST" ]; then
     echo "Loading variables from .env..."
     export $(grep -v '^#' .env | xargs)
 fi
 
-# 2. Strict Variable Validation
-# The :? syntax will exit the script and print the error if the variable is unset/empty
+# 2. Variable Validation
 : "${POSTGRES_DB_HOST:?Environment variable POSTGRES_DB_HOST is required}"
-: "${POSTGRES_DB_PORT:?Environment variable POSTGRES_DB_PORT is required}"
-: "${POSTGRES_DB:?Environment variable POSTGRES_DB is required}"
 : "${POSTGRES_USER:?Environment variable POSTGRES_USER is required}"
 
-# Handle Password: local dev needs POSTGRES_PASSWORD, 
-# but Prod will overwrite this with an Entra Token.
 DB_PASS=$POSTGRES_PASSWORD
 
-# 3. Azure Entra ID Token Logic
+# 3. Smart Azure Token Logic
 if [[ "$POSTGRES_DB_HOST" == *"postgres.database.azure.com"* ]]; then
-    echo "Azure host detected. Checking Azure authentication..."
-    
-    if ! az account show &> /dev/null; then
-        echo "✗ Not authenticated with Azure. Running 'az login'..."
-        az login
-    fi
+    echo "Azure host detected. Determining Auth Method..."
 
-    echo "Generating Entra ID access token..."
-    DB_PASS=$(az account get-access-token --resource-type https://ossrdbms-aad.database.windows.net --query 'accessToken' --output tsv)
+    # Method A: Inside Azure Container App (Managed Identity Endpoint)
+    if [ -n "$IDENTITY_ENDPOINT" ] || [ -n "$MSI_ENDPOINT" ]; then
+        echo "Detected Azure Environment. Fetching token via Managed Identity Endpoint..."
+        # IDENTITY_ENDPOINT is provided by the ACA runtime
+        DB_PASS=$(curl -s "$IDENTITY_ENDPOINT?api-version=2019-08-01&resource=https://ossrdbms-aad.database.windows.net" -H "X-IDENTITY-HEADER: $IDENTITY_HEADER" | jq -r '.access_token')
+
+    # Method B: Local or GitHub Runner (using az CLI)
+    elif command -v az &> /dev/null; then
+        echo "Detected CLI environment. Fetching token via az CLI..."
+        # If not logged in and not in CI, try login
+        if ! az account show &> /dev/null && [ -z "$GITHUB_ACTIONS" ]; then
+            az login
+        fi
+        DB_PASS=$(az account get-access-token --resource-type https://ossrdbms-aad.database.windows.net --query 'accessToken' --output tsv)
+    else
+        echo "Error: Azure Host detected but no authentication method (az CLI or Managed Identity) found."
+        exit 1
+    fi
     echo "✓ Token generated successfully"
 fi
 
-# 4. Global PG variables for tools
+# 4. Global PG variables
 export PGPASSWORD="$DB_PASS"
 export PGSSLMODE="require"
 
-# 5. Version Resolution
+# 5. GitHub CLI Auth check
+if [ -n "$GITHUB_ACTIONS" ]; then
+    echo "Running in GitHub Actions. Using provided GITHUB_TOKEN..."
+    export GH_TOKEN="${GITHUB_TOKEN:-$GH_TOKEN}"
+elif [ -z "$GH_TOKEN" ] && ! gh auth status &> /dev/null; then
+    echo "Warning: GitHub CLI not authenticated. gh release download may fail."
+fi
+
+# 6. Version Resolution
 VERSION=${1:-"latest"}
 if [ "$VERSION" = "latest" ]; then
     VERSION=$(gh api repos/rcpch/rcpch-census-platform/releases --jq '[.[] | select(.draft==false and .prerelease==false)] | sort_by(.published_at) | reverse | .[0].tag_name')
 fi
 
-# 6. Temporary Workspace
+# 7. Workspace and Restore
 DUMP_FILE="rcpch-census-${VERSION}.dump"
 WORK_DIR="./tmp_seed_$(date +%s)"
 mkdir -p "$WORK_DIR" && cd "$WORK_DIR"
 
-# 7. Download and Restore
-gh release download "$VERSION" -p "${DUMP_FILE}*"
+echo "Downloading release $VERSION..."
+gh release download "$VERSION" -p "${DUMP_FILE}*" -R rcpch/rcpch-census-platform
 
 if ls ${DUMP_FILE}.part-* 1> /dev/null 2>&1; then
     cat ${DUMP_FILE}.part-* > "$DUMP_FILE"
 fi
 
-# Construct connection string
-CONN="host=$POSTGRES_DB_HOST port=$POSTGRES_DB_PORT user=$POSTGRES_USER dbname=$POSTGRES_DB sslmode=require"
-
-echo "Ensuring PostGIS..."
-psql "$CONN" -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+CONN="host=$POSTGRES_DB_HOST port=${POSTGRES_DB_PORT:-5432} user=$POSTGRES_USER dbname=${POSTGRES_DB:-postgres} sslmode=require"
 
 echo "Restoring database..."
 pg_restore --dbname="$CONN" --no-owner --no-acl --clean --if-exists -v "$DUMP_FILE"
 
-# 8. Cleanup
 cd ..
 rm -rf "$WORK_DIR"
-
 echo "✓ Database seeding complete!"

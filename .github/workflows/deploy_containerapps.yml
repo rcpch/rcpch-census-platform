@@ -123,13 +123,14 @@ jobs:
       - name: Seed Database
         shell: bash
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           POSTGRES_DB_HOST: ${{ secrets.POSTGRES_DB_HOST }}
           POSTGRES_DB_PORT: ${{ secrets.POSTGRES_DB_PORT }}
           POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }} # The Identity name
         run: |
-          chmod +x ./seed-managed-db.sh
-          ./seed-managed-db.sh latest
+          chmod +x ./s/seed-managed-db.sh
+          ./s/seed-managed-db.sh latest
 
       - name: Deploy Container App revision
         shell: bash

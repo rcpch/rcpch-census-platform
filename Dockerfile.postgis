@@ -13,6 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libproj-dev \
     libpq-dev \
     postgresql-client \
+    gh \               
+    curl \             
+    jq \               
     && rm -rf /var/lib/apt/lists/*
 
 # Ensure headers are found for C extensions
@@ -30,9 +33,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements/common-requirements.txt && \
     pip install --no-cache-dir -r requirements/development-requirements.txt
 
-# Copy wait-for-db script
+# Copy wait-for-db and seed-managed-db scripts
 COPY ./s/wait-for-db.sh /app/s/wait-for-db.sh
-RUN chmod +x /app/s/wait-for-db.sh
+COPY ./s/seed-managed-db.sh /app/s/seed-managed-db.sh
+RUN chmod +x /app/s/wait-for-db.sh /app/s/seed-managed-db.sh
 
 # Copy the rest of the project
 COPY . /app/
