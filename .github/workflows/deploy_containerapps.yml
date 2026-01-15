@@ -120,6 +120,17 @@ jobs:
             --container-name "tiles" \
             --set-env-vars "DATABASE_URL=secretref:tiles-db-url"
 
+      - name: Seed Database
+        shell: bash
+        env:
+          POSTGRES_DB_HOST: ${{ secrets.POSTGRES_DB_HOST }}
+          POSTGRES_DB_PORT: ${{ secrets.POSTGRES_DB_PORT }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }} # The Identity name
+        run: |
+          chmod +x ./seed-managed-db.sh
+          ./seed-managed-db.sh latest
+
       - name: Deploy Container App revision
         shell: bash
         run: |
