@@ -120,17 +120,12 @@ jobs:
             --container-name "tiles" \
             --set-env-vars "DATABASE_URL=secretref:tiles-db-url"
 
-      - name: Seed Database
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          POSTGRES_DB_HOST: ${{ secrets.POSTGRES_DB_HOST }}
-          POSTGRES_DB_PORT: ${{ secrets.POSTGRES_DB_PORT }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }} # The Identity name
+      - name: Trigger Seed inside Container
         run: |
-          chmod +x ./s/seed-managed-db
-          ./s/seed-managed-db latest
+          az containerapp exec \
+            -n rcpch-census-platform-v2 \
+            -g ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --command "/app/s/seed-managed-db latest"
 
       - name: Deploy Container App revision
         shell: bash
