@@ -130,8 +130,8 @@ jobs:
           POSTGRES_USER: ${{ secrets.POSTGRES_DB_ADMIN }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_DB_ADMIN_PASSWORD }}
         run: |
-          chmod +x ./s/seed-managed-db.sh
-          ./s/seed-managed-db.sh latest
+          chmod +x ./s/seed-managed-db
+          ./s/seed-managed-db latest
 
       - name: Deploy Container App revision
         shell: bash
