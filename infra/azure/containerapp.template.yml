@@ -43,6 +43,10 @@ properties:
             value: "__DJANGO_CSRF_TRUSTED_ORIGINS__"
           - name: DJANGO_SECRET_KEY
             secretRef: django-secret-key
+          - name: POSTCODES_IO_API_URL
+            secretRef: postcodes-io-api-url
+          - name: POSTCODES_IO_API_KEY
+            secretRef: postcodes-io-api-key
         command:
             - sh
             - -c
