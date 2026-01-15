@@ -34,7 +34,7 @@ if [[ "$POSTGRES_DB_HOST" == *"postgres.database.azure.com"* ]]; then
         if ! az account show &> /dev/null && [ -z "$GITHUB_ACTIONS" ]; then
             az login
         fi
-        DB_PASS=$(az account get-access-token --resource-type https://ossrdbms-aad.database.windows.net --query 'accessToken' --output tsv)
+        DB_PASS=$(az account get-access-token --resource-type oss-rdbms --query 'accessToken' --output tsv)
     else
         echo "Error: Azure Host detected but no authentication method (az CLI or Managed Identity) found."
         exit 1
