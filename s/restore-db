@@ -12,11 +12,14 @@ echo "=========================================="
 : "${CONFIRM_RESTORE:?You must set CONFIRM_RESTORE=true}"
 [ "$CONFIRM_RESTORE" = "true" ] || { echo "Aborting."; exit 1; }
 
-# ---- Required env (Ensure these are passed in your 'exec' command) ----
+# ---- Required env ----
 : "${POSTGRES_DB_HOST:?Required}"
 : "${POSTGRES_DB:?Required}"
 : "${CENSUS_RESTORE_USER:?Required}"
 : "${CENSUS_RESTORE_USER_PASSWORD:?Required}"
+# NEW: Admin credentials for extension installation
+: "${POSTGRES_ADMIN_USER:?Required - Azure admin user}"
+: "${POSTGRES_ADMIN_PASSWORD:?Required - Azure admin password}"
 
 VERSION="${1:-latest}"
 
@@ -54,28 +57,43 @@ if [ ! -s "${DUMP_BASE}" ]; then
 fi
 echo "✓ Reassembly successful. Size: $(du -sh "${DUMP_BASE}" | cut -f1)"
 
-# 5. Execute pg_restore
-echo "Starting pg_restore... (This may take a while)"
-export PGPASSWORD="$CENSUS_RESTORE_USER_PASSWORD"
-
-echo "Step 1: Cleaning Schema & Pre-authorizing Role..."
-psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" <<EOF
--- Drop everything
+# 5. STEP 1: Install Extensions as Admin
+echo "Step 1: Installing PostGIS extensions as admin..."
+export PGPASSWORD="$POSTGRES_ADMIN_PASSWORD"
+psql --host="$POSTGRES_DB_HOST" --username="$POSTGRES_ADMIN_USER" --dbname="$POSTGRES_DB" <<EOF
+-- Drop and recreate schema
 DROP SCHEMA IF EXISTS public CASCADE;
 CREATE SCHEMA public;
 
--- Make the restore user the owner of the schema so it can create tables
+-- Install PostGIS extensions (requires admin privileges)
+CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS postgis_topology WITH SCHEMA topology;
+
+-- Note: fuzzystrmatch and postgis_tiger_geocoder may not be needed
+-- Uncomment if your data actually requires them:
+-- CREATE EXTENSION IF NOT EXISTS fuzzystrmatch WITH SCHEMA public;
+-- CREATE EXTENSION IF NOT EXISTS postgis_tiger_geocoder WITH SCHEMA tiger;
+
+-- Grant schema ownership to restore user
 ALTER SCHEMA public OWNER TO "$CENSUS_RESTORE_USER";
+GRANT ALL ON SCHEMA public TO "$CENSUS_RESTORE_USER";
 
--- Enable PostGIS for geometry columns
-CREATE EXTENSION IF NOT EXISTS postgis;
+-- If topology schema exists, grant access
+DO \$\$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'topology') THEN
+        GRANT USAGE ON SCHEMA topology TO "$CENSUS_RESTORE_USER";
+    END IF;
+END \$\$;
 
--- Link the app role to the restore user so 'REASSIGN OWNED BY' works later
+-- Link the app role to the restore user
 GRANT "$TARGET_APP_ROLE" TO "$CENSUS_RESTORE_USER";
 EOF
 
-echo "Step 2: Restoring Data..."
-# --no-owner and --no-privileges are VITAL here to ignore the old 'rcpchCensusdb' refs
+# 6. STEP 2: Restore Data as Restore User
+echo "Step 2: Restoring data as restore user..."
+export PGPASSWORD="$CENSUS_RESTORE_USER_PASSWORD"
+
 pg_restore \
   --host="$POSTGRES_DB_HOST" \
   --username="$CENSUS_RESTORE_USER" \
@@ -85,27 +103,56 @@ pg_restore \
   --no-acl \
   --clean \
   --if-exists \
-  -v "${DUMP_BASE}" || echo "Restore finished with standard warnings."
+  --section=pre-data \
+  --section=data \
+  --section=post-data \
+  --exclude-schema=topology \
+  --exclude-schema=tiger \
+  --exclude-schema=tiger_data \
+  -v "${DUMP_BASE}" 2>&1 | tee restore.log || true
 
-echo "Step 3: Handing over ownership to $TARGET_APP_ROLE..."
+# Check for critical errors (not just warnings)
+if grep -q "FATAL\|PANIC" restore.log; then
+    echo "ERROR: Critical restore failure detected"
+    exit 1
+fi
+
+echo "Restore completed (warnings are normal for extension-related objects)"
+
+# 7. STEP 3: Transfer Ownership
+echo "Step 3: Transferring ownership to $TARGET_APP_ROLE..."
 psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" <<EOF
--- Transfer all newly created tables to the app role
+-- Transfer ownership of all objects created by restore user
 REASSIGN OWNED BY "$CENSUS_RESTORE_USER" TO "$TARGET_APP_ROLE";
--- Ensure the app role has schema access
+
+-- Ensure app role has schema privileges
 GRANT ALL ON SCHEMA public TO "$TARGET_APP_ROLE";
+GRANT ALL ON ALL TABLES IN SCHEMA public TO "$TARGET_APP_ROLE";
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO "$TARGET_APP_ROLE";
 EOF
 
-echo "Step 4: Restoring Service User Access (pg_tileserv)..."
+# 8. STEP 4: Grant Tileserver Access
+echo "Step 4: Configuring tileserver access..."
 psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" <<EOF
--- Give tileserver_user permission to see the schema and data
+-- Grant read access to tileserver
 GRANT USAGE ON SCHEMA public TO "tileserver_user";
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO "tileserver_user";
-
--- Ensure future tables are also readable by the tileserver
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO "tileserver_user";
 EOF
 
-echo "=========================================="
-echo "            RESTORE SUCCESSFUL            "
-echo "=========================================="
+# 9. Verify Restoration
+echo "Step 5: Verifying restoration..."
+TABLE_COUNT=$(psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" -tAc \
+  "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE';")
+
+echo "✓ Restored $TABLE_COUNT tables"
+
+if [ "$TABLE_COUNT" -lt 10 ]; then
+    echo "WARNING: Expected more tables. Check restore.log for issues."
+else
+    echo "=========================================="
+    echo "         RESTORE SUCCESSFUL               "
+    echo "=========================================="
+fi
+
 rm -rf "$WORK_DIR"
