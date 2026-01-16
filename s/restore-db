@@ -95,6 +95,16 @@ REASSIGN OWNED BY "$CENSUS_RESTORE_USER" TO "$TARGET_APP_ROLE";
 GRANT ALL ON SCHEMA public TO "$TARGET_APP_ROLE";
 EOF
 
+echo "Step 4: Restoring Service User Access (pg_tileserv)..."
+psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" <<EOF
+-- Give tileserver_user permission to see the schema and data
+GRANT USAGE ON SCHEMA public TO "tileserver_user";
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO "tileserver_user";
+
+-- Ensure future tables are also readable by the tileserver
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO "tileserver_user";
+EOF
+
 echo "=========================================="
 echo "            RESTORE SUCCESSFUL            "
 echo "=========================================="
