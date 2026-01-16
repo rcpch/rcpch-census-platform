@@ -58,16 +58,16 @@ echo "Starting pg_restore... (This may take a while)"
 export PGPASSWORD="$CENSUS_RESTORE_USER_PASSWORD"
 
 echo "Wiping existing 'public' schema to resolve ownership conflicts..."
-export PGPASSWORD="$POSTGRES_RESTORE_PASSWORD"
+export PGPASSWORD="$CENSUS_RESTORE_PASSWORD"
 
-psql --host="$POSTGRES_DB_HOST" --username="$POSTGRES_RESTORE_USER" --dbname="$POSTGRES_DB" <<EOF
+psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" <<EOF
 -- Drop everything
 DROP SCHEMA IF EXISTS public CASCADE;
 -- Recreate blank
 CREATE SCHEMA public;
 -- Restore standard permissions
 GRANT ALL ON SCHEMA public TO public;
-GRANT ALL ON SCHEMA public TO "$POSTGRES_RESTORE_USER";
+GRANT ALL ON SCHEMA public TO "$CENSUS_RESTORE_USER";
 -- Optional: if the web app uses a different user, grant them access too
 GRANT ALL ON SCHEMA public TO "rcpchCensusUser"; 
 EOF
