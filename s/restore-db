@@ -1,39 +1,10 @@
-#!/bin/bash
-set -euo pipefail
-
-echo "=========================================="
-echo "RCPCH Census – Manual Database Restore"
-echo "=========================================="
-
-# ---- Hard safety guard ----
-: "${CONFIRM_RESTORE:?You must set CONFIRM_RESTORE=true}"
-[ "$CONFIRM_RESTORE" = "true" ] || {
-  echo "CONFIRM_RESTORE is not 'true'. Aborting."
-  exit 1
-}
-
-# ---- Required env ----
-: "${POSTGRES_DB_HOST:?Required}"
-: "${POSTGRES_DB:?Required}"
-: "${POSTGRES_RESTORE_USER:?Required}"
-: "${POSTGRES_RESTORE_PASSWORD:?Required}"
-
-# ---- Optional ----
-POSTGRES_DB_PORT="${POSTGRES_DB_PORT:-5432}"
-
-# ---- GitHub ----
-GITHUB_REPO="rcpch/rcpch-census-platform"
-
 # ---- Version ----
 VERSION="${1:-latest}"
 
 if [ "$VERSION" = "latest" ]; then
   echo "Resolving latest release version…"
-  VERSION=$(gh api repos/${GITHUB_REPO}/releases \
-    --jq '[.[] | select(.draft==false and .prerelease==false)]
-           | sort_by(.published_at)
-           | reverse
-           | .[0].tag_name')
+  # Use curl + jq to find the latest tag if not provided
+  VERSION=$(curl -s "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | jq -r '.tag_name')
 fi
 
 DUMP_FILE="rcpch-census-${VERSION}.dump"
@@ -42,44 +13,23 @@ WORK_DIR="$(mktemp -d)"
 echo "Release version: ${VERSION}"
 echo "Working directory: ${WORK_DIR}"
 
-# ---- Postgres ----
-export PGPASSWORD="$POSTGRES_RESTORE_PASSWORD"
-export PGSSLMODE=require
-
+# ---- Download via Curl (No GH Token needed for public repos) ----
 cd "$WORK_DIR"
 
-echo "Downloading dump from GitHub Releases…"
-gh release download "$VERSION" \
-  -R "$GITHUB_REPO" \
-  -p "${DUMP_FILE}*"
+echo "Downloading dump from GitHub Releases via curl…"
+# Note: This constructs the direct download URL for the release asset
+DOWNLOAD_URL="https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${DUMP_FILE}"
 
-# ---- Reassemble if split ----
-if ls ${DUMP_FILE}.part-* >/dev/null 2>&1; then
-  echo "Reassembling multipart dump…"
-  cat ${DUMP_FILE}.part-* > "$DUMP_FILE"
-fi
+curl -L -O "$DOWNLOAD_URL"
 
-if [ ! -s "$DUMP_FILE" ]; then
-  echo "ERROR: Dump file missing or empty"
+# Check if the download failed (e.g. 404)
+if [ ! -f "$DUMP_FILE" ] || [ ! -s "$DUMP_FILE" ]; then
+  echo "ERROR: Failed to download $DUMP_FILE. Checking for multipart parts..."
+  
+  # Logic for multipart if your dump is still split:
+  # This part is trickier without 'gh', but usually simple curl loops work:
+  # for i in {a..z}; do curl -L -O "${DOWNLOAD_URL}.part-a$i" || break; done
+  
+  echo "ERROR: Dump file missing or empty at $DOWNLOAD_URL"
   exit 1
 fi
-
-# ---- Restore ----
-echo "Starting pg_restore (this may take some time)…"
-
-pg_restore \
-  --host="$POSTGRES_DB_HOST" \
-  --port="$POSTGRES_DB_PORT" \
-  --username="$POSTGRES_RESTORE_USER" \
-  --dbname="$POSTGRES_DB" \
-  --no-owner \
-  --no-acl \
-  --clean \
-  --if-exists \
-  -v \
-  "$DUMP_FILE"
-
-echo "✓ Restore completed successfully"
-
-cd /
-rm -rf "$WORK_DIR"
