@@ -1,430 +1,54 @@
 #!/bin/bash
-# s/release-dump.sh
-# Creates a GitHub release and uploads the dump file
-
-set -e
-
-DUMP_DIR="postgis_dump_files"
-DUMP_FILE="${DUMP_DIR}/rcpch-census.dump"
-MAX_SIZE_MB=1800  # Stay under 2GB limit with safety margin
+set -euo pipefail
 
 echo "=========================================="
-echo "RCPCH Census Database Release Publisher"
+echo "RCPCH Census – Release Database Dump"
 echo "=========================================="
-echo ""
 
-# Create dump directory if it doesn't exist
-mkdir -p "$DUMP_DIR"
+# ---- Required ----
+: "${DUMP_FILE:?Path to pg_dump file is required}"
+: "${RELEASE_VERSION:?Release version is required}"
+: "${GITHUB_REPO:=rcpch/rcpch-census-platform}"
 
-# Check if dump exists (either single file or split files)
-DUMP_EXISTS=false
-IS_SPLIT=false
+# ---- Config ----
+MAX_SIZE_MB=1900
+BASENAME="rcpch-census-${RELEASE_VERSION}.dump"
+WORK_DIR="$(mktemp -d)"
 
-if [ -f "$DUMP_FILE" ]; then
-    DUMP_EXISTS=true
-    IS_SPLIT=false
-    echo "Found existing dump: rcpch-census.dump"
-elif ls ${DUMP_DIR}/rcpch-census.dump.part-* 1> /dev/null 2>&1; then
-    DUMP_EXISTS=true
-    IS_SPLIT=true
-    NUM_EXISTING_PARTS=$(ls ${DUMP_DIR}/rcpch-census.dump.part-* | wc -l)
-    echo "Found existing split dump: $NUM_EXISTING_PARTS parts"
-fi
+echo "Dump file: $DUMP_FILE"
+echo "Release:   $RELEASE_VERSION"
 
-if [ "$DUMP_EXISTS" = false ]; then
-    echo "✗ No dump file found in $DUMP_DIR/"
-    echo ""
-    read -p "Do you want to build it now? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        ./s/build-dump.sh
-    else
-        echo "Please run './s/build-dump.sh' first"
-        exit 1
-    fi
-fi
+cp "$DUMP_FILE" "$WORK_DIR/$BASENAME"
+cd "$WORK_DIR"
 
-# Check if gh CLI is installed
-if ! command -v gh &> /dev/null; then
-    echo "✗ GitHub CLI (gh) is not installed"
-    echo ""
-    echo "Install it with:"
-    echo "  macOS: brew install gh"
-    echo "  Linux: See https://github.com/cli/cli#installation"
-    echo ""
-    exit 1
-fi
+# ---- Split if necessary ----
+SIZE_MB=$(du -m "$BASENAME" | cut -f1)
 
-# Check if authenticated
-if ! gh auth status &> /dev/null; then
-    echo "✗ Not authenticated with GitHub"
-    echo ""
-    echo "Run: gh auth login"
-    exit 1
-fi
-
-# Get file size
-if [ "$IS_SPLIT" = true ]; then
-    # If already split from previous build, calculate total size
-    SIZE_MB=0
-    for part in ${DUMP_DIR}/rcpch-census.dump.part-*; do
-        PART_SIZE=$(du -m "$part" | cut -f1)
-        SIZE_MB=$((SIZE_MB + PART_SIZE))
-    done
-    SIZE="${SIZE_MB}MB (split)"
+if [ "$SIZE_MB" -gt "$MAX_SIZE_MB" ]; then
+  echo "Splitting dump (size ${SIZE_MB}MB)…"
+  split -b ${MAX_SIZE_MB}m "$BASENAME" "${BASENAME}.part-"
+  rm "$BASENAME"
+  FILES=(${BASENAME}.part-*)
 else
-    SIZE=$(du -h "$DUMP_FILE" | cut -f1)
-    SIZE_MB=$(du -m "$DUMP_FILE" | cut -f1)
+  FILES=("$BASENAME")
 fi
 
-echo "Total dump size: $SIZE ($SIZE_MB MB)"
-
-# Get latest release version
-
-# Get all release tags, sort by semver, and pick the latest
-LATEST_VERSION=$(gh release list --json tagName --jq '.[].tagName' 2>/dev/null | grep -E '^v[0-9]+(\.[0-9]+){2}$' | sed 's/^v//' | sort -V | tail -n1)
-
-if [ -z "$LATEST_VERSION" ]; then
-    echo "No previous releases found."
-    SUGGESTED_MAJOR="v1.0.0"
-    SUGGESTED_MINOR="v0.1.0"
-    SUGGESTED_PATCH="v0.0.1"
-else
-    echo "Latest release: v$LATEST_VERSION"
-    echo ""
-    # Split into major.minor.patch
-    IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_VERSION"
-    # Calculate next versions
-    SUGGESTED_MAJOR="v$((MAJOR + 1)).0.0"
-    SUGGESTED_MINOR="v${MAJOR}.$((MINOR + 1)).0"
-    SUGGESTED_PATCH="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+# ---- Create or update release ----
+if ! gh release view "$RELEASE_VERSION" -R "$GITHUB_REPO" >/dev/null 2>&1; then
+  gh release create "$RELEASE_VERSION" \
+    -R "$GITHUB_REPO" \
+    --title "Database dump ${RELEASE_VERSION}" \
+    --notes "Automated database dump"
 fi
 
-# Display suggestions
-echo "Suggested versions:"
-echo "  1) $SUGGESTED_PATCH (patch - bug fixes, data corrections)"
-echo "  2) $SUGGESTED_MINOR (minor - new features, new data fields)"
-echo "  3) $SUGGESTED_MAJOR (major - breaking changes, new schema)"
-echo "  4) Custom version"
-echo ""
+# ---- Upload assets ----
+echo "Uploading assets…"
+gh release upload "$RELEASE_VERSION" \
+  -R "$GITHUB_REPO" \
+  "${FILES[@]}" \
+  --clobber
 
-# Prompt for version choice
-read -p "Choose version (1-4) or press Enter for patch [$SUGGESTED_PATCH]: " CHOICE
+echo "✓ Release ${RELEASE_VERSION} published successfully"
 
-case "$CHOICE" in
-    1|"")
-        VERSION="$SUGGESTED_PATCH"
-        ;;
-    2)
-        VERSION="$SUGGESTED_MINOR"
-        ;;
-    3)
-        VERSION="$SUGGESTED_MAJOR"
-        ;;
-    4)
-        echo "Enter custom version (e.g., v2024.10 or v1.5.2):"
-        read -r VERSION
-        if [ -z "$VERSION" ]; then
-            echo "✗ Version cannot be empty"
-            exit 1
-        fi
-        # Ensure version starts with 'v'
-        if [[ ! "$VERSION" =~ ^v ]]; then
-            VERSION="v${VERSION}"
-        fi
-        ;;
-    *)
-        echo "✗ Invalid choice"
-        exit 1
-        ;;
-esac
-
-echo ""
-echo "Selected version: $VERSION"
-
-# Check if release already exists
-if gh release view "$VERSION" &> /dev/null; then
-    echo "⚠ Release $VERSION already exists"
-    read -p "Do you want to delete and recreate it? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "Deleting existing release..."
-        gh release delete "$VERSION" -y
-    else
-        echo "Cancelled"
-        exit 1
-    fi
-fi
-
-# Prepare file(s) for upload
-UPLOAD_FILES=()
-NEEDS_NEW_SPLIT=false
-
-if [ "$IS_SPLIT" = true ]; then
-    # Use existing split files, just rename them for the version
-    echo "Using existing split files..."
-    for old_part in ${DUMP_DIR}/rcpch-census.dump.part-*; do
-        SUFFIX=$(echo "$old_part" | sed "s|${DUMP_DIR}/rcpch-census.dump.part-||")
-        NEW_PART="${DUMP_DIR}/rcpch-census-${VERSION}.dump.part-${SUFFIX}"
-        cp "$old_part" "$NEW_PART"
-        UPLOAD_FILES+=("$NEW_PART")
-    done
-    NUM_PARTS=${#UPLOAD_FILES[@]}
-    echo "✓ Prepared $NUM_PARTS parts for upload"
-elif [ "$SIZE_MB" -gt "$MAX_SIZE_MB" ]; then
-    # Need to split for the first time
-    NEEDS_NEW_SPLIT=true
-    echo ""
-    echo "⚠ File is larger than ${MAX_SIZE_MB}MB and will be split for GitHub upload"
-    echo "Splitting dump file..."
-    
-    VERSIONED_BASE="${DUMP_DIR}/rcpch-census-${VERSION}.dump"
-    
-    # Split into 1.8GB chunks
-    split -b ${MAX_SIZE_MB}M "$DUMP_FILE" "${VERSIONED_BASE}.part-"
-    
-    # Get list of parts
-    for part in ${VERSIONED_BASE}.part-*; do
-        UPLOAD_FILES+=("$part")
-    done
-    
-    NUM_PARTS=${#UPLOAD_FILES[@]}
-    echo "✓ Split into $NUM_PARTS parts"
-else
-    # Single file, small enough
-    VERSIONED_DUMP="${DUMP_DIR}/rcpch-census-${VERSION}.dump"
-    cp "$DUMP_FILE" "$VERSIONED_DUMP"
-    UPLOAD_FILES=("$VERSIONED_DUMP")
-fi
-
-# Prompt for release type/description
-echo ""
-echo "What type of release is this?"
-echo "  1) Data update (Updated IMD data for [date/region])"
-echo "  2) Bug fix (Fixed [issue])"
-echo "  3) New feature (Added [feature])"
-echo "  4) Custom description"
-echo ""
-read -p "Choose (1-4): " RELEASE_TYPE
-
-case "$RELEASE_TYPE" in
-    1)
-        echo "Enter date/region for data update (e.g., 'October 2024' or 'England Q4 2024'):"
-        read -r UPDATE_INFO
-        TITLE="Data Update ${VERSION}"
-        NOTES="Updated IMD data for ${UPDATE_INFO}"
-        ;;
-    2)
-        echo "Describe the fix:"
-        read -r FIX_DESC
-        TITLE="Bug Fix ${VERSION}"
-        NOTES="Fixed: ${FIX_DESC}"
-        ;;
-    3)
-        echo "Describe the new feature:"
-        read -r FEATURE_DESC
-        TITLE="New Feature ${VERSION}"
-        NOTES="Added: ${FEATURE_DESC}"
-        ;;
-    4)
-        echo "Enter release title:"
-        read -r TITLE
-        echo "Enter release description:"
-        read -r NOTES
-        ;;
-    *)
-        TITLE="Database Dump ${VERSION}"
-        NOTES=""
-        ;;
-esac
-
-# Create release notes with split file instructions if needed
-if [ "$IS_SPLIT" = true ] || [ "$NEEDS_NEW_SPLIT" = true ]; then
-    DOWNLOAD_INSTRUCTIONS="
-## ⚠️ Large File - Assembly Required
-
-This dump has been split into ${NUM_PARTS} parts due to GitHub's file size limits.
-
-**Download and reassemble:**
-
-\`\`\`bash
-# Download all parts
-wget https://github.com/rcpch/rcpch-census-platform/releases/download/${VERSION}/rcpch-census-${VERSION}.dump.part-aa
-wget https://github.com/rcpch/rcpch-census-platform/releases/download/${VERSION}/rcpch-census-${VERSION}.dump.part-ab
-# ... (download remaining parts)
-
-# Reassemble
-cat rcpch-census-${VERSION}.dump.part-* > rcpch-census-${VERSION}.dump
-
-# Verify integrity (optional)
-ls -lh rcpch-census-${VERSION}.dump
-
-# Clean up parts
-rm rcpch-census-${VERSION}.dump.part-*
-\`\`\`
-
-**Or use this one-liner:**
-
-\`\`\`bash
-# Download and reassemble automatically
-for part in {a..z}; do
-  wget -q https://github.com/rcpch/rcpch-census-platform/releases/download/${VERSION}/rcpch-census-${VERSION}.dump.part-a\${part} 2>/dev/null || break
-done
-cat rcpch-census-${VERSION}.dump.part-* > rcpch-census-${VERSION}.dump
-rm rcpch-census-${VERSION}.dump.part-*
-\`\`\`
-"
-else
-    DOWNLOAD_INSTRUCTIONS="
-\`\`\`bash
-# Download the dump
-wget https://github.com/rcpch/rcpch-census-platform/releases/download/${VERSION}/rcpch-census-${VERSION}.dump
-\`\`\`
-"
-fi
-
-RELEASE_NOTES="# RCPCH Census Database Dump ${VERSION}
-
-**Total Size:** ${SIZE}
-
-${NOTES}
-
-${DOWNLOAD_INSTRUCTIONS}
-
-## How to use this dump:
-
-### Option 1: Using Docker Compose
-
-\`\`\`yaml
-# docker-compose.yml
-services:
-  db:
-    image: postgis/postgis:15-3.4
-    environment:
-      POSTGRES_USER: rcpchCensusUser
-      POSTGRES_PASSWORD: \${DB_PASSWORD}
-      POSTGRES_DB: rcpchCensusdb
-    volumes:
-      - ./init-db:/docker-entrypoint-initdb.d
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - \"5432:5432\"
-
-volumes:
-  pgdata:
-\`\`\`
-
-\`\`\`bash
-# Download and prepare
-mkdir -p init-db
-cd init-db
-
-${DOWNLOAD_INSTRUCTIONS}
-
-# Create restore script
-cat > restore.sh << 'EOF'
-#!/bin/bash
-set -e
-echo \"Restoring database from dump...\"
-pg_restore -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" --no-owner /docker-entrypoint-initdb.d/rcpch-census-${VERSION}.dump
-echo \"Database restored successfully\"
-EOF
-
-chmod +x restore.sh
-cd ..
-
-# Start services
-docker-compose up -d
-\`\`\`
-
-### Option 2: Manual Docker Setup
-
-\`\`\`bash
-${DOWNLOAD_INSTRUCTIONS}
-
-# Start PostGIS container
-docker run -d --name census-db \\
-  -e POSTGRES_USER=rcpchCensusUser \\
-  -e POSTGRES_PASSWORD=yourpassword \\
-  -e POSTGRES_DB=rcpchCensusdb \\
-  -p 5432:5432 \\
-  -v census-data:/var/lib/postgresql/data \\
-  postgis/postgis:15-3.4
-
-# Wait for database to be ready
-sleep 10
-
-# Restore the dump
-docker exec -i census-db pg_restore \\
-  -U rcpchCensusUser \\
-  -d rcpchCensusdb \\
-  --no-owner < rcpch-census-${VERSION}.dump
-
-echo \"Database ready on localhost:5432\"
-\`\`\`
-
-### Option 3: Local PostgreSQL
-
-\`\`\`bash
-# Create database
-createdb -U postgres rcpchCensusdb
-
-# Enable PostGIS
-psql -U postgres -d rcpchCensusdb -c \"CREATE EXTENSION postgis;\"
-
-# Restore dump
-pg_restore -U postgres -d rcpchCensusdb --no-owner rcpch-census-${VERSION}.dump
-\`\`\`
-
-## Data Sources
-
-This dump contains Index of Multiple Deprivation (IMD) data for all four UK nations, including:
-- LSOA boundaries and geometries
-- IMD scores and rankings
-- Postcode to LSOA mappings
-
-## License
-
-See repository LICENSE file for data usage terms.
-"
-
-# Create the release
-echo ""
-echo "Creating GitHub release: $VERSION"
-echo "Title: $TITLE"
-echo ""
-
-gh release create "$VERSION" "${UPLOAD_FILES[@]}" \
-  --title "$TITLE" \
-  --notes "$RELEASE_NOTES"
-
-if [ $? -eq 0 ]; then
-    echo ""
-    echo "=========================================="
-    echo "✓ Release published successfully!"
-    echo "=========================================="
-    echo ""
-    echo "View at: https://github.com/rcpch/rcpch-census-platform/releases/tag/${VERSION}"
-    
-    if [ "$IS_SPLIT" = true ] || [ "$NEEDS_NEW_SPLIT" = true ]; then
-        echo ""
-        echo "Files uploaded (${NUM_PARTS} parts):"
-        for file in "${UPLOAD_FILES[@]}"; do
-            echo "  - $(basename $file)"
-        done
-    fi
-    
-    echo ""
-    
-    # Clean up versioned files (keep original rcpch-census.dump or parts in dump dir)
-    for file in "${UPLOAD_FILES[@]}"; do
-        rm -f "$file"
-    done
-else
-    echo "✗ Failed to create release"
-    # Clean up on failure
-    for file in "${UPLOAD_FILES[@]}"; do
-        rm -f "$file"
-    done
-    exit 1
-fi
+cd /
+rm -rf "$WORK_DIR"

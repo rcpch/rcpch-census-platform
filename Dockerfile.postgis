@@ -33,10 +33,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements/common-requirements.txt && \
     pip install --no-cache-dir -r requirements/development-requirements.txt
 
-# Copy wait-for-db and seed-managed-db scripts
+# Copy wait-for-db and restore-db scripts
 COPY ./s/wait-for-db.sh /app/s/wait-for-db.sh
-COPY ./s/seed-managed-db /app/s/seed-managed-db
-RUN chmod +x /app/s/wait-for-db.sh /app/s/seed-managed-db
+COPY ./s/restore-db /app/s/restore-db
+RUN chmod +x /app/s/wait-for-db.sh /app/s/restore-db
 
 # Copy the rest of the project
 COPY . /app/
