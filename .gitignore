@@ -132,3 +132,5 @@ build_info.json
 deprivation_scores/geojson/
 deprivation_scores/shape_files/
 postgis_dump_files/
+
+s/deploy-db

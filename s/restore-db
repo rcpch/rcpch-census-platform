@@ -1,35 +1,29 @@
-# ---- Version ----
-VERSION="${1:-latest}"
-
-if [ "$VERSION" = "latest" ]; then
-  echo "Resolving latest release version…"
-  # Use curl + jq to find the latest tag if not provided
-  VERSION=$(curl -s "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | jq -r '.tag_name')
-fi
-
-DUMP_FILE="rcpch-census-${VERSION}.dump"
-WORK_DIR="$(mktemp -d)"
-
-echo "Release version: ${VERSION}"
-echo "Working directory: ${WORK_DIR}"
-
 # ---- Download via Curl (No GH Token needed for public repos) ----
 cd "$WORK_DIR"
 
-echo "Downloading dump from GitHub Releases via curl…"
-# Note: This constructs the direct download URL for the release asset
-DOWNLOAD_URL="https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${DUMP_FILE}"
+echo "Fetching asset list for version: ${VERSION}..."
+# Get the download URLs for all assets in this release
+ASSETS=$(curl -s "https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${VERSION}" \
+  | jq -r '.assets[].browser_download_url' | grep "${DUMP_FILE}")
 
-curl -L -O "$DOWNLOAD_URL"
+if [ -z "$ASSETS" ]; then
+  echo "ERROR: No assets found matching ${DUMP_FILE} for version ${VERSION}"
+  exit 1
+fi
 
-# Check if the download failed (e.g. 404)
-if [ ! -f "$DUMP_FILE" ] || [ ! -s "$DUMP_FILE" ]; then
-  echo "ERROR: Failed to download $DUMP_FILE. Checking for multipart parts..."
-  
-  # Logic for multipart if your dump is still split:
-  # This part is trickier without 'gh', but usually simple curl loops work:
-  # for i in {a..z}; do curl -L -O "${DOWNLOAD_URL}.part-a$i" || break; done
-  
-  echo "ERROR: Dump file missing or empty at $DOWNLOAD_URL"
+for URL in $ASSETS; do
+  echo "Downloading $(basename "$URL")..."
+  curl -L -O "$URL"
+done
+
+# ---- Reassemble if split ----
+# Use the same logic you had before, it works great once files are local
+if ls ${DUMP_FILE}.part-* >/dev/null 2>&1; then
+  echo "Reassembling multipart dump..."
+  cat ${DUMP_FILE}.part-* > "$DUMP_FILE"
+fi
+
+if [ ! -s "$DUMP_FILE" ]; then
+  echo "ERROR: Final reassembled dump file is missing or empty"
   exit 1
 fi
