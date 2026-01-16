@@ -22,6 +22,7 @@ env:
   ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
   WEB_IMAGE_NAME: rcpch-census-web
   AZURE_ENVIRONMENT_ID: ${{ secrets.AZURE_ENVIRONMENT_ID }}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -35,15 +36,6 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Fetch latest DB dump release tag (by published date)
-        id: fetch_db_dump_version
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          LATEST_TAG=$(gh api repos/rcpch/rcpch-census-platform/releases --jq '[.[] | select(.draft==false and .prerelease==false)] | sort_by(.published_at) | reverse | .[0].tag_name')
-          echo "Latest DB dump tag: $LATEST_TAG"
-          echo "DB_DUMP_VERSION=$LATEST_TAG" >> $GITHUB_ENV
 
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -81,7 +73,6 @@ jobs:
           ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
           DJANGO_ALLOWED_HOSTS: ${{ secrets.DJANGO_ALLOWED_HOSTS }}
           DJANGO_CSRF_TRUSTED_ORIGINS: ${{ secrets.DJANGO_CSRF_TRUSTED_ORIGINS }}
-          DB_DUMP_VERSION: ${{ env.DB_DUMP_VERSION }}
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -96,11 +87,10 @@ jobs:
               '__IMAGE_TAG__': os.environ['GITHUB_SHA'],
               '__DJANGO_ALLOWED_HOSTS__': os.environ['DJANGO_ALLOWED_HOSTS'],
               '__DJANGO_CSRF_TRUSTED_ORIGINS__': os.environ['DJANGO_CSRF_TRUSTED_ORIGINS'],
-              '__DB_DUMP_VERSION__': os.environ['DB_DUMP_VERSION'],
               '__AZURE_ENVIRONMENT_ID__': os.environ['AZURE_ENVIRONMENT_ID'],
-              '__TILES_SECRET_NAME__': 'tiles-db-url' ,
-              '__AZURE_POSTGRES_HOST__': 'rcpch-census-platform-db', 
-              '__MANAGED_IDENTITY_NAME__': 'rcpch-census-platform-v2', 
+              '__TILES_SECRET_NAME__': 'tiles-db-url',
+              '__AZURE_POSTGRES_HOST__': 'rcpch-census-platform-db',
+              '__MANAGED_IDENTITY_NAME__': 'rcpch-census-platform-v2',
               '__DB_NAME__': 'postgres'
           }
 
@@ -131,5 +121,9 @@ jobs:
       - name: Show FQDN
         shell: bash
         run: |
-          FQDN=$(az containerapp show -n "${AZURE_CONTAINERAPP_NAME}" -g "${AZURE_RESOURCE_GROUP}" --query properties.configuration.ingress.fqdn -o tsv)
+          FQDN=$(az containerapp show \
+            -n "${AZURE_CONTAINERAPP_NAME}" \
+            -g "${AZURE_RESOURCE_GROUP}" \
+            --query properties.configuration.ingress.fqdn \
+            -o tsv)
           echo "Application URL: https://${FQDN}"
