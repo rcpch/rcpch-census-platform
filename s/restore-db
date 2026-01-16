@@ -1,50 +1,78 @@
-# ---- 1. Resolve 'latest' to an actual tag ----
+#!/bin/bash
+# Using bash explicitly to support pipefail
+set -euo pipefail
+
+GITHUB_REPO="rcpch/rcpch-census-platform"
+echo "=========================================="
+echo "RCPCH Census – Manual Database Restore"
+echo "=========================================="
+
+# ---- Hard safety guard ----
+: "${CONFIRM_RESTORE:?You must set CONFIRM_RESTORE=true}"
+[ "$CONFIRM_RESTORE" = "true" ] || { echo "Aborting."; exit 1; }
+
+# ---- Required env (Ensure these are passed in your 'exec' command) ----
+: "${POSTGRES_DB_HOST:?Required}"
+: "${POSTGRES_DB:?Required}"
+: "${CENSUS_RESTORE_USER:?Required}"
+: "${CENSUS_RESTORE_PASSWORD:?Required}"
+
 VERSION="${1:-latest}"
 
+# 1. Resolve Version
 if [ "$VERSION" = "latest" ]; then
   echo "Resolving latest release version..."
-  # This gets the 'tag_name' from the latest release
   VERSION=$(curl -s "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | jq -r '.tag_name')
 fi
+echo "Targeting version: ${VERSION}"
 
-if [ "$VERSION" == "null" ] || [ -z "$VERSION" ]; then
-  echo "ERROR: Could not resolve version. Check GITHUB_REPO or connectivity."
-  exit 1
-fi
-
-echo "Using version: ${VERSION}"
-
-# ---- 2. Download Multipart Parts ----
-# Naming convention: rcpch-census-v1.1.1.dump.part-aa
+# 2. Setup Workspace
 DUMP_BASE="rcpch-census-${VERSION}.dump"
 WORK_DIR="$(mktemp -d)"
 cd "$WORK_DIR"
 
-echo "Downloading parts for ${DUMP_BASE}..."
-
-for char in a b c d e f g h i j; do
+# 3. Download Multipart Parts
+for char in a b c d e f g h; do
     PART="part-a${char}"
-    # Construct the exact filename based on the version
     FILE_NAME="${DUMP_BASE}.${PART}"
     URL="https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${FILE_NAME}"
     
-    echo "Attempting to fetch ${PART}..."
-    # -f ensures we don't save a 404 page as a file
     if curl -sL -f -O "$URL"; then
         echo "✓ Downloaded ${FILE_NAME}"
     else
-        echo "Finished downloading parts (or reached end)."
         break
     fi
 done
 
-# ---- 3. Reassemble ----
-if ls ${DUMP_BASE}.part-* >/dev/null 2>&1; then
-    echo "Reassembling multipart dump..."
-    cat ${DUMP_BASE}.part-* > "${DUMP_BASE}"
-else
-    echo "ERROR: No parts were downloaded. Check if the tag ${VERSION} and filenames match."
+# 4. Reassemble and Validate
+echo "Reassembling multipart dump..."
+cat ${DUMP_BASE}.part-* > "${DUMP_BASE}"
+if [ ! -s "${DUMP_BASE}" ]; then
+    echo "ERROR: Reassembly failed."
     exit 1
 fi
+echo "✓ Reassembly successful. Size: $(du -sh "${DUMP_BASE}" | cut -f1)"
 
-# Now pg_restore can use ${DUMP_BASE}
+# 5. Execute pg_restore
+echo "Starting pg_restore... (This may take a while)"
+export PGPASSWORD="$POSTGRES_RESTORE_PASSWORD"
+
+# We use '|| true' on pg_restore because it often exits with warnings 
+# about 'owner' or 'privileges' that aren't actual failures
+pg_restore \
+  --host="$POSTGRES_DB_HOST" \
+  --username="$CENSUS_RESTORE_USER" \
+  --dbname="$POSTGRES_DB" \
+  --no-owner --no-acl --clean --if-exists \
+  -v "${DUMP_BASE}"
+
+# 6. Final Verification
+echo "Verifying Database Content..."
+psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" -c "SELECT count(*) as table_count FROM information_schema.tables WHERE table_schema = 'public';"
+
+echo "=========================================="
+echo "  RESTORE COMPLETE  "
+echo "=========================================="
+
+# Cleanup
+rm -rf "$WORK_DIR"
