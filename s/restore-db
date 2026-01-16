@@ -1,29 +1,50 @@
-# ---- Download via Curl (No GH Token needed for public repos) ----
+# ---- 1. Resolve 'latest' to an actual tag ----
+VERSION="${1:-latest}"
+
+if [ "$VERSION" = "latest" ]; then
+  echo "Resolving latest release version..."
+  # This gets the 'tag_name' from the latest release
+  VERSION=$(curl -s "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | jq -r '.tag_name')
+fi
+
+if [ "$VERSION" == "null" ] || [ -z "$VERSION" ]; then
+  echo "ERROR: Could not resolve version. Check GITHUB_REPO or connectivity."
+  exit 1
+fi
+
+echo "Using version: ${VERSION}"
+
+# ---- 2. Download Multipart Parts ----
+# Naming convention: rcpch-census-v1.1.1.dump.part-aa
+DUMP_BASE="rcpch-census-${VERSION}.dump"
+WORK_DIR="$(mktemp -d)"
 cd "$WORK_DIR"
 
-echo "Fetching asset list for version: ${VERSION}..."
-# Get the download URLs for all assets in this release
-ASSETS=$(curl -s "https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${VERSION}" \
-  | jq -r '.assets[].browser_download_url' | grep "${DUMP_FILE}")
+echo "Downloading parts for ${DUMP_BASE}..."
 
-if [ -z "$ASSETS" ]; then
-  echo "ERROR: No assets found matching ${DUMP_FILE} for version ${VERSION}"
-  exit 1
-fi
-
-for URL in $ASSETS; do
-  echo "Downloading $(basename "$URL")..."
-  curl -L -O "$URL"
+for char in a b c d e f g h i j; do
+    PART="part-a${char}"
+    # Construct the exact filename based on the version
+    FILE_NAME="${DUMP_BASE}.${PART}"
+    URL="https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${FILE_NAME}"
+    
+    echo "Attempting to fetch ${PART}..."
+    # -f ensures we don't save a 404 page as a file
+    if curl -sL -f -O "$URL"; then
+        echo "✓ Downloaded ${FILE_NAME}"
+    else
+        echo "Finished downloading parts (or reached end)."
+        break
+    fi
 done
 
-# ---- Reassemble if split ----
-# Use the same logic you had before, it works great once files are local
-if ls ${DUMP_FILE}.part-* >/dev/null 2>&1; then
-  echo "Reassembling multipart dump..."
-  cat ${DUMP_FILE}.part-* > "$DUMP_FILE"
+# ---- 3. Reassemble ----
+if ls ${DUMP_BASE}.part-* >/dev/null 2>&1; then
+    echo "Reassembling multipart dump..."
+    cat ${DUMP_BASE}.part-* > "${DUMP_BASE}"
+else
+    echo "ERROR: No parts were downloaded. Check if the tag ${VERSION} and filenames match."
+    exit 1
 fi
 
-if [ ! -s "$DUMP_FILE" ]; then
-  echo "ERROR: Final reassembled dump file is missing or empty"
-  exit 1
-fi
+# Now pg_restore can use ${DUMP_BASE}
