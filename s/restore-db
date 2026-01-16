@@ -3,6 +3,7 @@
 set -euo pipefail
 
 GITHUB_REPO="rcpch/rcpch-census-platform"
+TARGET_APP_ROLE="rcpch-census-platform"
 echo "=========================================="
 echo "RCPCH Census – Manual Database Restore"
 echo "=========================================="
