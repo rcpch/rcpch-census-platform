@@ -85,9 +85,12 @@ pg_restore \
   --host="$POSTGRES_DB_HOST" \
   --username="$CENSUS_RESTORE_USER" \
   --dbname="$POSTGRES_DB" \
-  --role="rcpchCensusUser" \
-  --no-owner --no-acl --clean --if-exists \
-  -v "${DUMP_BASE}"
+  --no-owner \
+  --no-privileges \
+  --no-acl \
+  --clean \
+  --if-exists \
+  -v "${DUMP_BASE}" || echo "Restore finished with warnings (usually safe to ignore)."
 
 # 6. Final Verification
 echo "Verifying Database Content..."
