@@ -15,7 +15,7 @@ echo "=========================================="
 : "${POSTGRES_DB_HOST:?Required}"
 : "${POSTGRES_DB:?Required}"
 : "${CENSUS_RESTORE_USER:?Required}"
-: "${CENSUS_RESTORE_PASSWORD:?Required}"
+: "${CENSUS_RESTORE_USER_PASSWORD:?Required}"
 
 VERSION="${1:-latest}"
 
@@ -55,7 +55,7 @@ echo "✓ Reassembly successful. Size: $(du -sh "${DUMP_BASE}" | cut -f1)"
 
 # 5. Execute pg_restore
 echo "Starting pg_restore... (This may take a while)"
-export PGPASSWORD="$POSTGRES_RESTORE_PASSWORD"
+export PGPASSWORD="$CENSUS_RESTORE_USER_PASSWORD"
 
 # We use '|| true' on pg_restore because it often exits with warnings 
 # about 'owner' or 'privileges' that aren't actual failures
