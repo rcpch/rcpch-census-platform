@@ -57,30 +57,24 @@ echo "✓ Reassembly successful. Size: $(du -sh "${DUMP_BASE}" | cut -f1)"
 echo "Starting pg_restore... (This may take a while)"
 export PGPASSWORD="$CENSUS_RESTORE_USER_PASSWORD"
 
-echo "Cleaning up existing schema and enabling PostGIS..."
-export PGPASSWORD="$CENSUS_RESTORE_USER_PASSWORD"
-
+echo "Step 1: Cleaning Schema & Pre-authorizing Role..."
 psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" <<EOF
--- 1. Drop the schema to clear 'locked' tables and missing columns
+-- Drop everything
 DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
 
--- 2. Recreate it with your current user as the owner
-CREATE SCHEMA public AUTHORIZATION "$CENSUS_RESTORE_USER";
+-- Make the restore user the owner of the schema so it can create tables
+ALTER SCHEMA public OWNER TO "$CENSUS_RESTORE_USER";
 
--- 3. Enable PostGIS (This is why your 'geometry' columns failed)
+-- Enable PostGIS for geometry columns
 CREATE EXTENSION IF NOT EXISTS postgis;
 
--- 4. Set permissions so the app user can see the new tables later
-GRANT ALL ON SCHEMA public TO public;
-GRANT ALL ON SCHEMA public TO "$CENSUS_RESTORE_USER";
-GRANT ALL ON SCHEMA public TO "rcpchCensusUser";
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "rcpchCensusUser";
+-- Link the app role to the restore user so 'REASSIGN OWNED BY' works later
+GRANT "$TARGET_APP_ROLE" TO "$CENSUS_RESTORE_USER";
 EOF
 
-echo "✓ Schema is ready. Starting pg_restore..."
-
-# We use '|| true' on pg_restore because it often exits with warnings 
-# about 'owner' or 'privileges' that aren't actual failures
+echo "Step 2: Restoring Data..."
+# --no-owner and --no-privileges are VITAL here to ignore the old 'rcpchCensusdb' refs
 pg_restore \
   --host="$POSTGRES_DB_HOST" \
   --username="$CENSUS_RESTORE_USER" \
@@ -90,19 +84,17 @@ pg_restore \
   --no-acl \
   --clean \
   --if-exists \
-  -v "${DUMP_BASE}" || echo "Restore finished with warnings (usually safe to ignore)."
+  -v "${DUMP_BASE}" || echo "Restore finished with standard warnings."
 
-# 6. Final Verification
-echo "Verifying Database Content..."
-psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" -c "SELECT count(*) as table_count FROM information_schema.tables WHERE table_schema = 'public';"
-
-echo "Reassigning ownership to rcpchCensusUser for application access..."
-psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" \
-  -c "REASSIGN OWNED BY \"$CENSUS_RESTORE_USER\" TO \"rcpchCensusUser\";"
+echo "Step 3: Handing over ownership to $TARGET_APP_ROLE..."
+psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" <<EOF
+-- Transfer all newly created tables to the app role
+REASSIGN OWNED BY "$CENSUS_RESTORE_USER" TO "$TARGET_APP_ROLE";
+-- Ensure the app role has schema access
+GRANT ALL ON SCHEMA public TO "$TARGET_APP_ROLE";
+EOF
 
 echo "=========================================="
-echo "  RESTORE COMPLETE  "
+echo "            RESTORE SUCCESSFUL            "
 echo "=========================================="
-
-# Cleanup
 rm -rf "$WORK_DIR"
