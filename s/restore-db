@@ -58,7 +58,7 @@ echo "Starting pg_restore... (This may take a while)"
 export PGPASSWORD="$CENSUS_RESTORE_USER_PASSWORD"
 
 echo "Wiping existing 'public' schema to resolve ownership conflicts..."
-export PGPASSWORD="$CENSUS_RESTORE_PASSWORD"
+export PGPASSWORD="$CENSUS_RESTORE_USER_PASSWORD"
 
 psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" <<EOF
 -- Drop everything
