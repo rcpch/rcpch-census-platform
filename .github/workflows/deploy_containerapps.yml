@@ -102,15 +102,6 @@ jobs:
           print(f"Wrote {out_path}")
           PY
 
-      - name: Force link tiles secret
-        shell: bash
-        run: |
-          az containerapp update \
-            -n "${AZURE_CONTAINERAPP_NAME}" \
-            -g "${AZURE_RESOURCE_GROUP}" \
-            --container-name "tiles" \
-            --set-env-vars "DATABASE_URL=secretref:tiles-db-url"
-
       - name: Deploy Container App revision
         shell: bash
         run: |
