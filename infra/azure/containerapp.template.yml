@@ -67,6 +67,8 @@ properties:
             secretRef: tiles-db-url
           - name: URLBASE
             secretRef: tiles-base-url
+          - name: TRUST_PROXY
+            value: "true"
         resources:
           cpu: 0.5
           memory: 1.0Gi # Increased for geometry caching
