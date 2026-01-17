@@ -61,15 +61,25 @@ properties:
 
       # pg_tileserv for vector tiles
       - name: tiles
-        image: pramsey/pg_tileserv:20250131
+        image: pramsey/pg_tileserv:latest
+        command:
+          - /bin/sh
+          - -c
+          - |
+            cat > /tmp/pg_tileserv.toml <<EOF
+            [server]
+            HttpHost = "0.0.0.0"
+            HttpPort = 7800
+            UrlBase = "/tiles"
+            
+            [database]
+            EOF
+            export DATABASE_URL="${DATABASE_URL}"
+            /app/pg_tileserv --config /tmp/pg_tileserv.toml
         env:
           - name: DATABASE_URL
             secretRef: tiles-db-url
-          - name: TS_URLBASE
-            value: "/tiles"
-          - name: TRUST_PROXY
-            value: "true"
         resources:
           cpu: 0.5
-          memory: 1.0Gi # Increased for geometry caching
+          memory: 1.0Gi
   
