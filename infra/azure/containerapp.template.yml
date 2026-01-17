@@ -71,7 +71,7 @@ properties:
             HttpHost = "0.0.0.0"
             HttpPort = 7800
             BasePath = "/tiles"
-            UrlBase = "${TILES_BASE_URL}"
+            UrlBase = "https://rcpch-census-platform-v2.greenrock-df7c746b.uksouth.azurecontainerapps.io/tiles/"
             
             [database]
             EOF
