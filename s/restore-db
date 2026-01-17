@@ -82,7 +82,14 @@ GRANT "$TARGET_APP_ROLE" TO "$CENSUS_RESTORE_USER";
 EOF
 
 echo "Step 2: Restoring Data..."
-# --no-owner and --no-privileges are VITAL here to ignore the old 'rcpchCensusdb' refs
+# Create a custom restore list excluding problematic extensions
+pg_restore -l "${DUMP_BASE}" | \
+  grep -v "EXTENSION fuzzystrmatch" | \
+  grep -v "EXTENSION postgis_tiger_geocoder" | \
+  grep -v "COMMENT - EXTENSION fuzzystrmatch" | \
+  grep -v "COMMENT - EXTENSION postgis_tiger_geocoder" > restore.list
+
+# Restore using the filtered list
 pg_restore \
   --host="$POSTGRES_DB_HOST" \
   --username="$CENSUS_RESTORE_USER" \
@@ -92,9 +99,7 @@ pg_restore \
   --no-acl \
   --clean \
   --if-exists \
-  --section=pre-data \
-  --section=data \
-  --section=post-data \
+  --use-list=restore.list \
   --exclude-schema=tiger \
   --exclude-schema=tiger_data \
   -v "${DUMP_BASE}" 2>&1 | tee restore.log || true
@@ -105,7 +110,7 @@ if grep -q "FATAL\|PANIC" restore.log; then
     exit 1
 fi
 
-echo "Restore completed (warnings about fuzzystrmatch and tiger extensions are expected)"
+echo "Restore completed successfully"
 
 # 7. STEP 3: Transfer Ownership
 echo "Step 3: Transferring ownership to $TARGET_APP_ROLE..."
