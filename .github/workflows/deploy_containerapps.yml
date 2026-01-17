@@ -65,7 +65,8 @@ jobs:
               django-secret-key="${{ secrets.DJANGO_SECRET_KEY }}" \
               postcodes-io-api-url="${{ secrets.POSTCODES_IO_API_URL }}" \
               postcodes-io-api-key="${{ secrets.POSTCODES_IO_API_KEY }}" \
-              tiles-db-url="${{ secrets.TILES_DB_URL }}"
+              tiles-db-url="${{ secrets.TILES_DB_URL }}" \
+              tiles-base-url="${{ secrets.TILES_BASE_URL }}"
 
       - name: Render Container App YAML
         shell: bash

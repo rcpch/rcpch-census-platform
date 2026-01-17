@@ -66,7 +66,7 @@ properties:
           - name: DATABASE_URL
             secretRef: tiles-db-url
           - name: SERVER_BASEPATH
-            value: /tiles
+            secretRef: tiles-base-url
         resources:
           cpu: 0.5
           memory: 1.0Gi # Increased for geometry caching
