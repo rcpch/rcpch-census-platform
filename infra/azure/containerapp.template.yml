@@ -70,7 +70,6 @@ properties:
             [server]
             HttpHost = "0.0.0.0"
             HttpPort = 7800
-            BasePath = "/tiles"
             UrlBase = "${TILES_BASE_URL}"
             
             [database]
