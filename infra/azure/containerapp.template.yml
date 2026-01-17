@@ -70,7 +70,7 @@ properties:
             [server]
             HttpHost = "0.0.0.0"
             HttpPort = 7800
-            UrlBase = "/tiles"
+            BasePath = "/tiles"
             
             [database]
             EOF
