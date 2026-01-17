@@ -61,11 +61,11 @@ properties:
 
       # pg_tileserv for vector tiles
       - name: tiles
-        image: pramsey/pg_tileserv:latest
+        image: pramsey/pg_tileserv:20250131
         env:
           - name: DATABASE_URL
             secretRef: tiles-db-url
-          - name: TS_URLBASE
+          - name: TS_BASEPATH
             secretRef: tiles-base-url
           - name: TRUST_PROXY
             value: "true"
