@@ -24,6 +24,8 @@ ENV C_INCLUDE_PATH=/usr/include/gdal
 
 WORKDIR /app
 
+RUN mkdir -p /app/static/root
+
 # Copy requirements first for better layer caching
 COPY requirements/ /app/requirements/
 
