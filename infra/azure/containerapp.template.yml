@@ -65,7 +65,7 @@ properties:
         env:
           - name: DATABASE_URL
             secretRef: tiles-db-url
-          - name: SERVER_BASEPATH
+          - name: URLBASE
             secretRef: tiles-base-url
         resources:
           cpu: 0.5
