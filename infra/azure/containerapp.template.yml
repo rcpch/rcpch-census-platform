@@ -71,7 +71,7 @@ properties:
             HttpHost = "0.0.0.0"
             HttpPort = 7800
             BasePath = "/tiles"
-            UrlBase = "https://rcpch-census-platform-v2.greenrock-df7c746b.uksouth.azurecontainerapps.io/tiles"
+            UrlBase = "${TILES_BASE_URL}"
             
             [database]
             EOF
@@ -80,6 +80,8 @@ properties:
         env:
           - name: DATABASE_URL
             secretRef: tiles-db-url
+          - name: TILES_BASE_URL
+            secretRef: tiles-base-url
         resources:
           cpu: 0.5
           memory: 1.0Gi
