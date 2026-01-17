@@ -82,12 +82,14 @@ CENSUS_RESTORE_USER_PASSWORD='your-password' \
 If you need to download and restore a dump manually (e.g., for local development):
 
 #### For single-file dumps:
+
 ```bash
 VERSION="v1.2.0"  # Replace with desired version
 wget "https://github.com/rcpch/rcpch-census-platform/releases/download/${VERSION}/rcpch-census-${VERSION}.dump"
 ```
 
 #### For split dumps (reassembly required):
+
 ```bash
 VERSION="v1.2.0"  # Replace with desired version
 
@@ -124,6 +126,7 @@ docker exec -i postgres-restore \
 ## Version Numbering Guidelines
 
 Follow semantic versioning:
+
 - **Major version** (e.g., v2.0.0): Breaking schema changes or complete dataset overhaul
 - **Minor version** (e.g., v1.2.0): New data added, new tables, or backward-compatible changes
 - **Patch version** (e.g., v1.2.1): Bug fixes, data corrections, or minor updates
@@ -148,12 +151,14 @@ Follow semantic versioning:
 ### Build Issues
 
 **Problem**: Dump creation fails
+
 - Check Docker is running and has sufficient resources (8GB+ RAM recommended)
 - Ensure no port conflicts on 5432
 - Review logs for migration or seeding errors
 - Verify PostGIS extension is available in the container
 
 **Problem**: Dump test restoration fails
+
 - Review the test logs for specific errors
 - Common issues: missing extensions, permission problems
 - The dump may be corrupt if the build was interrupted
@@ -161,16 +166,19 @@ Follow semantic versioning:
 ### Release Issues
 
 **Problem**: `gh` authentication fails
+
 - Run `gh auth login` and follow prompts
 - Ensure you have write access to the repository
 - Check your GitHub token has `repo` scope
 
 **Problem**: Upload fails for large files
+
 - The script should auto-split files >1.8GB
 - If manual splitting needed, use: `split -b 1800M dump.file dump.part-`
 - Verify your internet connection for large uploads
 
 **Problem**: Release already exists
+
 - Choose a different version number
 - Delete the existing release if it was created in error
 - Use `gh release list` to see existing releases
