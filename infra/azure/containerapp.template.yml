@@ -65,7 +65,7 @@ properties:
         env:
           - name: DATABASE_URL
             secretRef: tiles-db-url
-          - name: URLBASE
+          - name: TS_URLBASE
             secretRef: tiles-base-url
           - name: TRUST_PROXY
             value: "true"
