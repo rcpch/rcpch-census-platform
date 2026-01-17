@@ -1,299 +1,392 @@
-# Managed Database Seeding
+# Database Seeding Guide
 
 ## Overview
 
-Since moving from a sidecar PostgreSQL container to a managed Azure Database for PostgreSQL service, the database needs to be seeded separately from the application deployment. This document explains how to seed your managed database from GitHub releases.
-
-## Background
-
-Previously, the database ran as a sidecar container alongside the application, and the `init-db/01-download-and-restore.sh` script would automatically download and restore the database dump on container startup. 
-
-Now with a managed database service:
-
-- The database persists independently of application deployments
-- The database only needs to be seeded once (or when you want to update the data)
-- Seeding is done via GitHub Actions workflow or a local script
+The RCPCH Census Platform uses an Azure Database for PostgreSQL Flexible Server as a managed database service. This database needs to be seeded separately from application deployments using database dumps published as GitHub releases.
 
 ## Prerequisites
 
-### Azure Resources Required
+### One-Time Setup Requirements
 
-1. **Azure Database for PostgreSQL** (Flexible Server recommended)
-   - PostGIS extension enabled
-   - Firewall rules configured to allow connections
+Before you can seed the database, ensure the following are configured:
+
+1. **Azure Database for PostgreSQL Flexible Server** deployed
+2. **PostGIS extensions installed** (requires `azure_pg_admin` role):
+   ```sql
+   -- Connect as an admin user (e.g., rcpchCensusAdmin)
+   CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA public;
+   CREATE EXTENSION IF NOT EXISTS postgis_topology WITH SCHEMA topology;
+   ```
+
+3. **Database user permissions** (one-time grant):
+   ```sql
+   -- Grant azure_pg_admin role to the restore user
+   GRANT azure_pg_admin TO census_restore_user;
    
-2. **Azure Key Vault** with the following secrets:
-   - `postgres-db-host`: Database server hostname
-   - `postgres-db-port`: Database port (usually 5432)
-   - `postgres-db-name`: Database name
-   - `postgres-db-user`: Database username
-   - `postgres-db-password`: Database password
+   -- Grant the app role to restore user (for ownership transfer)
+   GRANT "rcpch-census-platform" TO census_restore_user;
+   ```
 
-3. **GitHub Secrets** configured:
-   - `KEY_VAULT_NAME`: Name of your Azure Key Vault
-   - Azure OIDC authentication secrets (AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID)
+4. **Azure Container App** deployed with the restore script included
+5. **GitHub releases** with published database dumps (see [Database Dump Creation and Publication Guide](./DATABASE_DUMP_PUBLICATION.md))
+
+### Required Admin Users
+
+You need credentials for one of these admin users to perform the one-time setup:
+
+- `rcpchCensusAdmin` (recommended - purpose-built admin account)
+- `michaelbadm@rcpch.ac.uk`
+- `simon.chapman@rcpch.ac.uk`
+- `rcpch-census-platform-v2`
+
+All have the `azure_pg_admin` role required for extension installation and permission grants.
+
+## Architecture
+
+### Database Connection Flow
+
+```
+Azure Container App
+├── nginx container
+├── web container (Django) ──────┐
+└── tiles container (pg_tileserv) ┼─→ Azure Database for PostgreSQL
+                                   │   (seeded via restore script)
+                                   └────────────────────────────────→
+```
+
+The managed database persists independently of application deployments and only needs seeding when:
+- Initially setting up a new environment
+- Updating to a new data release version
+- Restoring from a known-good state
 
 ## Seeding Methods
 
-### Method 1: GitHub Actions Workflow (Recommended)
+### Method 1: Azure CLI with Container App Exec (Recommended)
 
-This is the easiest method for production environments.
+This method uses Azure CLI to execute the restore script inside your running container app.
 
-#### How to Run
+#### Step 1: Install Azure CLI
 
-1. Go to your repository on GitHub
-2. Navigate to **Actions** → **Seed Managed Azure Database**
-3. Click **Run workflow**
-4. Choose options:
-   - **db_dump_version**: Enter a specific version tag (e.g., `v1.1.0`) or leave as `latest`
-   - **force_reseed**: Check this to drop and re-seed an already populated database
-5. Click **Run workflow**
+If not already installed:
 
-#### What It Does
-
-The workflow will:
-1. Authenticate with Azure using OIDC
-2. Fetch database connection details from Azure Key Vault
-3. Download the specified database dump from GitHub releases
-4. Handle split dumps automatically (reassembles if needed)
-5. Check if database is already populated
-6. Restore the dump to your managed database
-7. Set appropriate permissions
-8. Verify the restoration
-
-#### Monitoring
-
-- View real-time logs in the GitHub Actions interface
-- Check the summary at the end for verification details
-- Row counts and table listings will be displayed
-
-### Method 2: Local Script
-
-Use this method for local testing or when you need manual control.
-
-#### Prerequisites
-
-Install required tools:
 ```bash
 # macOS
-brew install postgresql azure-cli gh wget
+brew install azure-cli
 
-# Ubuntu/Debian
-sudo apt-get install postgresql-client azure-cli gh wget
+# Ubuntu/Debian  
+sudo apt-get install azure-cli
 
-# Verify installations
-psql --version
-az --version
-gh --version
+# Windows
+# Download from https://aka.ms/installazurecliwindows
 ```
 
-#### How to Run
+#### Step 2: Authenticate with Azure
 
-1. Authenticate with Azure:
-   ```bash
-   az login
-   ```
+```bash
+az login
+```
 
-2. Authenticate with GitHub (if using Key Vault option):
-   ```bash
-   gh auth login
-   ```
+#### Step 3: Run the Restore Command
 
-3. Run the seeding script:
-   ```bash
-   ./s/seed-managed-db
-   ```
+Copy and paste this command, replacing the placeholder values:
 
-4. Follow the interactive prompts:
-   - Choose connection method (Key Vault or manual entry)
-   - Select database dump version (latest or specific)
-   - Confirm any actions (like dropping existing data)
+```bash
+az containerapp exec \
+  --name rcpch-census-platform \
+  --resource-group rcpch-census-platform-rg \
+  --command "/bin/bash" \
+  --container web \
+  -- -c "
+    CONFIRM_RESTORE=true \
+    POSTGRES_DB_HOST='your-server.postgres.database.azure.com' \
+    POSTGRES_DB='rcpch_census_db' \
+    CENSUS_RESTORE_USER='census_restore_user' \
+    CENSUS_RESTORE_USER_PASSWORD='your-password-here' \
+    /app/s/restore-db latest
+  "
+```
 
-#### What It Does
+**Parameter Explanation**:
+- `--name`: Your Azure Container App name
+- `--resource-group`: Your Azure resource group
+- `--container`: Container to execute in (usually `web`)
+- `CONFIRM_RESTORE=true`: Required safety flag to proceed with restore
+- `POSTGRES_DB_HOST`: Your Azure PostgreSQL server hostname
+- `POSTGRES_DB`: Database name
+- `CENSUS_RESTORE_USER`: Database user with `azure_pg_admin` role
+- `CENSUS_RESTORE_USER_PASSWORD`: Password for restore user
+- `/app/s/restore-db latest`: Script path and version (`latest` or specific tag like `v1.2.0`)
 
-The script will:
-1. Verify all required tools are installed
-2. Test database connectivity
-3. Check if database is already populated
-4. Download the dump from GitHub releases (handles split files)
-5. Restore the dump
-6. Set permissions
-7. Verify the restoration
-8. Clean up temporary files
+#### What the Script Does
 
-## Database Dump Versions
+The `restore-db` script will:
 
-Database dumps are stored as GitHub releases in this repository. Each release contains:
+1. **Download** the specified database dump version from GitHub releases
+2. **Reassemble** split dump files automatically (if the dump exceeds 2GB)
+3. **Prepare** the database by dropping and recreating the schema
+4. **Install** PostGIS extensions (requires `azure_pg_admin` role)
+5. **Restore** all tables, indexes, and constraints
+6. **Transfer** ownership to the application role (`rcpch-census-platform`)
+7. **Grant** read permissions to the tileserver user
+8. **Verify** restoration with table counts
+9. **Clean up** temporary files
 
-- **Single file**: `rcpch-census-{version}.dump` (if under 2GB)
-- **Split files**: `rcpch-census-{version}.dump.part-aa`, `.part-ab`, etc. (if over 2GB)
+#### Expected Output
+
+```
+==========================================
+RCPCH Census – Manual Database Restore
+==========================================
+Targeting version: v1.2.0
+✓ Downloaded rcpch-census-v1.2.0.dump.part-aa
+✓ Downloaded rcpch-census-v1.2.0.dump.part-ab
+...
+✓ Reassembly successful. Size: 4.2G
+Step 1: Cleaning Schema & Installing Extensions...
+Step 2: Restoring Data...
+Step 3: Transferring ownership to rcpch-census-platform...
+Step 4: Configuring tileserver access...
+Step 5: Verifying restoration...
+✓ Restored 45 tables
+==========================================
+            RESTORE SUCCESSFUL            
+==========================================
+```
+
+#### Expected Warnings (Safe to Ignore)
+
+You will see warnings about these extensions - **this is normal and expected**:
+
+```
+ERROR: extension "fuzzystrmatch" is not allow-listed for users in Azure Database for PostgreSQL
+ERROR: required extension "fuzzystrmatch" is not installed
+ERROR: extension "postgis_tiger_geocoder" does not exist
+```
+
+These extensions are:
+- Not available in Azure PostgreSQL's allowlist
+- Not required for UK census data (they're for US address geocoding)
+- Safely excluded from the restore process
+
+### Method 2: Azure Portal Console (Alternative)
+
+If you prefer a GUI approach:
+
+1. Navigate to Azure Portal → Container Apps
+2. Select your container app
+3. Go to **Console** → Select **web** container
+4. Run the command directly:
+
+```bash
+CONFIRM_RESTORE=true \
+POSTGRES_DB_HOST='your-server.postgres.database.azure.com' \
+POSTGRES_DB='rcpch_census_db' \
+CENSUS_RESTORE_USER='census_restore_user' \
+CENSUS_RESTORE_USER_PASSWORD='your-password' \
+/app/s/restore-db latest
+```
+
+## Version Selection
+
+### Using "latest"
+
+```bash
+/app/s/restore-db latest
+```
+
+Automatically fetches and restores the most recent GitHub release. Recommended for:
+
+- Initial setup
+- Getting the most current data
+- Development/testing environments
+
+### Using a Specific Version
+
+```bash
+/app/s/restore-db v1.2.0
+```
+
+Restores a specific tagged release. Recommended for:
+
+- Production environments requiring version pinning
+- Rollback scenarios
+- Reproducible deployments
 
 ### Finding Available Versions
 
 ```bash
-# List recent releases
-gh release list
+# List all releases
+gh release list --repo rcpch/rcpch-census-platform
 
-# View specific release
-gh release view v1.1.0
+# View specific release details
+gh release view v1.2.0 --repo rcpch/rcpch-census-platform
 ```
 
-### Version Selection Strategy
+## Common Workflows
 
-- **Latest**: Use for initial setup or to get the most recent data
-- **Specific version**: Use when you need a particular dataset version or for reproducibility
+### Initial Environment Setup
 
-## Workflow Integration
+```bash
+# 1. Deploy Azure Database for PostgreSQL
+# 2. Run as admin to install extensions
+psql -h your-server.postgres.database.azure.com -U rcpchCensusAdmin -d rcpch_census_db
+> CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA public;
+> CREATE EXTENSION IF NOT EXISTS postgis_topology WITH SCHEMA topology;
+> GRANT azure_pg_admin TO census_restore_user;
+> GRANT "rcpch-census-platform" TO census_restore_user;
+> \q
 
-### Initial Database Setup
+# 3. Seed the database
+az containerapp exec \
+  --name rcpch-census-platform \
+  --resource-group rcpch-census-platform-rg \
+  --command "/bin/bash" \
+  --container web \
+  -- -c "
+    CONFIRM_RESTORE=true \
+    POSTGRES_DB_HOST='your-server.postgres.database.azure.com' \
+    POSTGRES_DB='rcpch_census_db' \
+    CENSUS_RESTORE_USER='census_restore_user' \
+    CENSUS_RESTORE_USER_PASSWORD='your-password' \
+    /app/s/restore-db latest
+  "
 
-When setting up a new environment:
-
-1. Deploy the Azure Database for PostgreSQL service
-2. Configure PostGIS extension:
-   ```sql
-   CREATE EXTENSION IF NOT EXISTS postgis;
-   ```
-3. Store connection details in Azure Key Vault
-4. Run the seed workflow with `latest` version
-5. Deploy your application (it will connect to the pre-seeded database)
-
-### Updating Data
-
-When you need to update the database with new data:
-
-1. Create a new database dump locally using `./s/build-dump`
-2. Release it to GitHub using `./s/release-dump`
-3. Run the seed workflow with `force_reseed: true` and the new version
-
-### Application Deployment
-
-Your application deployment workflow (`.github/workflows/deploy_containerapps.yml`) should:
-1. **Not** include database seeding
-2. Simply connect to the managed database using connection strings from Key Vault
-3. Run Django migrations if schema changes are needed:
-   ```bash
-   python manage.py migrate
-   ```
-
-## Architecture Differences
-
-### Before (Sidecar Database)
-
-```
-Container App
-├── nginx container
-├── db container (PostGIS)
-│   └── init-db script downloads & restores dump on startup
-├── web container (Django)
-└── tiles container (pg_tileserv)
+# 4. Deploy application (it will connect to pre-seeded database)
 ```
 
-### After (Managed Database)
+### Updating to New Data Release
 
+```bash
+# After a new dump version is published to GitHub releases
+az containerapp exec \
+  --name rcpch-census-platform \
+  --resource-group rcpch-census-platform-rg \
+  --command "/bin/bash" \
+  --container web \
+  -- -c "
+    CONFIRM_RESTORE=true \
+    POSTGRES_DB_HOST='your-server.postgres.database.azure.com' \
+    POSTGRES_DB='rcpch_census_db' \
+    CENSUS_RESTORE_USER='census_restore_user' \
+    CENSUS_RESTORE_USER_PASSWORD='your-password' \
+    /app/s/restore-db v1.3.0
+  "
 ```
-Container App
-├── nginx container
-├── web container (Django) ──────┐
-└── tiles container (pg_tileserv) ┼─→ Azure Database for PostgreSQL
-                                   │   (seeded separately via workflow)
-                                   └───────────────────────────────────→
+
+### Rollback to Previous Version
+
+```bash
+# Restore to a known-good version
+az containerapp exec \
+  --name rcpch-census-platform \
+  --resource-group rcpch-census-platform-rg \
+  --command "/bin/bash" \
+  --container web \
+  -- -c "
+    CONFIRM_RESTORE=true \
+    POSTGRES_DB_HOST='your-server.postgres.database.azure.com' \
+    POSTGRES_DB='rcpch_census_db' \
+    CENSUS_RESTORE_USER='census_restore_user' \
+    CENSUS_RESTORE_USER_PASSWORD='your-password' \
+    /app/s/restore-db v1.1.0
+  "
 ```
 
 ## Troubleshooting
 
-### Connection Issues
+### Connection Errors
 
-**Problem**: Cannot connect to managed database
-
-**Solutions**:
-- Check firewall rules in Azure (allow GitHub Actions IP ranges or your local IP)
-- Verify PostGIS extension is enabled
-- Confirm connection details in Key Vault are correct
-- For GitHub Actions, ensure OIDC federation is configured correctly
-
-### Split File Issues
-
-**Problem**: Download fails for split dumps
+**Symptom**: `could not connect to server`
 
 **Solutions**:
-- Check internet connection
-- Verify the release exists and contains all parts
-- Both the workflow and script handle split files automatically
+
+- Verify firewall rules allow connections from Container App
+- Check PostgreSQL server is running
+- Confirm hostname and credentials are correct
+- Test connection: `psql -h hostname -U username -d database`
 
 ### Permission Errors
 
-**Problem**: `pg_restore` fails with permission errors
+**Symptom**: `must be owner of extension` or `only members of "azure_pg_admin" are allowed`
 
 **Solutions**:
-- Ensure the database user has sufficient privileges
-- The workflow/script uses `--no-owner` and `--role` flags to handle this
-- May need to grant CREATE privileges on the database
 
-### Already Populated
+- Ensure `census_restore_user` has been granted `azure_pg_admin` role
+- Run the one-time setup commands as an admin user
+- Verify with: `SELECT * FROM pg_roles WHERE rolname = 'census_restore_user';`
 
-**Problem**: Database already has data
+### Extension Errors
 
-**Solutions**:
-- Use `force_reseed: true` in the GitHub Actions workflow
-- Confirm when prompted in the local script
-- This will drop and recreate the schema
-
-### Large File Timeouts
-
-**Problem**: Restoration takes too long
+**Symptom**: `extension "postgis" does not exist`
 
 **Solutions**:
-- This is normal for large datasets (5-10 minutes or more)
-- GitHub Actions has a generous timeout
-- For local runs, ensure stable internet connection
-- Consider running locally if GitHub Actions times out
 
-## Security Considerations
+- Install extensions manually as admin user (see Prerequisites)
+- Ensure `azure_pg_admin` role is granted
+- Check Azure allows PostGIS for your server tier
 
-1. **Credentials**: Never commit database credentials to the repository
-2. **Key Vault**: Store all sensitive connection details in Azure Key Vault
-3. **Firewall**: Restrict database access to known IP ranges when possible
-4. **SSL**: Enable SSL connections to the managed database
-5. **Secrets**: Use `::add-mask::` in workflows to prevent password leakage in logs
+### Download Failures
 
-## Cost Considerations
+**Symptom**: Failed to download dump parts from GitHub
 
-- **Managed Database**: Runs 24/7, costs more than sidecar but provides better performance and reliability
-- **Seeding**: Only needs to be done once or when data updates are required
-- **Storage**: Database backup storage is included with Azure Database for PostgreSQL
-- **Compute**: Consider using Burstable tier for dev/test environments
+**Solutions**:
 
-## Migration Checklist
+- Check GitHub release exists: `gh release view v1.2.0`
+- Verify container has internet access
+- Check GitHub API rate limits
+- Try a different version or `latest`
 
-If migrating from sidecar to managed database:
+### Restore Hangs
 
-- [ ] Create Azure Database for PostgreSQL
-- [ ] Enable PostGIS extension
-- [ ] Configure firewall rules
-- [ ] Store connection details in Key Vault
-- [ ] Test connection from local machine
-- [ ] Run seed workflow to populate database
-- [ ] Verify data integrity (row counts, geometries)
-- [ ] Update application connection strings to point to managed database
-- [ ] Remove `db` container from `containerapp.template.yml`
-- [ ] Update `deploy_containerapps.yml` to remove database deployment steps
-- [ ] Update application environment variables (POSTGRES_DB_HOST, etc.)
-- [ ] Deploy application
-- [ ] Test application functionality
-- [ ] Monitor performance and costs
+**Symptom**: Restore process stops responding
 
-## Related Scripts
+**Solutions**:
 
-- `s/build-dump`: Creates a database dump locally
-- `s/release-dump`: Publishes dump to GitHub releases
-- `s/seed-managed-db`: Seeds managed database (local)
-- `.github/workflows/seed_managed_db.yml`: Seeds managed database (GitHub Actions)
+- Large dumps can take 10-20 minutes - be patient
+- Check Azure Container App logs for errors
+- Verify database has sufficient storage space
+- Monitor PostgreSQL server metrics in Azure Portal
+
+### Verification Failures
+
+**Symptom**: Fewer tables than expected after restore
+
+**Solutions**:
+
+- Review restore logs for errors
+- Check for FATAL or PANIC messages (critical errors)
+- Warnings about tiger/fuzzystrmatch extensions are normal
+- Re-run restore with a different version to compare
+
+## Security Best Practices
+
+1. **Never commit credentials**: Use environment variables, never hardcode passwords
+2. **Rotate passwords**: Change `CENSUS_RESTORE_USER_PASSWORD` regularly
+3. **Limit firewall rules**: Only allow necessary IP ranges
+4. **Use SSL**: Enable SSL connections to the database
+5. **Audit access**: Monitor who runs restore operations
+6. **Mask secrets**: The script masks passwords in logs automatically
+
+## Performance Considerations
+
+- **Restore time**: 5-20 minutes depending on dump size and network speed
+- **Database sizing**: Ensure adequate storage (current dumps are ~5GB, allow 2x for overhead)
+- **Compute tier**: Burstable tier sufficient for restore operations
+- **Concurrent connections**: Restore requires exclusive access - don't run during high traffic
+- **Indexes**: Restored with data automatically, no manual rebuild needed
+
+## Related Documentation
+
+- [Database Dump Creation and Publication Guide](./DATABASE_DUMP_PUBLICATION.md) - How to create and release dumps
+- [Deployment Guide](./DEPLOYMENT.md) - Full application deployment workflow
+- [Azure Container Apps Documentation](https://learn.microsoft.com/en-us/azure/container-apps/)
+- [Azure Database for PostgreSQL Documentation](https://learn.microsoft.com/en-us/azure/postgresql/)
 
 ## Support
 
 For issues or questions:
-1. Check the GitHub Actions logs for detailed error messages
-2. Review Azure Database for PostgreSQL logs
-3. Consult the PostgreSQL and PostGIS documentation
-4. Open an issue in this repository
+
+1. Check the restore script logs for detailed error messages
+2. Review Azure Database for PostgreSQL logs in Azure Portal
+3. Consult PostgreSQL and PostGIS documentation
+4. Open an issue in the GitHub repository with logs attached
