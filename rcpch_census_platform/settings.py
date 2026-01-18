@@ -197,7 +197,7 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Deprivation Scores API",
     "DESCRIPTION": "UK census data, especially Index of Multiple Deprivation, as a service.",
     "VERSION": "1.0.0",
-    "SERVE_INCLUDE_SCHEMA": False,
+    "SERVE_INCLUDE_SCHEMA": True,
     # OTHER SETTINGS
 }
 
