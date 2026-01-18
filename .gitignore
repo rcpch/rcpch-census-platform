@@ -125,3 +125,6 @@ staticfiles/
 .data
 
 build_info.json
+
+s/deploy-db
+postgis_dump_files
