@@ -67,6 +67,16 @@ router.register(
     basename="uk_population_density",
 )
 
+
+class CustomSwaggerView(SpectacularSwaggerView):
+    def get(self, request, *args, **kwargs):
+        # Detect the base path from the request
+        # if coming from api.rcpch.ac.uk we need to set the schema url accordingly
+        schema_url = request.build_absolute_uri("/schema/")
+        self.url = schema_url
+        return super().get(request, *args, **kwargs)
+
+
 drf_routes = [
     # rest framework paths
     path("", include(router.urls)),
@@ -83,9 +93,7 @@ drf_routes = [
     path("schema/", SpectacularJSONAPIView.as_view(), name="schema"),
     # Swagger UI
     path(
-        "swagger-ui/",
-        SpectacularSwaggerView.as_view(),
-        name="swagger-ui",
+        "swagger-ui/", CustomSwaggerView.as_view(url_name="schema"), name="swagger-ui"
     ),
 ]
 

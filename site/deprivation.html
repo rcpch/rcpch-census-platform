@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Index of Multiple Deprivation Lookup</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#11a7f2',
+            dark: '#0d0d58',
+            accent: '#E00087'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --p: 197 93% 51%;
+      --pf: 197 93% 41%;
+      --pc: 0 0% 100%;
+      --a: 328 100% 46%;
+      --af: 328 100% 36%;
+      --ac: 0 0% 100%;
+    }
+    
+    .subscore-card {
+      background: #f9fafb;
+      border-left: 3px solid #11a7f2;
+    }
+  </style>
+</head>
+<body class="bg-white">
+  <div class="container mx-auto px-4 py-8 max-w-4xl">
+    <div class="mb-8">
+      <h1 class="text-4xl font-bold mb-2" style="color: #0d0d58;">Index of Multiple Deprivation Lookup</h1>
+      <p class="text-gray-600">Enter a UK postcode to retrieve deprivation data</p>
+    </div>
+
+    <form id="imd-form" class="space-y-6">
+      <div class="form-control w-full">
+        <label class="label">
+          <span class="label-text font-semibold">Country</span>
+        </label>
+        <select id="country" class="select select-bordered w-full" required>
+          <option value="">Select a country</option>
+          <option value="england">England</option>
+          <option value="wales">Wales</option>
+          <option value="scotland">Scotland</option>
+          <option value="northern_ireland">Northern Ireland</option>
+        </select>
+      </div>
+
+      <div class="form-control w-full">
+        <label class="label">
+          <span class="label-text font-semibold">Dataset Year</span>
+        </label>
+        <select id="year" class="select select-bordered w-full" required disabled>
+          <option value="">Select a year</option>
+        </select>
+      </div>
+
+      <div class="form-control w-full">
+        <label class="label">
+          <span class="label-text font-semibold">Postcode</span>
+        </label>
+        <input type="text" id="postcode" placeholder="e.g., SW1A 1AA" class="input input-bordered w-full" required>
+      </div>
+
+      <div class="form-control w-full">
+        <label class="label">
+          <span class="label-text font-semibold">Quantile (for quantile lookup)</span>
+        </label>
+        <select id="quantile" class="select select-bordered w-full">
+          <option value="median">Median</option>
+          <option value="tertile">Tertile</option>
+          <option value="quartile">Quartile</option>
+          <option value="quintile">Quintile</option>
+          <option value="sextile">Sextile</option>
+          <option value="septile">Septile</option>
+          <option value="octile">Octile</option>
+          <option value="decile">Decile</option>
+          <option value="duodecile">Duodecile</option>
+          <option value="hexadecile">Hexadecile</option>
+          <option value="vigintile">Vigintile</option>
+        </select>
+      </div>
+
+      <div class="flex gap-4">
+        <button type="submit" class="btn btn-primary flex-1" data-endpoint="quantile" style="background-color: #11a7f2; border-color: #11a7f2;">
+          Get IMD Quantile
+        </button>
+        <button type="button" class="btn btn-outline flex-1" data-endpoint="indices" style="color: #0d0d58; border-color: #0d0d58;">
+          Get Full Indices
+        </button>
+      </div>
+    </form>
+
+    <div id="loading" class="text-center py-8 hidden">
+      <span class="loading loading-spinner loading-lg" style="color: #11a7f2;"></span>
+      <p class="mt-4 text-gray-600">Loading...</p>
+    </div>
+
+    <div id="results" class="mt-8 hidden"></div>
+  </div>
+
+  <script>
+    const yearsByCountry = {
+      england: [2025, 2019],
+      wales: [2019],
+      scotland: [2020],
+      northern_ireland: [2017]
+    };
+
+    const countrySelect = document.getElementById('country');
+    const yearSelect = document.getElementById('year');
+    const postcodeInput = document.getElementById('postcode');
+    const quantileSelect = document.getElementById('quantile');
+    const form = document.getElementById('imd-form');
+    const resultsDiv = document.getElementById('results');
+    const loadingDiv = document.getElementById('loading');
+
+    // Update year dropdown when country changes
+    countrySelect.addEventListener('change', (e) => {
+      const country = e.target.value;
+      yearSelect.innerHTML = '<option value="">Select a year</option>';
+      
+      if (country && yearsByCountry[country]) {
+        yearSelect.disabled = false;
+        yearsByCountry[country].forEach(year => {
+          const option = document.createElement('option');
+          option.value = year;
+          option.textContent = year;
+          yearSelect.appendChild(option);
+        });
+        
+        // Auto-select if only one year available
+        if (yearsByCountry[country].length === 1) {
+          yearSelect.value = yearsByCountry[country][0];
+        }
+      } else {
+        yearSelect.disabled = true;
+      }
+    });
+
+    // Handle both button clicks
+    document.querySelectorAll('button[data-endpoint]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        
+        if (!form.checkValidity()) {
+          form.reportValidity();
+          return;
+        }
+
+        const endpoint = e.target.dataset.endpoint;
+        await fetchIMDData(endpoint);
+      });
+    });
+
+    async function fetchIMDData(endpoint) {
+      const country = countrySelect.value;
+      const year = yearSelect.value;
+      const postcode = postcodeInput.value.trim();
+      const quantile = quantileSelect.value;
+
+      resultsDiv.classList.add('hidden');
+      loadingDiv.classList.remove('hidden');
+
+      try {
+        let url = `https://api.rcpch.ac.uk/deprivation/v2/`;
+        
+        if (endpoint === 'quantile') {
+          url += `index_of_multiple_deprivation_quantile?country=${country}&year=${year}&postcode=${encodeURIComponent(postcode)}&quantile=${quantile}`;
+        } else {
+          url += `indices_of_multiple_deprivation?country=${country}&year=${year}&postcode=${encodeURIComponent(postcode)}`;
+        }
+
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`API returned ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        displayResults(data, endpoint);
+      } catch (error) {
+        displayError(error.message);
+      } finally {
+        loadingDiv.classList.add('hidden');
+      }
+    }
+
+    function displayResults(data, endpoint) {
+      resultsDiv.innerHTML = '';
+      
+      const title = document.createElement('h2');
+      title.className = 'text-2xl font-bold mb-6';
+      title.style.color = '#0d0d58';
+      title.textContent = endpoint === 'quantile' ? 'IMD Quantile Results' : 'Full IMD Indices';
+      resultsDiv.appendChild(title);
+
+      // Display main fields
+      const mainFields = ['lsoa_code', 'lsoa_name', 'postcode', 'country', 'year'];
+      
+      const mainFieldsContainer = document.createElement('div');
+      mainFieldsContainer.className = 'space-y-3 mb-6';
+      
+      mainFields.forEach(field => {
+        if (data[field] !== undefined) {
+          const stat = document.createElement('div');
+          stat.className = 'stat bg-base-100 border border-gray-200 rounded-lg p-4';
+          stat.innerHTML = `
+            <div class="stat-title text-sm font-semibold text-gray-600">${formatFieldName(field)}</div>
+            <div class="stat-value text-2xl" style="color: #0d0d58;">${data[field]}</div>
+          `;
+          mainFieldsContainer.appendChild(stat);
+        }
+      });
+      resultsDiv.appendChild(mainFieldsContainer);
+
+      // Display IMD score/rank if present
+      if (data.index_of_multiple_deprivation_score !== undefined || data.index_of_multiple_deprivation_rank !== undefined) {
+        const imdContainer = document.createElement('div');
+        imdContainer.className = 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-6';
+        
+        if (data.index_of_multiple_deprivation_score !== undefined) {
+          const stat = document.createElement('div');
+          stat.className = 'stat bg-base-100 border border-gray-200 rounded-lg p-4';
+          stat.innerHTML = `
+            <div class="stat-title text-sm font-semibold text-gray-600">IMD Score</div>
+            <div class="stat-value text-3xl" style="color: #11a7f2;">${data.index_of_multiple_deprivation_score}</div>
+          `;
+          imdContainer.appendChild(stat);
+        }
+
+        if (data.index_of_multiple_deprivation_rank !== undefined) {
+          const stat = document.createElement('div');
+          stat.className = 'stat bg-base-100 border border-gray-200 rounded-lg p-4';
+          stat.innerHTML = `
+            <div class="stat-title text-sm font-semibold text-gray-600">IMD Rank</div>
+            <div class="stat-value text-3xl" style="color: #11a7f2;">${data.index_of_multiple_deprivation_rank}</div>
+          `;
+          imdContainer.appendChild(stat);
+        }
+        
+        resultsDiv.appendChild(imdContainer);
+      }
+
+      // Display quantile if present
+      if (endpoint === 'quantile' && data[quantileSelect.value] !== undefined) {
+        const stat = document.createElement('div');
+        stat.className = 'stat bg-base-100 border rounded-lg p-6 mb-6';
+        stat.style.borderColor = '#E00087';
+        stat.innerHTML = `
+          <div class="stat-title text-sm font-semibold text-gray-600">${formatFieldName(quantileSelect.value)}</div>
+          <div class="stat-value text-4xl" style="color: #E00087;">${data[quantileSelect.value]}</div>
+        `;
+        resultsDiv.appendChild(stat);
+      }
+
+      // Display subscores if present (for full indices endpoint)
+      if (endpoint === 'indices') {
+        const subscoreFields = Object.keys(data).filter(key => 
+          !mainFields.includes(key) && 
+          key !== 'index_of_multiple_deprivation_score' && 
+          key !== 'index_of_multiple_deprivation_rank'
+        );
+
+        if (subscoreFields.length > 0) {
+          const subscoresTitle = document.createElement('h3');
+          subscoresTitle.className = 'text-xl font-bold mb-4';
+          subscoresTitle.style.color = '#0d0d58';
+          subscoresTitle.textContent = 'Subscores';
+          resultsDiv.appendChild(subscoresTitle);
+
+          const grid = document.createElement('div');
+          grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
+
+          subscoreFields.forEach(field => {
+            const card = document.createElement('div');
+            card.className = 'subscore-card rounded-lg p-4';
+            card.innerHTML = `
+              <div class="text-xs font-semibold text-gray-600 mb-1">${formatFieldName(field)}</div>
+              <div class="text-2xl font-bold" style="color: #0d0d58;">${data[field]}</div>
+            `;
+            grid.appendChild(card);
+          });
+
+          resultsDiv.appendChild(grid);
+        }
+      }
+
+      resultsDiv.classList.remove('hidden');
+    }
+
+    function displayError(message) {
+      resultsDiv.innerHTML = `
+        <div class="alert alert-error">
+          <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <span><strong>Error:</strong> ${message}</span>
+        </div>
+      `;
+      resultsDiv.classList.remove('hidden');
+    }
+
+    function formatFieldName(field) {
+      return field
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    }
+  </script>
+</body>
+</html>
