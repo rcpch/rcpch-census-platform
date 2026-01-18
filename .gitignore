@@ -123,5 +123,14 @@ staticfiles/
 # Docker and docker compose
 .pip_cache
 .data
+# Docker and docker compose
+.pip_cache
+.data
 
 build_info.json
+# Ignore large generated/staging geojson and shapefiles
+deprivation_scores/geojson/
+deprivation_scores/shape_files/
+postgis_dump_files/
+
+s/deploy-db

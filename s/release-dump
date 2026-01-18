@@ -1,0 +1,54 @@
+#!/bin/bash
+set -euo pipefail
+
+echo "=========================================="
+echo "RCPCH Census – Release Database Dump"
+echo "=========================================="
+
+# ---- Required ----
+: "${DUMP_FILE:?Path to pg_dump file is required}"
+: "${RELEASE_VERSION:?Release version is required}"
+: "${GITHUB_REPO:=rcpch/rcpch-census-platform}"
+
+# ---- Config ----
+MAX_SIZE_MB=1900
+BASENAME="rcpch-census-${RELEASE_VERSION}.dump"
+WORK_DIR="$(mktemp -d)"
+
+echo "Dump file: $DUMP_FILE"
+echo "Release:   $RELEASE_VERSION"
+
+cp "$DUMP_FILE" "$WORK_DIR/$BASENAME"
+cd "$WORK_DIR"
+
+# ---- Split if necessary ----
+SIZE_MB=$(du -m "$BASENAME" | cut -f1)
+
+if [ "$SIZE_MB" -gt "$MAX_SIZE_MB" ]; then
+  echo "Splitting dump (size ${SIZE_MB}MB)…"
+  split -b ${MAX_SIZE_MB}m "$BASENAME" "${BASENAME}.part-"
+  rm "$BASENAME"
+  FILES=(${BASENAME}.part-*)
+else
+  FILES=("$BASENAME")
+fi
+
+# ---- Create or update release ----
+if ! gh release view "$RELEASE_VERSION" -R "$GITHUB_REPO" >/dev/null 2>&1; then
+  gh release create "$RELEASE_VERSION" \
+    -R "$GITHUB_REPO" \
+    --title "Database dump ${RELEASE_VERSION}" \
+    --notes "Automated database dump"
+fi
+
+# ---- Upload assets ----
+echo "Uploading assets…"
+gh release upload "$RELEASE_VERSION" \
+  -R "$GITHUB_REPO" \
+  "${FILES[@]}" \
+  --clobber
+
+echo "✓ Release ${RELEASE_VERSION} published successfully"
+
+cd /
+rm -rf "$WORK_DIR"

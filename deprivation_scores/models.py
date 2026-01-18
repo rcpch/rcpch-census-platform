@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.gis.db import models as gis_models
 
 
 class LocalAuthority(models.Model):
@@ -11,6 +12,9 @@ class LocalAuthority(models.Model):
     year = models.IntegerField(
         "Local Authority District Year",
     )
+
+    # Geometry column for LSOA boundaries (EPSG:4326)
+    geom = gis_models.MultiPolygonField(srid=4326, null=True, blank=True)
 
     class Meta:
         verbose_name = ("Local Authority",)
@@ -74,6 +78,9 @@ class LSOA(models.Model):
     local_authority_district = models.ForeignKey(
         to=LocalAuthority, on_delete=models.CASCADE
     )
+
+    # Geometry column for LSOA boundaries (EPSG:4326)
+    geom = gis_models.MultiPolygonField(srid=4326, null=True, blank=True)
 
     class Meta:
         verbose_name = ("LSOA",)
@@ -418,6 +425,7 @@ class DataZone(models.Model):
     )
     year = models.IntegerField("Data Zone Year")
     local_authority = models.ForeignKey(LocalAuthority, on_delete=models.CASCADE)
+    geom = gis_models.MultiPolygonField(srid=4326, null=True, blank=True)
 
     class Meta:
         verbose_name = ("Data Zone",)
@@ -580,6 +588,7 @@ class SOA(models.Model):
     year = models.IntegerField()
     soa_code = models.CharField(max_length=50, unique=True)
     soa_name = models.CharField(max_length=50)
+    geom = gis_models.MultiPolygonField(srid=4326, null=True, blank=True)
 
     class Meta:
         verbose_name = ("SOA",)

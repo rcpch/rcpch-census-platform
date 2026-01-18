@@ -1,0 +1,151 @@
+#!/bin/bash
+# Using bash explicitly to support pipefail
+set -euo pipefail
+
+GITHUB_REPO="rcpch/rcpch-census-platform"
+TARGET_APP_ROLE="rcpch-census-platform"
+echo "=========================================="
+echo "RCPCH Census – Manual Database Restore"
+echo "=========================================="
+
+# ---- Hard safety guard ----
+: "${CONFIRM_RESTORE:?You must set CONFIRM_RESTORE=true}"
+[ "$CONFIRM_RESTORE" = "true" ] || { echo "Aborting."; exit 1; }
+
+# ---- Required env ----
+: "${POSTGRES_DB_HOST:?Required}"
+: "${POSTGRES_DB:?Required}"
+: "${CENSUS_RESTORE_USER:?Required}"
+: "${CENSUS_RESTORE_USER_PASSWORD:?Required}"
+
+VERSION="${1:-latest}"
+
+# 1. Resolve Version
+if [ "$VERSION" = "latest" ]; then
+  echo "Resolving latest release version..."
+  VERSION=$(curl -s "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | jq -r '.tag_name')
+fi
+echo "Targeting version: ${VERSION}"
+
+# 2. Setup Workspace
+DUMP_BASE="rcpch-census-${VERSION}.dump"
+WORK_DIR="$(mktemp -d)"
+cd "$WORK_DIR"
+
+# 3. Download Multipart Parts
+for char in a b c d e f g h; do
+    PART="part-a${char}"
+    FILE_NAME="${DUMP_BASE}.${PART}"
+    URL="https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${FILE_NAME}"
+    
+    if curl -sL -f -O "$URL"; then
+        echo "✓ Downloaded ${FILE_NAME}"
+    else
+        break
+    fi
+done
+
+# 4. Reassemble and Validate
+echo "Reassembling multipart dump..."
+cat ${DUMP_BASE}.part-* > "${DUMP_BASE}"
+if [ ! -s "${DUMP_BASE}" ]; then
+    echo "ERROR: Reassembly failed."
+    exit 1
+fi
+echo "✓ Reassembly successful. Size: $(du -sh "${DUMP_BASE}" | cut -f1)"
+
+# 5. Execute pg_restore
+echo "Starting pg_restore... (This may take a while)"
+export PGPASSWORD="$CENSUS_RESTORE_USER_PASSWORD"
+
+echo "Step 1: Cleaning Schema & Installing Extensions..."
+psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" <<EOF
+-- Drop and recreate schema
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+
+-- Install PostGIS extensions (census_restore_user must have azure_pg_admin role)
+CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA public;
+
+-- Create topology schema if needed by your dump
+CREATE SCHEMA IF NOT EXISTS topology;
+CREATE EXTENSION IF NOT EXISTS postgis_topology WITH SCHEMA topology;
+
+-- Note: fuzzystrmatch and postgis_tiger_geocoder are not in Azure's allowlist
+-- They will be skipped during restore (safe to ignore related warnings)
+
+-- Ensure restore user owns the schema
+ALTER SCHEMA public OWNER TO "$CENSUS_RESTORE_USER";
+
+-- Link the app role to the restore user for later ownership transfer
+GRANT "$TARGET_APP_ROLE" TO "$CENSUS_RESTORE_USER";
+EOF
+
+echo "Step 2: Restoring Data..."
+# Create a custom restore list excluding problematic extensions
+pg_restore -l "${DUMP_BASE}" | \
+  grep -v "EXTENSION fuzzystrmatch" | \
+  grep -v "EXTENSION postgis_tiger_geocoder" | \
+  grep -v "COMMENT - EXTENSION fuzzystrmatch" | \
+  grep -v "COMMENT - EXTENSION postgis_tiger_geocoder" > restore.list
+
+# Restore using the filtered list
+pg_restore \
+  --host="$POSTGRES_DB_HOST" \
+  --username="$CENSUS_RESTORE_USER" \
+  --dbname="$POSTGRES_DB" \
+  --no-owner \
+  --no-privileges \
+  --no-acl \
+  --clean \
+  --if-exists \
+  --use-list=restore.list \
+  --exclude-schema=tiger \
+  --exclude-schema=tiger_data \
+  -v "${DUMP_BASE}" 2>&1 | tee restore.log || true
+
+# Check for critical errors (not just warnings)
+if grep -q "FATAL\|PANIC" restore.log; then
+    echo "ERROR: Critical restore failure detected"
+    exit 1
+fi
+
+echo "Restore completed successfully"
+
+# 7. STEP 3: Transfer Ownership
+echo "Step 3: Transferring ownership to $TARGET_APP_ROLE..."
+psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" <<EOF
+-- Transfer ownership of all objects created by restore user
+REASSIGN OWNED BY "$CENSUS_RESTORE_USER" TO "$TARGET_APP_ROLE";
+
+-- Ensure app role has schema privileges
+GRANT ALL ON SCHEMA public TO "$TARGET_APP_ROLE";
+GRANT ALL ON ALL TABLES IN SCHEMA public TO "$TARGET_APP_ROLE";
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO "$TARGET_APP_ROLE";
+EOF
+
+# 8. STEP 4: Grant Tileserver Access
+echo "Step 4: Configuring tileserver access..."
+psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" <<EOF
+-- Grant read access to tileserver
+GRANT USAGE ON SCHEMA public TO "tileserver_user";
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO "tileserver_user";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO "tileserver_user";
+EOF
+
+# 9. Verify Restoration
+echo "Step 5: Verifying restoration..."
+TABLE_COUNT=$(psql --host="$POSTGRES_DB_HOST" --username="$CENSUS_RESTORE_USER" --dbname="$POSTGRES_DB" -tAc \
+  "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE';")
+
+echo "✓ Restored $TABLE_COUNT tables"
+
+if [ "$TABLE_COUNT" -lt 10 ]; then
+    echo "WARNING: Expected more tables. Check restore.log for issues."
+else
+    echo "=========================================="
+    echo "         RESTORE SUCCESSFUL               "
+    echo "=========================================="
+fi
+
+rm -rf "$WORK_DIR"

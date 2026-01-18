@@ -1,0 +1,257 @@
+#!/bin/bash
+# s/build-dump.sh
+# Creates a database dump file locally
+
+set -e
+
+DUMP_DIR="postgis_dump_files"
+DUMP_FILE="${DUMP_DIR}/rcpch-census.dump"
+CONTAINER_NAME="rcpch-census-platform-db-1"
+RUNNING_IN_CONTAINER=false
+USING_EXISTING_CONTAINER=false
+
+echo "=========================================="
+echo "RCPCH Census Database Dump Builder"
+echo "=========================================="
+echo ""
+
+# Detect if running inside a container
+if [ -f /.dockerenv ] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
+    RUNNING_IN_CONTAINER=true
+    echo "⚠️  WARNING: Running inside a Docker container"
+    echo "This script is designed to be run from the host machine."
+    echo "It will proceed but may not work as expected."
+    echo ""
+    read -p "Do you want to continue anyway? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Aborted."
+        exit 1
+    fi
+fi
+
+# Create dump directory if it doesn't exist
+mkdir -p "$DUMP_DIR"
+
+# Check if dump already exists (either single file or split files)
+EXISTING_DUMP=false
+if [ -f "$DUMP_FILE" ]; then
+    EXISTING_DUMP=true
+    DUMP_TYPE="single file"
+elif ls ${DUMP_DIR}/rcpch-census.dump.part-* 1> /dev/null 2>&1; then
+    EXISTING_DUMP=true
+    DUMP_TYPE="split files ($(ls ${DUMP_DIR}/rcpch-census.dump.part-* | wc -l) parts)"
+fi
+
+if [ "$EXISTING_DUMP" = true ]; then
+    echo "⚠️  Dump already exists: $DUMP_TYPE"
+    read -p "Do you want to rebuild it? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Using existing dump."
+        exit 0
+    fi
+    echo "Rebuilding dump..."
+    rm -f "$DUMP_FILE"
+    rm -f ${DUMP_DIR}/rcpch-census.dump.part-*
+fi
+
+# Check if build container is already running
+if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    echo "✓ Found running container: $CONTAINER_NAME"
+    read -p "Use existing container? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        USING_EXISTING_CONTAINER=true
+        echo "Using existing container..."
+    else
+        echo "Cleaning up existing container and starting fresh..."
+        docker rm -f "$CONTAINER_NAME" || true
+    fi
+elif docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Found stopped container: $CONTAINER_NAME"
+    echo "Cleaning up..."
+    docker rm -f "$CONTAINER_NAME" || true
+fi
+
+# Start PostGIS container if not using existing one
+if [ "$USING_EXISTING_CONTAINER" = false ]; then
+    echo ""
+    echo "Starting PostGIS container..."
+    docker run -d --name "$CONTAINER_NAME" \
+      -e POSTGRES_USER=rcpchCensusUser \
+      -e POSTGRES_PASSWORD=buildpass \
+      -e POSTGRES_DB=rcpchCensusdb \
+      -p 5432:5432 \
+      postgis/postgis:15-3.4
+
+    # Wait for database to be ready
+    echo "Waiting for database to be ready..."
+    for i in {1..60}; do
+      if docker exec "$CONTAINER_NAME" pg_isready -U rcpchCensusUser -d rcpchCensusdb > /dev/null 2>&1; then
+        echo "✓ Database is ready"
+        break
+      fi
+      if [ $i -eq 60 ]; then
+        echo "✗ Database failed to start in time"
+        docker rm -f "$CONTAINER_NAME"
+        exit 1
+      fi
+      sleep 2
+    done
+
+    # Build Django image if needed
+    echo ""
+    echo "Building Django seeder image..."
+    DJANGO_IMAGE=$(docker build -q -f Dockerfile.postgis .)
+
+    # Run migrations first
+    echo ""
+    echo "Running database migrations..."
+    
+    docker run --rm --network host \
+      -e POSTGRES_USER=rcpchCensusUser \
+      -e POSTGRES_PASSWORD=buildpass \
+      -e POSTGRES_DB=rcpchCensusdb \
+      -e POSTGRES_DB_HOST=127.0.0.1 \
+      -e POSTGRES_DB_PORT=5432 \
+      -e DJANGO_SECRET_KEY=dummy-build-key \
+      -e WAIT_FOR_POPULATION=false \
+      -e PYTHONUNBUFFERED=1 \
+      "$DJANGO_IMAGE" \
+      sh -c "/app/s/wait-for-db.sh && python manage.py migrate --noinput"
+
+    if [ $? -ne 0 ]; then
+        echo "✗ Migration failed"
+        docker rm -f "$CONTAINER_NAME"
+        exit 1
+    fi
+    
+    echo "✓ Migrations completed"
+
+    # Seed main data
+    echo ""
+    echo "⏳ Running main seeding (--mode=__all__)..."
+    echo "⚠️  WARNING: This will take a significant amount of time (15-30 minutes for large datasets)"
+    echo ""
+    
+    docker run --rm --network host \
+      -e POSTGRES_USER=rcpchCensusUser \
+      -e POSTGRES_PASSWORD=buildpass \
+      -e POSTGRES_DB=rcpchCensusdb \
+      -e POSTGRES_DB_HOST=127.0.0.1 \
+      -e POSTGRES_DB_PORT=5432 \
+      -e DJANGO_SECRET_KEY=dummy-build-key \
+      -e WAIT_FOR_POPULATION=false \
+      -e PYTHONUNBUFFERED=1 \
+      "$DJANGO_IMAGE" \
+      python manage.py seed --mode=__all__
+
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "✗ Main seeding failed (--mode=__all__)"
+        echo "Aborting and cleaning up..."
+        docker rm -f "$CONTAINER_NAME"
+        exit 1
+    fi
+
+    echo ""
+    echo "✓ Main seeding completed successfully"
+
+    # Import BFC boundaries
+    echo ""
+    echo "⏳ Importing BFC boundaries (--mode=import_bfc_boundaries)..."
+    echo ""
+    
+    docker run --rm --network host \
+      -e POSTGRES_USER=rcpchCensusUser \
+      -e POSTGRES_PASSWORD=buildpass \
+      -e POSTGRES_DB=rcpchCensusdb \
+      -e POSTGRES_DB_HOST=127.0.0.1 \
+      -e POSTGRES_DB_PORT=5432 \
+      -e DJANGO_SECRET_KEY=dummy-build-key \
+      -e WAIT_FOR_POPULATION=false \
+      -e PYTHONUNBUFFERED=1 \
+      "$DJANGO_IMAGE" \
+      python manage.py seed --mode=import_bfc_boundaries
+
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "✗ BFC boundaries import failed (--mode=import_bfc_boundaries)"
+        echo "Aborting and cleaning up..."
+        docker rm -f "$CONTAINER_NAME"
+        exit 1
+    fi
+
+    echo ""
+    echo "✓ All seeding completed successfully"
+else
+    echo ""
+    echo "⚠️  Using existing container - skipping seeding"
+    echo "Make sure the database is already populated!"
+    echo ""
+    
+    # Verify database is responsive
+    if ! docker exec "$CONTAINER_NAME" pg_isready -U rcpchCensusUser -d rcpchCensusdb > /dev/null 2>&1; then
+        echo "✗ Database in existing container is not ready"
+        exit 1
+    fi
+fi
+
+# Create dump file
+echo ""
+echo "Creating database dump (this may take several minutes)..."
+docker exec "$CONTAINER_NAME" pg_dump \
+  -U rcpchCensusUser \
+  -Fc -Z 9 \
+  -f /tmp/rcpch-census.dump \
+  rcpchCensusdb
+
+# Copy dump to local filesystem
+docker cp "${CONTAINER_NAME}:/tmp/rcpch-census.dump" "./${DUMP_FILE}"
+
+# Get file size
+SIZE=$(du -h "$DUMP_FILE" | cut -f1)
+echo "✓ Dump created: $DUMP_FILE ($SIZE)"
+
+# Test restore in a separate container
+echo ""
+echo "Testing dump restore..."
+TEST_CONTAINER="census-test-db"
+
+docker run -d --name "$TEST_CONTAINER" \
+  -e POSTGRES_USER=testuser \
+  -e POSTGRES_PASSWORD=testpass \
+  -e POSTGRES_DB=testdb \
+  -p 5433:5432 \
+  postgis/postgis:15-3.4
+
+sleep 10
+
+if docker exec -i "$TEST_CONTAINER" pg_restore \
+  -U testuser \
+  -d testdb \
+  --no-owner < "$DUMP_FILE" > /dev/null 2>&1; then
+    echo "✓ Restore test successful"
+else
+    echo "⚠️  Restore test had warnings (this may be normal)"
+fi
+
+# Cleanup
+echo ""
+echo "Cleaning up test container..."
+docker rm -f "$TEST_CONTAINER" > /dev/null 2>&1
+
+if [ "$USING_EXISTING_CONTAINER" = false ]; then
+    echo "Cleaning up build container..."
+    docker rm -f "$CONTAINER_NAME" > /dev/null 2>&1
+else
+    echo "✓ Leaving build container running: $CONTAINER_NAME"
+fi
+
+echo ""
+echo "=========================================="
+echo "✓ Dump file ready: $DUMP_FILE ($SIZE)"
+echo "=========================================="
+echo ""
+echo "Run './s/release-dump.sh' to create a GitHub release"

@@ -1,9 +1,19 @@
-from enum import Enum
-from math import floor
-import sys
+import gc
 import csv
+from enum import Enum
+import io
+import json
+import os
+from math import floor
+import requests
+from shapely.geometry import MultiPolygon
+import sys
 from decimal import Decimal
+import geopandas as gpd
+import pandas as pd
+from sqlalchemy import create_engine
 from django.core.management.base import BaseCommand
+from django.db import connection
 from django.conf import settings
 from ...models import (
     LSOA,
@@ -18,6 +28,7 @@ from ...models import (
     NorthernIrelandIndexMultipleDeprivation,
     PopulationDensity,
 )
+from django.db import connection
 
 
 class QuantileType(Enum):
@@ -80,10 +91,817 @@ END = "\033[0m"
 class Command(BaseCommand):
     help = "seed database with census and IMD data for England, Wales, Scotland and Northern Ireland."
 
+    def _run_post_processing_sql(self):
+        self.stdout.write(
+            self.style.WARNING(
+                "\n🚀 Running high-performance PostGIS optimizations and building UK-wide views..."
+            )
+        )
+
+        # --- Nested SQL Helpers ---
+
+        def get_lsoa_view_sql(view_name, geom_column, boundary_year):
+            """Creates individual England/Wales Table filtered by boundary year"""
+            return f"""
+            -- 1. Clean up both types to prevent the conflict error
+            DROP TABLE IF EXISTS public.{view_name} CASCADE;
+            DROP VIEW IF EXISTS public.{view_name} CASCADE;
+
+            -- 2. Create as a TABLE, not a VIEW
+            CREATE TABLE public.{view_name} AS
+            SELECT 
+                l.year::int as year,
+                l.{geom_column}::geometry(MultiPolygon, 3857) AS geom,
+                l.lsoa_code::text,
+                COALESCE(e.imd_decile, w.imd_decile, 0)::int as imd_decile,
+                COALESCE(e.imd_rank, w.imd_rank, 0)::int as imd_rank
+            FROM deprivation_scores_lsoa l
+            LEFT JOIN deprivation_scores_englishindexmultipledeprivation e 
+                ON e.lsoa_id = l.id
+            LEFT JOIN deprivation_scores_welshindexmultipledeprivation w
+                ON w.lsoa_id = l.id
+            WHERE l.{geom_column} IS NOT NULL 
+            AND l.year = {boundary_year};
+
+            -- 3. Index it!
+            CREATE INDEX idx_{view_name}_geom ON public.{view_name} USING GIST (geom);
+            ANALYZE public.{view_name};
+            """
+
+        def get_uk_master_view_sql(view_name, geom_suffix, boundary_year, imd_year):
+            """
+            Creates UK Master View combining all 4 nations with IMD data.
+            
+            Boundary year mapping:
+            - England/Wales LSOAs: 2011 (for IMD 2019) or 2021 (for IMD 2025)
+            - Scotland datazones: Always 2011
+            - N. Ireland SOAs: Always 2001
+            
+            IMD year mapping:
+            - England: 2019 or 2025 (passed as imd_year)
+            - Wales: Always 2019
+            - Scotland: Always 2020
+            - Northern Ireland: Always 2017
+            """
+            actual_geom_col = (
+                "geom_3857" if geom_suffix == "3857" else f"geom_3857_{geom_suffix}"
+            )
+            
+            # Fixed boundary years for Scotland and NI
+            scotland_boundary_year = 2011
+            ni_boundary_year = 2001
+            
+            # Fixed IMD years for Wales, Scotland and NI
+            wales_imd_year = 2019
+            scotland_imd_year = 2020
+            ni_imd_year = 2017
+
+            return f"""
+            -- 1. Clean up existing objects (both table and view types)
+            DROP TABLE IF EXISTS public.{view_name} CASCADE;
+            DROP VIEW IF EXISTS public.{view_name} CASCADE;
+
+            -- 2. Materialize the data into a physical TABLE for performance
+            CREATE TABLE public.{view_name} AS
+            -- ENGLAND
+            SELECT 
+                l.year::int AS year, 
+                {imd_year}::int AS imd_year, 
+                l.lsoa_code::text AS code, 
+                ST_MakeValid(ST_Multi(l.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
+                'england'::text AS nation,
+                COALESCE(e.imd_decile, 0)::int AS imd_decile
+            FROM deprivation_scores_lsoa l
+            LEFT JOIN deprivation_scores_englishindexmultipledeprivation e 
+                ON e.lsoa_id = l.id AND e.year = {imd_year}
+            WHERE l.lsoa_code LIKE 'E%' 
+                AND l.{actual_geom_col} IS NOT NULL 
+                AND l.year = {boundary_year}
+            
+            UNION ALL
+            
+            -- WALES (Always uses 2019 IMD)
+            SELECT 
+                l.year::int AS year, 
+                {wales_imd_year}::int AS imd_year, 
+                l.lsoa_code::text AS code, 
+                ST_MakeValid(ST_Multi(l.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
+                'wales'::text AS nation,
+                COALESCE(w.imd_decile, 0)::int AS imd_decile
+            FROM deprivation_scores_lsoa l
+            LEFT JOIN deprivation_scores_welshindexmultipledeprivation w 
+                ON w.lsoa_id = l.id AND w.year = {wales_imd_year}
+            WHERE l.lsoa_code LIKE 'W%' 
+                AND l.{actual_geom_col} IS NOT NULL 
+                AND l.year = {boundary_year}
+
+            UNION ALL
+
+            -- SCOTLAND (Always uses 2011 boundaries and 2020 IMD)
+            SELECT 
+                d.year::int AS year, 
+                {scotland_imd_year}::int AS imd_year, 
+                d.data_zone_code::text AS code, 
+                ST_MakeValid(ST_Multi(d.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
+                'scotland'::text AS nation,
+                COALESCE(WIDTH_BUCKET(s.imd_rank, 1, 6977, 10), 0)::int AS imd_decile
+            FROM deprivation_scores_datazone d
+            LEFT JOIN deprivation_scores_scottishindexmultipledeprivation s 
+                ON s.data_zone_id = d.id AND s.year = {scotland_imd_year}
+            WHERE d.{actual_geom_col} IS NOT NULL 
+                AND d.year = {scotland_boundary_year}
+
+            UNION ALL
+
+            -- NORTHERN IRELAND (Always uses 2001 boundaries and 2017 IMD)
+            SELECT 
+                so.year::int AS year, 
+                {ni_imd_year}::int AS imd_year, 
+                so.soa_code::text AS code, 
+                ST_MakeValid(ST_Multi(so.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
+                'northern_ireland'::text AS nation,
+                COALESCE(WIDTH_BUCKET(ni.imd_rank, 1, 891, 10), 0)::int AS imd_decile
+            FROM deprivation_scores_soa so
+            LEFT JOIN deprivation_scores_northernirelandindexmultipledeprivation ni 
+                ON ni.soa_id = so.id AND ni.year = {ni_imd_year}
+            WHERE so.{actual_geom_col} IS NOT NULL 
+                AND so.year = {ni_boundary_year};
+
+            -- 3. Create Spatial Index (Removes 500 errors by speeding up BBOX queries)
+            CREATE INDEX idx_{view_name}_geom ON public.{view_name} USING GIST (geom);
+            
+            -- 4. Gather statistics for the query planner
+            ANALYZE public.{view_name};
+            """
+
+        # --- SQL Statement List ---
+
+        sql_statements = [
+            # Section 1: Schema setup
+            "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z8_10 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_datazone ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_datazone ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_datazone ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            
+            # Section 2: Cleanup
+            "DROP TABLE IF EXISTS public.uk_master_2011_z0_4 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2011_z5_7 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2011_z8_10 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2021_z0_4 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2021_z5_7 CASCADE;",
+            "DROP TABLE IF EXISTS public.uk_master_2021_z8_10 CASCADE;",
+            "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z0_4 CASCADE;",
+            "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z0_4 CASCADE;",
+            
+            # Section 3: Geoprocessing (WGS84 -> Web Mercator 3857)
+            "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_MakeValid(geom_3857) WHERE NOT ST_IsValid(geom_3857);",
+            "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            "UPDATE deprivation_scores_localauthority SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            
+            # Section 4: Simplification
+            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 5)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 0.5)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 20)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 10)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 2)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 10)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            
+            # Section 5: Spatial indexing & clustering
+            "CREATE INDEX IF NOT EXISTS idx_lsoa_3857 ON deprivation_scores_lsoa USING GIST (geom_3857);",
+            "CREATE INDEX IF NOT EXISTS idx_datazone_3857 ON deprivation_scores_datazone USING GIST (geom_3857);",
+            "CREATE INDEX IF NOT EXISTS idx_soa_3857 ON deprivation_scores_soa USING GIST (geom_3857);",
+            "CREATE INDEX IF NOT EXISTS idx_lsoa_year_id ON deprivation_scores_lsoa (year, id);",
+            "CREATE INDEX IF NOT EXISTS idx_english_imd_year_lsoa ON deprivation_scores_englishindexmultipledeprivation (year, lsoa_id);",
+            "CREATE INDEX IF NOT EXISTS idx_welsh_imd_year_lsoa ON deprivation_scores_welshindexmultipledeprivation (year, lsoa_id);",
+            "CLUSTER deprivation_scores_lsoa USING idx_lsoa_3857;",
+            "CLUSTER deprivation_scores_datazone USING idx_datazone_3857;",
+            "CLUSTER deprivation_scores_soa USING idx_soa_3857;",
+            
+            # Section 6: LSOA Views
+            get_lsoa_view_sql("lsoa_tiles_2011_z0_4", "geom_3857_simp_z0_4", 2011),
+            get_lsoa_view_sql("lsoa_tiles_2011_z5_7", "geom_3857_simp_z5_7", 2011),
+            get_lsoa_view_sql("lsoa_tiles_2011_z8_10", "geom_3857", 2011),
+            get_lsoa_view_sql("lsoa_tiles_2021_z0_4", "geom_3857_simp_z0_4", 2021),
+            get_lsoa_view_sql("lsoa_tiles_2021_z5_7", "geom_3857_simp_z5_7", 2021),
+            get_lsoa_view_sql("lsoa_tiles_2021_z8_10", "geom_3857", 2021),
+            
+            # Section 7: UK Master Views
+            get_uk_master_view_sql("uk_master_2011_z0_4", "simp_z0_4", 2011, 2019),
+            get_uk_master_view_sql("uk_master_2011_z5_7", "simp_z5_7", 2011, 2019),
+            get_uk_master_view_sql("uk_master_2011_z8_10", "3857", 2011, 2019),
+            get_uk_master_view_sql("uk_master_2021_z0_4", "simp_z0_4", 2021, 2025),
+            get_uk_master_view_sql("uk_master_2021_z5_7", "simp_z5_7", 2021, 2025),
+            get_uk_master_view_sql("uk_master_2021_z8_10", "3857", 2021, 2025),
+            
+            "CREATE OR REPLACE VIEW public.la_tiles AS SELECT year, geom_3857 AS geom, local_authority_district_code AS lad_code FROM deprivation_scores_localauthority;",
+            
+            # Section 8: Final housekeeping
+            "GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;",
+            "ANALYZE deprivation_scores_lsoa;",
+            "ANALYZE deprivation_scores_datazone;",
+            "ANALYZE deprivation_scores_soa;",
+            "VACUUM ANALYZE public.uk_master_2011_z0_4;",
+            "VACUUM ANALYZE public.uk_master_2011_z5_7;",
+            "VACUUM ANALYZE public.uk_master_2011_z8_10;",
+            "VACUUM ANALYZE public.uk_master_2021_z0_4;",
+            "VACUUM ANALYZE public.uk_master_2021_z5_7;",
+            "VACUUM ANALYZE public.uk_master_2021_z8_10;",
+        ]
+
+        print("[POSTPROCESS] Starting SQL post-processing...")
+        with connection.cursor() as cursor:
+            for statement in sql_statements:
+                stmt = statement.strip()
+                if not stmt:
+                    continue
+                    
+                print(f"[POSTPROCESS] Executing: {stmt[:100]}...")
+                
+                try:
+                    cursor.execute(stmt)
+                    print(f"[POSTPROCESS] Success")
+                except Exception as e:
+                    err_msg = f"SQL Error: {e}"
+                    self.stderr.write(self.style.ERROR(err_msg))
+                    print(f"[POSTPROCESS] ERROR: {err_msg}")
+                    
+        print("[POSTPROCESS] SQL post-processing complete.")
+
+        self.stdout.write(
+            self.style.SUCCESS("✅ Post-processing and spatial optimizations complete.")
+        )
+
+    def _stream_bfc_import(self, dataset, force=False):
+        source = dataset["url"]
+        table_name = dataset["table"]
+        year = dataset["year"]
+        chunk_size = dataset.get("chunk_size", 1000)
+        specific_code_col = dataset.get("code_column", "").lower()
+        django_col = dataset.get("django_code_col")
+
+        # 1. Guard
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT COUNT(*) FROM {table_name} WHERE year = %s AND geom IS NOT NULL",
+                [year],
+            )
+            if cursor.fetchone()[0] > 0 and not force:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"  {dataset['name']} already spatialized. Skipping."
+                    )
+                )
+                return
+
+        try:
+            # 2. Remote Download with simple progress log
+            if source.startswith("http"):
+                # Check if this is an ArcGIS REST API endpoint that needs pagination
+                is_arcgis_api = "/FeatureServer/" in source or "/MapServer/" in source
+
+                if is_arcgis_api:
+                    # Pagination for ArcGIS REST API using ObjectID strategy
+                    self.stdout.write(f"  Downloading from ArcGIS REST API: {source}")
+
+                    # Step 1: Get all ObjectIDs (fast, no geometry)
+                    base_url = source.split("?")[0]  # Remove existing query params
+                    separator = "&" if "?" in source else "?"
+
+                    # Extract query params from original URL if they exist
+                    query_params = {}
+                    if "?" in source:
+                        param_string = source.split("?")[1]
+                        for param in param_string.split("&"):
+                            if "=" in param:
+                                key, value = param.split("=", 1)
+                                query_params[key] = value
+
+                    # Get ObjectIDs only
+                    oid_url = f"{base_url}?where={query_params.get('where', '1=1')}&returnIdsOnly=true&f=json"
+                    self.stdout.write(f"  Fetching ObjectIDs...")
+                    oid_response = requests.get(oid_url, timeout=300)
+                    oid_response.raise_for_status()
+                    oid_data = oid_response.json()
+
+                    if "error" in oid_data:
+                        raise ValueError(
+                            f"API Error: {oid_data['error'].get('message', 'Unknown error')}"
+                        )
+
+                    object_ids = oid_data.get("objectIds", [])
+                    if not object_ids:
+                        raise ValueError("No ObjectIDs returned from API")
+
+                    self.stdout.write(
+                        f"  Found {len(object_ids)} features. Fetching in batches..."
+                    )
+
+                    # Step 2: Fetch features in batches by ObjectID (smaller batches to avoid URL length limits)
+                    all_gdfs = []
+                    batch_size = 100  # Reduced from 1000 to avoid 403 Forbidden due to URL length
+                    log_interval = 1000  # Log progress every 1000 features
+
+                    import time
+                    from requests.exceptions import (
+                        ChunkedEncodingError,
+                        ConnectionError,
+                        ReadTimeout,
+                        HTTPError,
+                    )
+
+                    max_retries = 4
+                    retry_delay = 5
+
+                    def fetch_batch(batch_ids, depth=0):
+                        id_list = ",".join(map(str, batch_ids))
+                        batch_url = (
+                            f"{base_url}?objectIds={id_list}&outFields=*&f=geojson"
+                        )
+                        for attempt in range(max_retries):
+                            try:
+                                indent = "  " * (depth + 1)
+                                self.stdout.write(
+                                    f"{indent}Downloading batch {batch_ids[0]}-{batch_ids[-1]} (attempt {attempt+1})..."
+                                )
+                                batch_response = requests.get(
+                                    batch_url, stream=True, timeout=300
+                                )
+                                batch_response.raise_for_status()
+                                total_bytes = 0
+                                bytes_data = io.BytesIO()
+                                for chunk in batch_response.iter_content(
+                                    chunk_size=1024 * 1024
+                                ):
+                                    if chunk:
+                                        bytes_data.write(chunk)
+                                        total_bytes += len(chunk)
+                                self.stdout.write(
+                                    f"{indent}Downloaded {total_bytes/1e6:.2f} MB for batch {batch_ids[0]}-{batch_ids[-1]}"
+                                )
+                                bytes_data.seek(0)
+                                batch_gdf = gpd.read_file(bytes_data)
+                                all_gdfs.append(batch_gdf)
+                                return True
+                            except HTTPError as e:
+                                if e.response.status_code == 504 and len(batch_ids) > 1:
+                                    self.stdout.write(
+                                        f"{indent}504 Gateway Timeout for batch {batch_ids[0]}-{batch_ids[-1]}. Splitting batch..."
+                                    )
+                                    mid = len(batch_ids) // 2
+                                    fetch_batch(batch_ids[:mid], depth + 1)
+                                    fetch_batch(batch_ids[mid:], depth + 1)
+                                    return True
+                                else:
+                                    self.stdout.write(
+                                        f"{indent}HTTP Error for batch {batch_ids[0]}-{batch_ids[-1]}: {str(e)}"
+                                    )
+                                    break
+                            except (
+                                ChunkedEncodingError,
+                                ConnectionError,
+                                ReadTimeout,
+                            ) as e:
+                                self.stdout.write(
+                                    f"{indent}Connection error: {e}. Retrying ({attempt+1}/{max_retries})..."
+                                )
+                                time.sleep(retry_delay)
+                            except Exception as e:
+                                self.stdout.write(
+                                    f"{indent}Failed to parse batch {batch_ids[0]}-{batch_ids[-1]}: {str(e)}"
+                                )
+                                break
+                        else:
+                            self.stdout.write(
+                                f"{indent}Failed to download batch {batch_ids[0]}-{batch_ids[-1]} after {max_retries} attempts. Skipping."
+                            )
+                        return False
+
+                    for i in range(0, len(object_ids), batch_size):
+                        batch_ids = object_ids[i : i + batch_size]
+                        fetch_batch(batch_ids)
+
+                    # Only log every 1000 features
+                    total_fetched = sum(len(gdf) for gdf in all_gdfs)
+                    if total_fetched % log_interval == 0 or total_fetched >= len(
+                        object_ids
+                    ):
+                        self.stdout.write(
+                            f"    Progress: {total_fetched}/{len(object_ids)} features fetched"
+                        )
+
+                    if len(all_gdfs) == 0:
+                        raise ValueError("No features retrieved from API")
+
+                    # Concatenate all batches
+                    final_gdf = gpd.GeoDataFrame(pd.concat(all_gdfs, ignore_index=True))
+                    self.stdout.write(
+                        f"  Download complete. Total features: {len(final_gdf)}"
+                    )
+                else:
+                    # Non-paginated download (e.g., direct JSON files)
+                    self.stdout.write(f"  Starting download: {source}")
+                    response = requests.get(source, stream=True, timeout=300)
+                    response.raise_for_status()
+
+                    total_size = int(response.headers.get("content-length", 0))
+                    bytes_data = io.BytesIO()
+                    downloaded = 0
+                    last_percent = -1
+
+                    for chunk in response.iter_content(chunk_size=chunk_size * 1024):
+                        bytes_data.write(chunk)
+                        if total_size > 0:
+                            downloaded += len(chunk)
+                            percent = int(100 * downloaded / total_size)
+                            if percent % 10 == 0 and percent != last_percent:
+                                self.stdout.write(f"    Download Progress: {percent}%")
+                                last_percent = percent
+
+                    self.stdout.write(
+                        "  Download complete. Parsing JSON into GeoPandas..."
+                    )
+                    bytes_data.seek(0)
+                    final_gdf = gpd.read_file(bytes_data)
+            else:
+                self.stdout.write(f"  Loading local file: {source}")
+                final_gdf = gpd.read_file(source)
+
+            final_gdf.columns = [c.lower() for c in final_gdf.columns]
+
+            # 3. Geometric Processing (ONLY for Northern Ireland Small Areas that need dissolving)
+            # Northern Ireland downloads ~4500 small areas that need to be dissolved into ~890 SOAs
+            is_ni_small_areas = (
+                table_name == "deprivation_scores_soa"
+                and len(final_gdf) > 1000
+                and specific_code_col in final_gdf.columns
+            )
+
+            if is_ni_small_areas:
+                self.stdout.write(
+                    f"  Condensing {len(final_gdf)} Small Areas into ~890 SOAs (Memory Intensive)..."
+                )
+
+                if final_gdf.crs is None:
+                    final_gdf.set_crs("EPSG:29903", inplace=True)
+
+                # Dissolve
+                final_gdf = final_gdf.dissolve(by=specific_code_col).reset_index()
+
+                # Simplify (Tolerance 1.0m)
+                self.stdout.write(
+                    "  Simplifying geometries for database optimization..."
+                )
+                final_gdf["geometry"] = final_gdf.simplify(
+                    tolerance=1.0, preserve_topology=True
+                )
+
+            # 4. Standardize CRS & Geometry Type
+            # Only apply Irish projection logic to Northern Ireland data
+            if table_name == "deprivation_scores_soa":
+                if (
+                    final_gdf.crs is None
+                    or final_gdf.geometry.iloc[0].centroid.x > 1000
+                ):
+                    final_gdf.set_crs("EPSG:29903", allow_override=True, inplace=True)
+
+            # Ensure we have WGS84 (EPSG:4326) for database storage
+            if final_gdf.crs is None:
+                self.stdout.write("  Warning: No CRS detected, assuming WGS84...")
+                final_gdf.set_crs("EPSG:4326", inplace=True)
+            elif final_gdf.crs != "EPSG:4326":
+                self.stdout.write(f"  Reprojecting from {final_gdf.crs} to WGS84...")
+                final_gdf = final_gdf.to_crs("EPSG:4326")
+
+            # Convert to MultiPolygon only if needed (preserve valid geometries)
+            def ensure_multipolygon(geom):
+                if geom.geom_type == "MultiPolygon":
+                    return geom
+                elif geom.geom_type == "Polygon":
+                    return MultiPolygon([geom])
+                else:
+                    # For other types, try to extract polygons
+                    return MultiPolygon(
+                        [g for g in geom.geoms if g.geom_type == "Polygon"]
+                    )
+
+            final_gdf["geometry"] = final_gdf["geometry"].map(ensure_multipolygon)
+
+            # 5. Database Merge
+            db = settings.DATABASES["default"]
+            engine = create_engine(
+                f"postgresql+psycopg2://{db['USER']}:{db['PASSWORD']}@{db['HOST']}:{db.get('PORT', 5432)}/{db['NAME']}"
+            )
+
+            temp_table = f"temp_shapes_{year}"
+            self.stdout.write(f"  Uploading shapes to PostgreSQL...")
+
+            final_gdf[[specific_code_col, "geometry"]].to_postgis(
+                temp_table, engine, if_exists="replace", index=False
+            )
+
+            # DEBUG: Check temp table geometry after to_postgis
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"SELECT ST_NPoints(geometry) FROM {temp_table} LIMIT 1;"
+                )
+
+                cursor.execute(
+                    f"SELECT ST_GeometryType(geom), ST_SRID(geom) FROM {table_name} WHERE year = %s LIMIT 1;",
+                    [year],
+                )
+
+            with connection.cursor() as cursor:
+                # Use explicit geometry cast to prevent any implicit simplification
+                cursor.execute(
+                    f"""
+                    UPDATE {table_name} SET geom = t.geometry::geometry(MultiPolygon, 4326)
+                    FROM {temp_table} t
+                    WHERE {table_name}.{django_col} = t.{specific_code_col} AND {table_name}.year = %s;
+                """,
+                    [year],
+                )
+                count = cursor.rowcount
+
+                # DEBUG: Check main table immediately after UPDATE
+                cursor.execute(
+                    f"SELECT ST_NPoints(geom) FROM {table_name} WHERE year = %s LIMIT 1;",
+                    [year],
+                )
+
+                cursor.execute(f"DROP TABLE IF EXISTS {temp_table};")
+                connection.commit()
+
+            self.stdout.write(
+                self.style.SUCCESS(f"  Successfully spatialized {count} rows.")
+            )
+
+        except Exception as e:
+            self.stderr.write(self.style.ERROR(f"  Import failed: {str(e)}"))
+            with connection.cursor() as cursor:
+                cursor.execute(f"DROP TABLE IF EXISTS temp_shapes_{year};")
+
+    def purge_cdn_cache(self):
+        """
+        Tells the CDN to clear the cached map data.
+        """
+        self.stdout.write(self.style.MIGRATE_LABEL("  Requesting CDN Cache Purge..."))
+
+        # Example for Cloudflare
+        zone_id = settings.CLOUDFLARE_ZONE_ID
+        api_token = settings.CLOUDFLARE_API_TOKEN
+
+        url = f"https://api.cloudflare.com/client/v4/zones/{zone_id}/purge_cache"
+        headers = {
+            "Authorization": f"Bearer {api_token}",
+            "Content-Type": "application/json",
+        }
+
+        # We target only the map-data URLs to avoid clearing the whole site
+        data = {"prefixes": [f"{settings.SITE_URL}/api/map-data/"]}
+
+        try:
+            response = requests.post(url, headers=headers, json=data, timeout=10)
+            if response.status_code == 200:
+                self.stdout.write(
+                    self.style.SUCCESS("  ✅ CDN Cache Purged successfully.")
+                )
+            else:
+                self.stdout.write(
+                    self.style.ERROR(f"  ❌ CDN Purge failed: {response.text}")
+                )
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"  ❌ CDN Purge error: {e}"))
+
+    def warm_cache(self):
+        self.stdout.write(
+            self.style.HTTP_INFO("  Pre-warming cache for zoom levels...")
+        )
+        # We target the specific levels our views are optimized for
+        for z in [3, 6, 9]:
+            url = f"{settings.SITE_URL}/api/map-data/?z={z}"
+            try:
+                # We use a long timeout because generating the first UK-wide
+                # GeoJSON from the DB can take a few seconds
+                requests.get(url, timeout=120)
+                self.stdout.write(f"    ✅ Cache primed for zoom {z}")
+            except Exception as e:
+                self.stdout.write(f"    ⚠️ Could not warm zoom {z}: {e}")
+
+    def test_geometries(self):
+        """
+        Test to ensure that the spatial data and views are correctly set up.
+        """
+        self.stdout.write(
+            self.style.MIGRATE_LABEL("\n🔍 Validating Spatial Data & Views...")
+        )
+
+        def table_or_view_exists(cursor, name):
+            if '.' in name:
+                schema, rel = name.split('.', 1)
+            else:
+                schema, rel = 'public', name
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_schema=%s AND table_name=%s
+                    UNION
+                    SELECT 1 FROM information_schema.views 
+                    WHERE table_schema=%s AND table_name=%s
+                )
+            """, [schema, rel, schema, rel])
+            return cursor.fetchone()[0]
+
+        with connection.cursor() as cursor:
+            # 1. Check the 2011 Master View
+            self.stdout.write("Checking 2011 Era (2019 IMD)...")
+            if table_or_view_exists(cursor, "uk_master_2011_z8_10"):
+                cursor.execute(
+                    """
+                    SELECT nation, COUNT(*) 
+                    FROM public.uk_master_2011_z8_10 
+                    GROUP BY nation;
+                """
+                )
+                results_2011 = cursor.fetchall()
+                nations_2011 = {row[0]: row[1] for row in results_2011}
+            else:
+                self.stdout.write(self.style.WARNING("  Skipping 2011 view check: public.uk_master_2011_z8_10 does not exist."))
+                nations_2011 = {}
+
+            # 2. Check the 2021 Master View
+            self.stdout.write("Checking 2021 Era (2025 IMD)...")
+            if table_or_view_exists(cursor, "uk_master_2021_z8_10"):
+                cursor.execute(
+                    """
+                    SELECT nation, COUNT(*) 
+                    FROM public.uk_master_2021_z8_10 
+                    GROUP BY nation;
+                """
+                )
+                results_2021 = cursor.fetchall()
+                nations_2021 = {row[0]: row[1] for row in results_2021}
+            else:
+                self.stdout.write(self.style.WARNING("  Skipping 2021 view check: public.uk_master_2021_z8_10 does not exist."))
+                nations_2021 = {}
+
+            expected_nations = ["england", "wales", "scotland", "northern_ireland"]
+
+            for nation in expected_nations:
+                count_11 = nations_2011.get(nation, 0)
+                count_21 = nations_2021.get(nation, 0)
+
+                status = "✅" if (count_11 > 0 and count_21 > 0) else "❌"
+                label = nation.replace("_", " ").title()
+
+                self.stdout.write(
+                    f"  {status} {label}: 2011({count_11}) | 2021({count_21}) polygons."
+                )
+
+            # 3. Coordinate System Verification
+            if table_or_view_exists(cursor, "uk_master_2021_z8_10"):
+                cursor.execute(
+                    "SELECT ST_X(ST_Centroid(geom)) FROM public.uk_master_2021_z8_10 LIMIT 1;"
+                )
+                coord_sample = cursor.fetchone()
+
+                if coord_sample and abs(coord_sample[0]) > 180:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            "  ✅ Coordinate System: Web Mercator (EPSG:3857) confirmed."
+                        )
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            "  ⚠️ Coordinate System: Geometry may be in degrees (WGS84). Check ST_Transform logic."
+                        )
+                    )
+            else:
+                self.stdout.write(self.style.WARNING("  Skipping coordinate system check: public.uk_master_2021_z8_10 does not exist."))
+
+        self.stdout.write(self.style.SUCCESS("✨ Validation Complete.\n"))
+
     def add_arguments(self, parser):
         parser.add_argument("--mode", type=str, help="Mode")
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Force re-import even if expected records with geom already exist",
+        )
 
     def handle(self, *args, **options):
+        force = options.get("force", False)
+
+        # Define the datasets to be used by the engine
+        BFC_DATASETS = [
+            {
+                "name": "LSOA 2011 BFC",
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Lower_layer_Super_Output_Areas_Dec_2011_Boundaries_Full_Clipped_BFC_EW_V3_2022/FeatureServer/0/query?where=1=1&outFields=*&f=geojson",
+                "table": "deprivation_scores_lsoa",
+                "django_code_col": "lsoa_code",
+                "year": 2011,
+                "code_column": "LSOA11CD",
+            },
+            {
+                "name": "LSOA 2021 BFC",
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LSOA_2021_EW_BFE_V10_RUC/FeatureServer/3/query?where=1=1&outFields=*&f=geojson",
+                "table": "deprivation_scores_lsoa",
+                "django_code_col": "lsoa_code",
+                "year": 2021,
+                "code_column": "LSOA21CD",
+            },
+            {
+                "name": "LAD 2024 BFC",
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_May_2024_Boundaries_UK_BFC/FeatureServer/0/query?where=1=1&outFields=*&f=geojson",
+                "table": "deprivation_scores_localauthority",
+                "django_code_col": "local_authority_district_code",
+                "year": 2024,
+                "code_column": "LAD24CD",
+                "chunk_size": 1,  # Fewer LAs
+            },
+            {
+                "name": "LAD 2019 BFC",
+                # Note the _2022 suffix and the /0/query at the end
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LAD_Dec_2019_Boundaries_UK_BFC_2022/FeatureServer/0/query?where=1=1&outFields=*&f=geojson",
+                "table": "deprivation_scores_localauthority",
+                "django_code_col": "local_authority_district_code",
+                "year": 2019,
+                "code_column": "lad19cd",  # MUST be lowercase for this specific service
+                "chunk_size": 25,  # Very complex polygons; keep chunk size small
+            },
+            {
+                "name": "Scotland DataZones 2011 BFC",
+                "url": "https://maps.gov.scot/server/rest/services/ScotGov/StatisticalUnits/MapServer/2/query?where=1=1&outFields=*&f=geojson",
+                "table": "deprivation_scores_datazone",
+                "django_code_col": "data_zone_code",
+                "year": 2011,
+                "code_column": "DataZone",
+                "chunk_size": 100,
+            },
+            {
+                "name": "Northern Ireland SOA 2011 (Auto-Processed)",
+                "url": "https://admin.opendatani.gov.uk/dataset/519e5019-6726-445d-8821-12d88f164c1e/resource/b64d8909-883e-42b1-bc79-50dc43f6769e/download/sa2011.json",
+                "table": "deprivation_scores_soa",
+                "django_code_col": "soa_code",
+                "year": 2001,
+                "code_column": "soa2011",
+            },
+        ]
+
+        # Update your logic here
+        if options.get("mode") == "import_bfc_boundaries":
+            self.stdout.write(
+                "\n"
+                + self.style.SUCCESS(
+                    "Starting high-performance BFC boundary import via ArcGIS API..."
+                )
+                + "\n"
+            )
+
+            for ds in BFC_DATASETS:
+                # We now pass the entire dictionary 'ds' instead of individual arguments
+                self._stream_bfc_import(
+                    dataset=ds,
+                    force=force,
+                )
+
+            # Run optimizations after all datasets are imported
+            self._run_post_processing_sql()
+
+            # Warm the local cache and then purge the remote CDN
+            # if not settings.DEBUG:  # Only purge in production
+            #     self.purge_cdn_cache()
+            #     # Trigger the CDN to fetch the new data immediately
+            #     self.warm_cache()
+
+            # test that the tables have the correct number of geometries
+            self.test_geometries()
+            return
+        if options.get("mode") == "process_geometries":
+            self.stdout.write(
+                "\n"
+                + self.style.SUCCESS(
+                    "Starting SQL post-processing and spatial optimizations..."
+                )
+                + "\n"
+            )
+            self._run_post_processing_sql()
+            self.test_geometries()
+            return
+        
+        if options["mode"] == "test_geometries":
+            self.test_geometries()
+            return
+
         if options["mode"] == "add_organisational_areas":
             self.stdout.write(B + "Adding organisational areas..." + W)
             add_lsoas_2011_wards_2019_to_LADS_2019()
@@ -458,7 +1276,11 @@ def update_english_imd_data_with_subdomains():
 
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_SUBDOMAINS_OF_DEPRIVATION}"
     sys.stdout.write(
-        "\n" + G + "📎 - Adding sub-domains of deprivation to LSOAs" + W + "\n"
+        "\n"
+        + G
+        + "📎 - Adding 2019 sub-domains of deprivation to 2011 LSOAs"
+        + W
+        + "\n"
     )
     with open(path, "r") as f:
         data = list(csv.reader(f, delimiter=","))
@@ -520,7 +1342,7 @@ def update_english_imd_data_with_supplementary_indices():
         sys.stdout.write(
             "\n"
             + G
-            + "📎 - Adding supplementary indices (IDACI and IDAOPI) of deprivation to LSOAs"
+            + "📎 - Adding 2019 supplementary indices (IDACI and IDAOPI) of deprivation to 2011 LSOAs"
             + W
             + "\n"
         )
@@ -542,7 +1364,7 @@ def update_english_imd_data_with_supplementary_indices():
                 idaopi_decile=int(float(row[9])),
             )
             count += 1
-    final = f" Added {count} supplementary indices (IDACI and IDAOPI) of deprivation 2019 to LSOAs\n"
+    final = f" Added {count} supplementary indices (IDACI and IDAOPI) of deprivation 2019 to 2011 LSOAs\n"
     sys.stdout.write(BOLD + "\n🔥 Complete." + END + final)
     try:
         assert count == 32844
@@ -570,7 +1392,11 @@ def update_english_imd_data_with_scores():
     path = f"{settings.IMD_DATA_FILES_FOLDER}/{IMD_2019_SCORES_OF_DEPRIVATION}"
     with open(path, "r") as f:
         sys.stdout.write(
-            "\n" + G + "📎 - Adding English scores of deprivation to LSOAs" + W + "\n"
+            "\n"
+            + G
+            + "📎 - Adding 2019 English scores of deprivation to 2011 LSOAs"
+            + W
+            + "\n"
         )
         data = list(csv.reader(f, delimiter=","))
         count = 0
@@ -637,7 +1463,7 @@ def update_english_imd_data_with_transformed_scores():
     sys.stdout.write(
         "\n"
         + G
-        + "📎 - Adding English transformed scores of deprivation to LSOAs"
+        + "📎 - Adding 2019 English transformed scores of deprivation to 2011 LSOAs"
         + W
         + "\n"
     )
@@ -662,7 +1488,7 @@ def update_english_imd_data_with_transformed_scores():
                 living_environment_score_exponentially_transformed=Decimal(row[10]),
             )
             count += 1
-    final = f" Added {count} English transformed scores of deprivation 2019\n"
+    final = f" Added {count} English 2019 transformed scores of deprivation 2019\n"
     sys.stdout.write(BOLD + "\n🔥 Complete." + END + final)
     try:
         assert count == 32844
@@ -1762,6 +2588,11 @@ def quantile_for_rank(rank: int, quantile: QuantileType) -> int:
         raise ValueError(f"Incorrect rank {rank} passed for {quantile.value}")
 
 
+"""
+Tests
+"""
+
+
 def test_table_totals():
     """
     Test the total number of records in each table
@@ -1801,9 +2632,11 @@ def test_table_totals():
         },
         {
             "model": LocalAuthority,
-            "count": LocalAuthority.objects.filter(year=2024).count(),
+            "count": LocalAuthority.objects.filter(
+                year=2024, geom__isnull=False
+            ).count(),
             "expected": 318,
-            "message": "2024 LocalAuthority should have 318 rows. ",
+            "message": "2024 LocalAuthority should have 318 rows with geometries.",
         },
         {
             "model": PopulationDensity,

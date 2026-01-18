@@ -1,0 +1,9 @@
+#!/bin/bash -e
+
+# Convenience script: bring up the PostGIS development stack
+echo "✨ Running PostGIS development compose 🗺️"
+
+# ensure data dir exists (compose will create volume but keep parity with other scripts)
+mkdir -p datadb
+
+docker compose -f docker-compose-postgis.yml up --build

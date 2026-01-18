@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UK Deprivation Map | Era Comparison</title>
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        
+        .control-panel {
+            position: absolute; top: 20px; left: 20px; z-index: 10;
+            background: white; padding: 20px; border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15); width: 280px;
+        }
+
+        .control-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; color: #333; }
+        select { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.9rem; }
+
+        /* The Legend Styling */
+        .legend {
+            position: absolute; bottom: 30px; right: 20px; z-index: 10;
+            background: white; padding: 15px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); font-size: 0.8rem;
+        }
+        .legend-title { font-weight: bold; margin-bottom: 8px; text-align: center; }
+        .legend-scale { display: flex; flex-direction: column; gap: 4px; }
+        .legend-item { display: flex; align-items: center; gap: 10px; }
+        .color-box { width: 20px; height: 12px; border: 1px solid #ddd; border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+<div class="control-panel">
+    <h2 style="margin-top:0; font-size: 1.2rem; color: #08306b;">UK Deprivation Viewer</h2>
+
+    <!-- Add docs link here -->
+    <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee;">
+        <a href="docs/index.html" style="color: #0969da; text-decoration: none; font-size: 0.9rem;">
+            View Documentation
+        </a>
+    </div>
+    
+    <div class="control-group">
+        <label for="era-toggle">Data Era & Boundaries</label>
+        <select id="era-toggle">
+            <option value="2021" selected>2025 IMD (2021 LSOAs)</option>
+            <option value="2011">2019 IMD (2011 LSOAs)</option>
+        </select>
+    </div>
+
+    <div class="control-group">
+        <label for="nation-filter">Filter Nation</label>
+        <select id="nation-filter">
+            <option value="all">All UK (Unified View)</option>
+            <option value="england">England</option>
+            <option value="scotland">Scotland</option>
+            <option value="wales">Wales</option>
+            <option value="northern_ireland">Northern Ireland</option>
+        </select>
+    </div>
+</div>
+
+<div class="legend">
+    <div class="legend-title">Deprivation Decile</div>
+    <div class="legend-scale">
+        <div class="legend-item"><div class="color-box" style="background: #08306b;"></div> 1 (Most Deprived)</div>
+        <div class="legend-item"><div class="color-box" style="background: #3182bd;"></div> 3</div>
+        <div class="legend-item"><div class="color-box" style="background: #9ecae1;"></div> 5</div>
+        <div class="legend-item"><div class="color-box" style="background: #deebf7;"></div> 8</div>
+        <div class="legend-item"><div class="color-box" style="background: #f7fbff;"></div> 10 (Least Deprived)</div>
+        <div class="legend-item"><div class="color-box" style="background: #cccccc;"></div> No Data</div>
+    </div>
+</div>
+
+<div id="map"></div>
+
+<script src="map-logic.js"></script>
+<script src="config.js"></script>
+</body>
+</html>
+<style>
+    .maplibregl-popup {
+    z-index: 20;
+}
+.maplibregl-popup-content {
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    pointer-events: none; /* Prevents popup from blocking hover events */
+}
+</style>

@@ -9,7 +9,9 @@ This project is a python 3.11 / Django Rest Framework project providing UK censu
 
 ## Why is it needed?
 
-The [Office of National Statistics](https://www.ons.gov.uk) publishes all the Census data exhaustively - this project is not intended to replace it. There is a need though for RCPCH to be able to describe the lived environment and experience of children and young people in a meaningful way, to inform research, audit and clinical practice. The project will curate social and environmental data where they have impact on children's health or on paediatrics, available to clinicians and researchers. It is a work in progress. The first application within this project is an API to address deprivation, by reporting indices of multiple deprivation from across the UK against a postcode. It is consumed by software that RCPCH provide.
+The [Office of National Statistics](https://www.ons.gov.uk) publishes all the Census data exhaustively - this project is not intended to replace it. There is a need though for RCPCH to be able to describe the lived environment and experience of children and young people in a meaningful way, to inform research, audit and clinical practice. The project will curate social and environmental data where they have impact on children's health or on paediatrics, available to clinicians and researchers. It is a work in progress. The first application within this project is an API to address deprivation, by reporting indices of multiple deprivation from across the UK against a postcode. It is consumed by software that RCPCH provide. It supports the latest deprivation score publications including 2025.
+
+The second feature of this project is to serve the shape files - the boundaries of the LSOAs, SOAs and Data Zones - as tiles coloured by IMD.
 
 ### UK Areas
 
@@ -114,8 +116,9 @@ Written in python 3.11 and django-rest-framework. We recommend using `pyenv` or 
 5. ```python manage.py makemigrations```
 6. ```python manage.py migrate```
 7. ```python manage.py seed --mode='__all__'```
+8. ```python manage.py seed --mode='import_bfc_boundaries'```
 
-This latter step will take several minutes as it populates the database with all the census and deprivation data. If successful, it should yield the following message:
+This latter step will take more than 30 minutes as it populates the database with all the census and deprivation data, and also the geographical boundary shapes and map tiles. If successful, it should yield the following message:
 > ![alt rcpch-census-db](static/images/census_db_screenshot.png?raw=true)
 
 The final step is to run the server:
@@ -141,14 +144,47 @@ To run the tests without:
 
 ### Docker Compose development install
 
-<!-- the below needs a rewrite to include 'docker compose exec web' in front of all the commands -->
-1. clone the repo
-2. ```cd rcpch_census_platform```
-3. ```s/up```
-4. grab the token from the console within the docker > ![alt drf_token](static/images/census_db_token.png)
-5.  Add the token to your header when making an api call (```-H 'Authorization: *******'``` in curl statement for example). If you are using Postman, use the OAUTH2 Authorization header, and the key 'Token'.
+This repository includes a Docker Compose development stack with:
 
-If you navigate to the base url```http://localhost:8001/rcpch-census-platform/api/v1/``` and login, it should be possible then to view the data. Alternatively, add the token to Postman.
+- `web`: Django/DRF API (runs on port `8000`)
+- `db`: PostGIS (runs on port `5432`)
+- `pg_tileserv`: vector tile server backed by PostGIS (runs on port `7800`)
+
+Prerequisites:
+
+- Docker Desktop (or Docker Engine + Compose)
+
+Steps:
+
+1. Clone the repo
+2. From the repository root, start the dev stack:
+    - `./s/dev`
+    - (equivalent: `docker compose -f docker-compose-postgis.yml up --build`)
+3. The `web` container will wait for the database, run `collectstatic`, run `migrate`, and then start Django.
+4. Seed the database (this can take a long time):
+    - `docker compose -f docker-compose-postgis.yml exec web python manage.py seed --mode='__all__'`
+    - Optional: `docker compose -f docker-compose-postgis.yml exec web python manage.py seed --mode='import_bfc_boundaries'`
+
+Useful URLs:
+
+- API: `http://localhost:8000/rcpch-census-platform/api/v1/`
+- Tileserver (pg_tileserv): `http://localhost:7800/`
+
+Note: the nginx reverse-proxy container is used in the Azure Container Apps deployment to route `/tiles/*` and the API under a single public ingress. For local development you can usually hit Django (`:8000`) and pg_tileserv (`:7800`) directly.
+
+### Demo map site (GitHub Pages + local dev)
+
+The MapLibre demo lives in the `site/` folder and is deployed to GitHub Pages via a GitHub Actions workflow.
+
+For local development, you can preview it in VS Code:
+
+1. Open `site/index.html`
+2. Right click the file in the Explorer and choose **Open with Live Server** (requires the Live Server extension)
+
+When the demo is served from `localhost` / `127.0.0.1`, it will default to using local tiles at `http://localhost:7800`.
+To point it at a deployed tiles endpoint, pass a query parameter:
+
+- `?tilesBase=https://<your-host>/tiles`
 
 ### Other Command Line functions
 
@@ -158,17 +194,24 @@ These are:
 
 | Model | Number of Rows | Notes | 
 |----|----|----|
-| LSOA | 34753 | LSOA should have 34753 (32844 in England, 1909 in wales) rows. |
-| DataZone | 6976 | DataZone should have 6976 rows. |
-| LocalAuthority | 371 | LocalAuthority should have 371 (317 in England, 22 in Wales, 32 is Scotland) rows (the 11 Northern Irish Local Authorities are not included here). |
-| PopulationDensity | 32844 | PopulationDensity should have 32058 rows. |
-| GreenSpace | 371 | GreenSpace should have 371 rows. |
-| SOA | 890 | SOA should have 890 rows. |
-| WelshIndexMultipleDeprivation | 1909 | WelshIndexMultipleDeprivation should have 1909 rows. |
-| NorthernIrelandIndexMultipleDeprivation | 890 | NorthernIrelandIndexMultipleDeprivation should have 890 rows. |
-| ScottishIndexMultipleDeprivation | 6976 | ScottishIndexMultipleDeprivation should have 6976 rows. |
+| LSOA (2011) | 34,753 | 2011 LSOA rows (32,844 in England, 1,909 in Wales). |
+| LSOA (2021) | 35,672 | 2021 LSOA rows. |
+| DataZone | 6,976 | Scotland Data Zones. |
+| LocalAuthority (2011) | 32 | Scotland local authorities (2011). |
+| LocalAuthority (2019) | 339 | England + Wales local authorities (2019): 317 + 22. |
+| LocalAuthority (2024, with geom) | 318 | 2024 local authorities with geometries present. |
+| PopulationDensity | 32,844 | England population densities. |
+| GreenSpace | 371 | England/Wales/Scotland green space rows. |
+| SOA | 890 | Northern Ireland SOAs. |
+| WelshIndexMultipleDeprivation | 1,909 | Wales WIMD (2019) rows. |
+| NorthernIrelandIndexMultipleDeprivation | 890 | Northern Ireland NIMDM (2017) rows. |
+| ScottishIndexMultipleDeprivation | 6,976 | Scotland SIMD (2020) rows. |
 
 `python manage.py seed --mode test_table_totals`
+
+To validate the generated UK master views have geometries for all nations (and sanity-check the coordinate system), run:
+
+`python manage.py seed --mode test_geometries`
 
 <!-- TODO: #14 #13 remove all references to auth, logins, or tokens in the census engine readme -->
 
@@ -187,21 +230,10 @@ YAML
 docker compose -f docker-compose.dev-init.yml exec web python manage.py spectacular --file openapi.json
 ```
 
-<!-- The detailed description of the routes should be added to the schema documentation and removed from here -->
+The full list of endpoints can be viewed in the openAPI spec above, but the key endpoints that are important are: 
 
-There are 10 routes that accept GET requests, all of which return lists that can be filtered, with the exception of ```/indices_of_multiple_deprivation/``` which accepts only a postcode.
-
-1. ```/local_authority_districts/```: params include ```local_authority_district_code```, ```local_authority_district_name```, ```year``` or if none is passed, a list of all local authorities in the UK is returned
-2. ```/england_wales_lower_layer_super_output_areas/```: params include ```lsoa_code```, ```lsoa_name```, ```year```. If none is passed, a list of all LSOAs is returned.
-3. ```/northern_ireland_small_output_areas/```: params include ```soa_code```, ```soa_name```, ```year```. If none is passed, a list of all SOAs is returned.
-4. ```/scotland_datazones/```: params include ```data_zone_code```,```data_zone_name```,```year```,```local_authority_code```. If none is passed, a list of all Data Zones is returned.
-5. ```/greenspace/```: returns data on green space access by local authority in England, Scotland and Wales
-6. ```/english_indices_of_multiple_deprivation/```: params include ```lsoa_code_name``` or ```lsoa_code```, ```local_authority_code``` as well any of the return object fields. It returns a list of all English indices of deprivation
-7. ```/welsh_indices_of_multiple_deprivation/```: params include ```lsoa_code```, ```local_authority_code``` as well any of the return object fields. It returns a list of all Welsh indices of deprivation
-8. ```/scottish_indices_of_multiple_deprivation/```: params include ```data_zone_code``` and ```data_zone_name```, ```local_authority_code``` as well as any of the return object fields. It returns a list of all Scottish indices of deprivation.
-9. ```/northern_ireland_indices_of_multiple_deprivation/```: params include ```soa_code``` and ```soa_code_name``` as well as any of the return object fields. It returns a list of all Scottish indices of deprivation
-10. ```/indices_of_multiple_deprivation/```: takes a UK postcode (mandatory) and returns deprivation score and quantiles for that LSOA
-11. ```/index_of_multiple_deprivation_quantile/```: takes a UK postcode (mandatory) and a requested quantile (mandatory) and returns a deprivation quantile.
+1.  ```/indices_of_multiple_deprivation/```: takes a UK postcode (mandatory) and returns deprivation score and quantiles for that LSOA. It optionally accepts a year for the request IMD dataset, defaulting to 2019 for England and Wales, 2020 for Scotland and 2017 for Northern Ireland
+2.  ```/index_of_multiple_deprivation_quantile/```: takes a UK postcode (mandatory) and a requested quantile (mandatory) and returns a deprivation quantile. Also accepts a  year as above.
 
 example:
 SW1A 1AA (Buckingham Palace):
@@ -406,58 +438,7 @@ returns:
 }
 ```
 
-There is an additional endpoint: 
-```http://localhost:8000/rcpch-census-platform/api/v1/boundaries?postcode=sw1a1aa```
-
-This will return information about a given postcode:
-
-```json
-HTTP 200 OK
-Allow: GET, HEAD, OPTIONS
-Content-Type: application/json
-Vary: Accept
-
-{
-    "postcode": "SW1A 1AA",
-    "quality": 1,
-    "eastings": 529090,
-    "northings": 179645,
-    "country": "England",
-    "nhs_ha": "London",
-    "longitude": -0.141588,
-    "latitude": 51.501009,
-    "european_electoral_region": "London",
-    "primary_care_trust": "Westminster",
-    "region": "London",
-    "lsoa": "Westminster 018C",
-    "msoa": "Westminster 018",
-    "incode": "1AA",
-    "outcode": "SW1A",
-    "parliamentary_constituency": "Cities of London and Westminster",
-    "admin_district": "Westminster",
-    "parish": "Westminster, unparished area",
-    "admin_county": null,
-    "admin_ward": "St. James's",
-    "ced": null,
-    "ccg": "NHS North West London",
-    "nuts": "Westminster",
-    "codes": {
-        "admin_district": "E09000033",
-        "admin_county": "E99999999",
-        "admin_ward": "E05013806",
-        "parish": "E43000236",
-        "parliamentary_constituency": "E14000639",
-        "ccg": "E38000256",
-        "ccg_id": "W2U3Z",
-        "ced": "E99999999",
-        "nuts": "TLI32",
-        "lsoa": "E01004736",
-        "msoa": "E02000977",
-        "lau2": "E09000033"
-    }
-}
-```
-
-This information comes directly from the remarkable [postcodes.io](https://postcodes.io) which offers this as a free service. This is a dependency of the RCPCH Census Platform API, since it is used to get LSOAs from a postcode. This process is complicated as boundaries frequently change.
+**ACKNOWLEDGEMENT**
+The postcode look up is powered by an RCPCH hosted instance of [postcodes.io](api.postcodes.io)
 
 [![DOI](https://zenodo.org/badge/568991339.svg)](https://zenodo.org/badge/latestdoi/568991339)

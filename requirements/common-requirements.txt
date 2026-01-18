@@ -8,6 +8,20 @@ django
 djangorestframework
 drf-spectacular
 django-filter
+gunicorn
 psycopg2-binary
+uvicorn
 whitenoise
 # RCPCH imports
+
+# Geo/PostGIS-related Python packages (install after system GDAL/GEOS/PROJ libs)
+# Pin broad compatible versions to reduce binary build issues — adjust if you
+# know the exact system GDAL/GEOS/PROJ versions you will have in the image.
+pyproj>=3.5,<5
+shapely>=2.0,<3
+fiona>=1.9,<2
+geopandas==1.1.2
+pandas==2.3.3
+SQLAlchemy==2.0.45
+GeoAlchemy2==0.18.1
+azure-identity==1.25.1

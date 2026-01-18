@@ -1,0 +1,123 @@
+name: Deploy to Azure Container Apps
+
+on:
+  pull_request:
+    branches:
+      - live
+    types:
+      - closed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+concurrency:
+  group: deploy-aca-shapes
+  cancel-in-progress: true
+
+env:
+  AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+  AZURE_CONTAINERAPP_NAME: rcpch-census-platform-v2
+  ACR_NAME: ${{ secrets.ACR_NAME }}
+  ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+  WEB_IMAGE_NAME: rcpch-census-web
+  AZURE_ENVIRONMENT_ID: ${{ secrets.AZURE_ENVIRONMENT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push web image
+        shell: bash
+        run: |
+          docker build -f Dockerfile.postgis -t "ghcr.io/rcpch/rcpch-census-web:${GITHUB_SHA}" .
+          docker push "ghcr.io/rcpch/rcpch-census-web:${GITHUB_SHA}"
+
+      - name: Build and push nginx image
+        shell: bash
+        run: |
+          docker build -f infra/nginx/Dockerfile -t "ghcr.io/rcpch/rcpch-census-nginx:${GITHUB_SHA}" infra/nginx
+          docker push "ghcr.io/rcpch/rcpch-census-nginx:${GITHUB_SHA}"
+
+      - name: Set Container App Secrets
+        shell: bash
+        run: |
+          az containerapp secret set \
+            -n "${AZURE_CONTAINERAPP_NAME}" \
+            -g "${AZURE_RESOURCE_GROUP}" \
+            --secrets \
+              postgres-db-user="${{ secrets.POSTGRES_USER }}" \
+              postgres-db-password="${{ secrets.POSTGRES_PASSWORD }}" \
+              postgres-db-name="${{ secrets.POSTGRES_DB }}" \
+              django-secret-key="${{ secrets.DJANGO_SECRET_KEY }}" \
+              postcodes-io-api-url="${{ secrets.POSTCODES_IO_API_URL }}" \
+              postcodes-io-api-key="${{ secrets.POSTCODES_IO_API_KEY }}" \
+              tiles-db-url="${{ secrets.TILES_DB_URL }}" \
+              tiles-base-url="${{ secrets.TILES_BASE_URL }}"
+
+      - name: Render Container App YAML
+        shell: bash
+        env:
+          ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+          DJANGO_ALLOWED_HOSTS: ${{ secrets.DJANGO_ALLOWED_HOSTS }}
+          DJANGO_CSRF_TRUSTED_ORIGINS: ${{ secrets.DJANGO_CSRF_TRUSTED_ORIGINS }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+
+          template_path = Path('infra/azure/containerapp.template.yml')
+          out_path = Path('infra/azure/containerapp.rendered.yml')
+
+          content = template_path.read_text(encoding='utf-8')
+          replacements = {
+              '__ACR_LOGIN_SERVER__': os.environ['ACR_LOGIN_SERVER'],
+              '__IMAGE_TAG__': os.environ['GITHUB_SHA'],
+              '__DJANGO_ALLOWED_HOSTS__': os.environ['DJANGO_ALLOWED_HOSTS'],
+              '__DJANGO_CSRF_TRUSTED_ORIGINS__': os.environ['DJANGO_CSRF_TRUSTED_ORIGINS'],
+              '__AZURE_ENVIRONMENT_ID__': os.environ['AZURE_ENVIRONMENT_ID'],
+              '__TILES_SECRET_NAME__': 'tiles-db-url',
+              '__AZURE_POSTGRES_HOST__': 'rcpch-census-platform-db',
+              '__MANAGED_IDENTITY_NAME__': 'rcpch-census-platform-v2',
+              '__DB_NAME__': 'postgres'
+          }
+
+          for k, v in replacements.items():
+              content = content.replace(k, v)
+
+          out_path.write_text(content, encoding='utf-8')
+          print(f"Wrote {out_path}")
+          PY
+
+      - name: Deploy Container App revision
+        shell: bash
+        run: |
+          az containerapp update \
+            -n "${AZURE_CONTAINERAPP_NAME}" \
+            -g "${AZURE_RESOURCE_GROUP}" \
+            --yaml infra/azure/containerapp.rendered.yml
+
+      - name: Show FQDN
+        shell: bash
+        run: |
+          FQDN=$(az containerapp show \
+            -n "${AZURE_CONTAINERAPP_NAME}" \
+            -g "${AZURE_RESOURCE_GROUP}" \
+            --query properties.configuration.ingress.fqdn \
+            -o tsv)
+          echo "Application URL: https://${FQDN}"

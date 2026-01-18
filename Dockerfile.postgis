@@ -1,0 +1,48 @@
+FROM python:3.12-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    build-essential \
+    gdal-bin \
+    libgdal-dev \
+    libgeos-dev \
+    libproj-dev \
+    libpq-dev \
+    postgresql-client \
+    gh \               
+    curl \             
+    jq \               
+    && rm -rf /var/lib/apt/lists/*
+
+# Ensure headers are found for C extensions
+ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
+ENV C_INCLUDE_PATH=/usr/include/gdal
+
+WORKDIR /app
+
+RUN mkdir -p /app/static/root
+
+# Copy requirements first for better layer caching
+COPY requirements/ /app/requirements/
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    export GDAL_VERSION=$(gdal-config --version) && \
+    pip install --no-cache-dir "GDAL==$GDAL_VERSION.*" && \
+    pip install --no-cache-dir -r requirements/common-requirements.txt && \
+    pip install --no-cache-dir -r requirements/development-requirements.txt
+
+# Copy wait-for-db and restore-db scripts
+COPY ./s/wait-for-db.sh /app/s/wait-for-db.sh
+COPY ./s/restore-db /app/s/restore-db
+# Copy the rest of the project
+COPY . /app/
+
+# Make scripts executable
+RUN chmod +x /app/s/wait-for-db.sh /app/s/restore-db
+
+
+EXPOSE 8000

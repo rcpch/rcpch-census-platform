@@ -1,0 +1,86 @@
+# infra/azure/containerapp.template.yml
+properties:
+  environmentId: __AZURE_ENVIRONMENT_ID__
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 80
+      transport: auto
+      allowInsecure: false
+  template:
+    identity:
+      type: UserAssigned
+      userAssignedIdentities:
+        "__IDENTITY_ID__": {}
+    containers:
+      # Nginx Reverse Proxy
+      - name: nginx
+        image: ghcr.io/rcpch/rcpch-census-nginx:__IMAGE_TAG__
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi # Increased to help hit total ratio
+
+      # Django Web App
+      - name: web
+        image: ghcr.io/rcpch/rcpch-census-web:__IMAGE_TAG__
+        env:
+          - name: DEBUG
+            value: "False"
+          - name: POSTGRES_DB_HOST
+            value: "__AZURE_POSTGRES_HOST__.postgres.database.azure.com"
+          - name: POSTGRES_DB_PORT
+            value: "5432"
+          - name: POSTGRES_DB
+            value: "__DB_NAME__"
+          - name: POSTGRES_USER
+            value: "__MANAGED_IDENTITY_NAME__"
+          - name: DJANGO_SETTINGS_MODULE
+            value: "rcpch_census_platform.settings"
+          - name: DJANGO_ALLOWED_HOSTS
+            value: "__DJANGO_ALLOWED_HOSTS__"
+          - name: DJANGO_CSRF_TRUSTED_ORIGINS
+            value: "__DJANGO_CSRF_TRUSTED_ORIGINS__"
+          - name: DJANGO_SECRET_KEY
+            secretRef: django-secret-key
+          - name: POSTCODES_IO_API_URL
+            secretRef: postcodes-io-api-url
+          - name: POSTCODES_IO_API_KEY
+            secretRef: postcodes-io-api-key
+        command:
+            - sh
+            - -c
+            - |
+              /app/s/wait-for-db.sh && \
+              python -u manage.py collectstatic --noinput && \
+              python -u manage.py migrate && \
+              gunicorn rcpch_census_platform.wsgi:application --bind 0.0.0.0:8000 --workers 4
+        resources:
+          cpu: 1.25 # Increased for DRF processing
+          memory: 2.5Gi
+
+      # pg_tileserv for vector tiles
+      - name: tiles
+        image: pramsey/pg_tileserv:latest
+        command:
+          - /bin/sh
+          - -c
+          - |
+            cat > /tmp/pg_tileserv.toml <<EOF
+            [server]
+            HttpHost = "0.0.0.0"
+            HttpPort = 7800
+            
+            [database]
+            EOF
+            export DATABASE_URL="${DATABASE_URL}"
+            /app/pg_tileserv --config /tmp/pg_tileserv.toml
+        env:
+          - name: DATABASE_URL
+            secretRef: tiles-db-url
+          - name: TILES_BASE_URL
+            secretRef: tiles-base-url
+        resources:
+          cpu: 0.5
+          memory: 1.0Gi
+  

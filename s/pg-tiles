@@ -1,0 +1,11 @@
+#!/bin/bash -e
+
+# Convenience script: start pg_tileserv service for serving vector tiles
+# Usage: ./s/pg-tiles
+
+echo "✨ Starting pg_tileserv (PostGIS → MVT) on port 7800"
+
+# ensure data dir exists
+mkdir -p datadb
+
+docker compose -f docker-compose-postgis.yml up --build pg_tileserv

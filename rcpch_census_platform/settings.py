@@ -16,7 +16,7 @@ import os
 
 # third party imports
 from django.core.management.utils import get_random_secret_key
-
+from azure.identity import DefaultAzureCredential
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
+    "django.contrib.gis",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
@@ -95,18 +96,39 @@ TEMPLATES = [
 WSGI_APPLICATION = "rcpch_census_platform.wsgi.application"
 
 
+def get_db_password():
+    """
+    Returns the static password for local dev or
+    a dynamic Entra ID token for production.
+    """
+    if DEBUG:
+        return os.environ.get("POSTGRES_PASSWORD")
+
+    # If not in Debug, fetch token from Azure
+    try:
+        scope = "https://ossrdbms-aad.database.windows.net/.default"
+        credential = DefaultAzureCredential()
+        token = credential.get_token(scope)
+        return token.token
+    except Exception as e:
+        # Fallback or log error for production debugging
+        print(f"Error fetching Entra ID token: {e}")
+        return os.environ.get("POSTGRES_PASSWORD")
+
+
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_NAME"),
-        "USER": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_USER"),
-        "PASSWORD": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_PASSWORD"),
-        "HOST": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_HOST"),
-        "PORT": os.environ.get("RCPCH_CENSUS_ENGINE_POSTGRES_DB_PORT"),
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
+        "NAME": os.environ.get("POSTGRES_DB"),
+        "USER": os.environ.get("POSTGRES_USER"),
+        "PASSWORD": get_db_password(),
+        "HOST": os.environ.get("POSTGRES_DB_HOST"),
+        "PORT": os.environ.get("POSTGRES_DB_PORT"),
         "ATOMIC_REQUESTS": False,
+        "options": {"sslmode": "require" if not DEBUG else "disable"},
     }
 }
 
@@ -150,7 +172,10 @@ STATICFILES_DIRS = (str(BASE_DIR.joinpath("static")),)
 STATIC_ROOT = str(BASE_DIR.joinpath("staticfiles"))
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 WHITENOISE_ROOT = os.path.join(BASE_DIR, "static/root")
-
+GITHUB_PAGES_URL = os.getenv("GITHUB_PAGES_URL", "http://localhost:3000/")
+if DEBUG:
+    GITHUB_PAGES_URL = "http://localhost:3000/"
+    CORS_ALLOW_ALL_ORIGINS = True
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
@@ -172,7 +197,7 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Deprivation Scores API",
     "DESCRIPTION": "UK census data, especially Index of Multiple Deprivation, as a service.",
     "VERSION": "1.0.0",
-    "SERVE_INCLUDE_SCHEMA": False,
+    "SERVE_INCLUDE_SCHEMA": True,
     # OTHER SETTINGS
 }
 
