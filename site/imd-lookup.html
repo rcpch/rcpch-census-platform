@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Index of Multiple Deprivation Lookup</title>
+  <link rel="icon" type="image/png" href="rcpch_logo.png">
   <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -33,9 +34,52 @@
       background: #f9fafb;
       border-left: 3px solid #11a7f2;
     }
+
+    .navbar {
+      background-color: #0d0d58;
+      height: 64px;
+      position: fixed;
+      top: 0;
+      width: 100%;
+      z-index: 1000;
+    }
+
+    .navbar-title {
+      color: white;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .navbar a {
+      color: white;
+    }
+
+    .navbar a:hover {
+      background-color: rgba(17, 167, 242, 0.2);
+    }
+
+    body {
+      padding-top: 64px;
+    }
   </style>
 </head>
 <body class="bg-white">
+  <!-- Navbar -->
+  <div class="navbar">
+    <div class="navbar-start">
+      <img src="rcpch_logo.png" alt="RCPCH Logo" class="h-10 ml-4 mr-3">
+      <div class="navbar-title">UK Deprivation Viewer</div>
+    </div>
+    <div class="navbar-end">
+      <ul class="menu menu-horizontal px-1">
+        <li><a href="index.html">Map</a></li>
+        <li><a href="imd-lookup.html">IMD Calculator</a></li>
+        <li><a href="docs/index.html">Documentation</a></li>
+        <li><a href="https://api.rcpch.ac.uk/deprivation/v2/swagger-ui/" target="_blank">API Spec</a></li>
+      </ul>
+    </div>
+  </div>
+
   <div class="container mx-auto px-4 py-8 max-w-4xl">
     <div class="mb-8">
       <h1 class="text-4xl font-bold mb-2" style="color: #0d0d58;">Index of Multiple Deprivation Lookup</h1>
