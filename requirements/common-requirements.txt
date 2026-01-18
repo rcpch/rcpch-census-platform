@@ -5,6 +5,7 @@ python-dateutil
 # third party imports
 beautifulsoup4
 django
+django-cors-headers==4.9.0
 djangorestframework
 drf-spectacular
 django-filter

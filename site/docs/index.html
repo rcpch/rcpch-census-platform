@@ -1,49 +1,70 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RCPCH Census Platform Documentation</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown.min.css">
+    <link rel="icon" type="image/png" href="../rcpch_logo.png">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-light.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#11a7f2',
+                        dark: '#0d0d58',
+                        accent: '#E00087'
+                    }
+                }
+            }
+        }
+    </script>
     <style>
+        :root {
+            --p: 197 93% 51%;
+            --pf: 197 93% 41%;
+            --pc: 0 0% 100%;
+            --a: 328 100% 46%;
+            --af: 328 100% 36%;
+            --ac: 0 0% 100%;
+        }
+
         body {
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            background: #f6f8fa;
-        }
-        
-        .header {
             background: white;
-            border-bottom: 1px solid #d0d7de;
-            padding: 16px 32px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
         
-        .header h1 {
-            margin: 0;
-            font-size: 1.5rem;
-            color: #24292f;
+        .navbar {
+            background-color: #0d0d58;
+            height: 64px;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
         }
-        
-        .header .breadcrumb {
-            font-size: 0.9rem;
-            color: #57606a;
-            margin-top: 4px;
+
+        .navbar-title {
+            color: white;
+            font-size: 1.25rem;
+            font-weight: 700;
         }
-        
-        .header .breadcrumb a {
-            color: #0969da;
-            text-decoration: none;
+
+        .navbar a {
+            color: white;
         }
-        
-        .header .breadcrumb a:hover {
-            text-decoration: underline;
+
+        .navbar a:hover {
+            background-color: rgba(17, 167, 242, 0.2);
         }
         
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
+            margin-top: 64px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
             padding: 32px;
             display: grid;
             grid-template-columns: 280px 1fr;
@@ -52,13 +73,13 @@
         
         .sidebar {
             position: sticky;
-            top: 32px;
+            top: 96px;
             height: fit-content;
         }
         
         .nav-menu {
             background: white;
-            border: 1px solid #d0d7de;
+            border: 1px solid #e5e7eb;
             border-radius: 8px;
             padding: 16px;
         }
@@ -67,7 +88,7 @@
             margin: 0 0 12px 0;
             font-size: 0.9rem;
             text-transform: uppercase;
-            color: #57606a;
+            color: #0d0d58;
             font-weight: 600;
         }
         
@@ -84,25 +105,25 @@
         .nav-menu a {
             display: block;
             padding: 8px 12px;
-            color: #24292f;
+            color: #374151;
             text-decoration: none;
             border-radius: 4px;
             transition: background 0.2s;
         }
         
         .nav-menu a:hover {
-            background: #f6f8fa;
+            background: #f3f4f6;
         }
         
         .nav-menu a.active {
-            background: #ddf4ff;
-            color: #0969da;
+            background: #dbeafe;
+            color: #11a7f2;
             font-weight: 500;
         }
         
         .content {
             background: white;
-            border: 1px solid #d0d7de;
+            border: 1px solid #e5e7eb;
             border-radius: 8px;
             padding: 32px;
             min-height: 500px;
@@ -112,20 +133,44 @@
             box-sizing: border-box;
             min-width: 200px;
             max-width: 100%;
+            color: #24292f;
+            background-color: white;
+        }
+
+        .markdown-body h1,
+        .markdown-body h2,
+        .markdown-body h3,
+        .markdown-body h4,
+        .markdown-body h5,
+        .markdown-body h6 {
+            color: #0d0d58;
+        }
+
+        .markdown-body a {
+            color: #11a7f2;
+        }
+
+        .markdown-body code {
+            background-color: #f6f8fa;
+            color: #24292f;
+        }
+
+        .markdown-body pre {
+            background-color: #f6f8fa;
         }
         
         .loading {
             text-align: center;
             padding: 60px;
-            color: #57606a;
+            color: #6b7280;
         }
         
         .error {
-            background: #fff1f0;
-            border: 1px solid #ffccc7;
+            background: #fee2e2;
+            border: 1px solid #fecaca;
             border-radius: 4px;
             padding: 16px;
-            color: #cf222e;
+            color: #991b1b;
         }
         
         @media (max-width: 768px) {
@@ -141,10 +186,19 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>📚 RCPCH Census Platform Documentation</h1>
-        <div class="breadcrumb">
-            <a href="../index.html">← Back to Map</a>
+    <!-- Navbar -->
+    <div class="navbar">
+        <div class="navbar-start">
+            <img src="../rcpch_logo.png" alt="RCPCH Logo" class="h-10 ml-4 mr-3">
+            <div class="navbar-title">UK Deprivation Viewer</div>
+        </div>
+        <div class="navbar-end">
+            <ul class="menu menu-horizontal px-1">
+                <li><a href="../index.html">Map</a></li>
+                <li><a href="../imd-lookup.html">IMD Calculator</a></li>
+                <li><a href="index.html">Documentation</a></li>
+                <li><a href="https://api.rcpch.ac.uk/deprivation/v2/swagger-ui/" target="_blank">API Spec</a></li>
+            </ul>
         </div>
     </div>
     
@@ -153,7 +207,7 @@
             <nav class="nav-menu">
                 <h3>Documentation</h3>
                 <ul id="doc-menu">
-                    <li><a href="#" data-doc="boundaries.md">Database Seeding</a></li>
+                    <li><a href="#" data-doc="boundaries.md">Boundaries</a></li>
                     <li><a href="#" data-doc="managed-database-seeding.md">Database Seeding</a></li>
                     <li><a href="#" data-doc="database-dump-and-publish.md">Dump Publication</a></li>
                     <li><a href="#" data-doc="deploy.md">Deployment Guide</a></li>
@@ -163,7 +217,10 @@
         
         <main class="content">
             <div id="doc-content" class="markdown-body">
-                <div class="loading">Loading documentation...</div>
+                <div class="loading">
+                    <span class="loading loading-spinner loading-lg" style="color: #11a7f2;"></span>
+                    <p class="mt-4">Loading documentation...</p>
+                </div>
             </div>
         </main>
     </div>
@@ -183,7 +240,12 @@
         
         async function loadDoc(filename) {
             try {
-                docContent.innerHTML = '<div class="loading">Loading...</div>';
+                docContent.innerHTML = `
+                    <div class="loading">
+                        <span class="loading loading-spinner loading-lg" style="color: #11a7f2;"></span>
+                        <p class="mt-4">Loading...</p>
+                    </div>
+                `;
                 
                 const response = await fetch(filename);
                 if (!response.ok) throw new Error(`Failed to load ${filename}`);

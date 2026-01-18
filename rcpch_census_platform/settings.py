@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "whitenoise.runserver_nostatic",
+    "corsheaders",
     "rest_framework",
     "django_filters",
     "drf_spectacular",
@@ -65,6 +66,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -175,7 +177,9 @@ WHITENOISE_ROOT = os.path.join(BASE_DIR, "static/root")
 GITHUB_PAGES_URL = os.getenv("GITHUB_PAGES_URL", "http://localhost:3000/")
 if DEBUG:
     GITHUB_PAGES_URL = "http://localhost:3000/"
-    CORS_ALLOW_ALL_ORIGINS = True
+
+# allow all origins for CORS as this is a public API
+CORS_ALLOW_ALL_ORIGINS = True
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
