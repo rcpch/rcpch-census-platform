@@ -1,9 +1,11 @@
-name: Deploy to Azure Container Apps (shapes)
+name: Deploy to Azure Container Apps
 
 on:
-  push:
+  pull_request:
     branches:
-      - shapes
+      - live
+    types:
+      - closed
   workflow_dispatch:
 
 permissions:

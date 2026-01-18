@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="rcpch-tiles-base-url" content="">
     <title>UK Deprivation Map | Era Comparison</title>
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
@@ -37,6 +36,13 @@
 
 <div class="control-panel">
     <h2 style="margin-top:0; font-size: 1.2rem; color: #08306b;">UK Deprivation Viewer</h2>
+
+    <!-- Add docs link here -->
+    <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee;">
+        <a href="docs/index.html" style="color: #0969da; text-decoration: none; font-size: 0.9rem;">
+            View Documentation
+        </a>
+    </div>
     
     <div class="control-group">
         <label for="era-toggle">Data Era & Boundaries</label>
@@ -73,6 +79,7 @@
 <div id="map"></div>
 
 <script src="map-logic.js"></script>
+<script src="config.js"></script>
 </body>
 </html>
 <style>
