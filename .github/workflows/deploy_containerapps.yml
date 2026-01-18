@@ -1,11 +1,9 @@
 name: Deploy to Azure Container Apps
 
 on:
-  pull_request:
+  push:
     branches:
       - live
-    types:
-      - closed
   workflow_dispatch:
 
 permissions:
