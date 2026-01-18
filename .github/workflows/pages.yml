@@ -35,11 +35,6 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Copy documentation to site
-        run: |
-          mkdir -p site/docs
-          cp docs/*.md site/docs/
-
       - name: Upload Pages artifact (site/)
         uses: actions/upload-pages-artifact@v3
         with:

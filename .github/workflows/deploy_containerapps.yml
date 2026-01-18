@@ -12,7 +12,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: deploy-aca-shapes
+  group: deploy-aca-${{ github.ref_name }}
   cancel-in-progress: true
 
 env:
