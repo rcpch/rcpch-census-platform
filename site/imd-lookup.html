@@ -121,17 +121,17 @@
           <span class="label-text font-semibold">Quantile (for quantile lookup)</span>
         </label>
         <select id="quantile" class="select select-bordered w-full">
-          <option value="median">Median</option>
-          <option value="tertile">Tertile</option>
-          <option value="quartile">Quartile</option>
-          <option value="quintile">Quintile</option>
-          <option value="sextile">Sextile</option>
-          <option value="septile">Septile</option>
-          <option value="octile">Octile</option>
-          <option value="decile">Decile</option>
-          <option value="duodecile">Duodecile</option>
-          <option value="hexadecile">Hexadecile</option>
-          <option value="vigintile">Vigintile</option>
+          <option value="2">Median</option>
+          <option value="3">Tertile</option>
+          <option value="4">Quartile</option>
+          <option value="5">Quintile</option>
+          <option value="6">Sextile</option>
+          <option value="7">Septile</option>
+          <option value="8">Octile</option>
+          <option value="10">Decile</option>
+          <option value="12">Duodecile</option>
+          <option value="16">Hexadecile</option>
+          <option value="20">Vigintile</option>
         </select>
       </div>
 
@@ -220,15 +220,18 @@
         let url = `https://api.rcpch.ac.uk/deprivation/v2/`;
         
         if (endpoint === 'quantile') {
-          url += `index_of_multiple_deprivation_quantile?country=${country}&year=${year}&postcode=${encodeURIComponent(postcode)}&quantile=${quantile}`;
+          url += `index_of_multiple_deprivation_quantile?postcode=${encodeURIComponent(postcode)}&country=${country}&year=${year}&quantile=${quantile}`;
         } else {
-          url += `indices_of_multiple_deprivation?country=${country}&year=${year}&postcode=${encodeURIComponent(postcode)}`;
+          url += `indices_of_multiple_deprivation?postcode=${encodeURIComponent(postcode)}&country=${country}&year=${year}`;
         }
+
+        console.log('Fetching:', url);
 
         const response = await fetch(url);
         
         if (!response.ok) {
-          throw new Error(`API returned ${response.status}: ${response.statusText}`);
+          const errorText = await response.text();
+          throw new Error(`API returned ${response.status}: ${errorText}`);
         }
 
         const data = await response.json();
@@ -296,16 +299,21 @@
         resultsDiv.appendChild(imdContainer);
       }
 
-      // Display quantile if present
-      if (endpoint === 'quantile' && data[quantileSelect.value] !== undefined) {
-        const stat = document.createElement('div');
-        stat.className = 'stat bg-base-100 border rounded-lg p-6 mb-6';
-        stat.style.borderColor = '#E00087';
-        stat.innerHTML = `
-          <div class="stat-title text-sm font-semibold text-gray-600">${formatFieldName(quantileSelect.value)}</div>
-          <div class="stat-value text-4xl" style="color: #E00087;">${data[quantileSelect.value]}</div>
-        `;
-        resultsDiv.appendChild(stat);
+      // Display quantile result
+      if (endpoint === 'quantile') {
+        // The API returns the quantile value directly in the response
+        const quantileValue = data.quantile || data.decile || data.quintile;
+        
+        if (quantileValue !== undefined) {
+          const stat = document.createElement('div');
+          stat.className = 'stat bg-base-100 border rounded-lg p-6 mb-6';
+          stat.style.borderColor = '#E00087';
+          stat.innerHTML = `
+            <div class="stat-title text-sm font-semibold text-gray-600">Quantile Result</div>
+            <div class="stat-value text-4xl" style="color: #E00087;">${quantileValue}</div>
+          `;
+          resultsDiv.appendChild(stat);
+        }
       }
 
       // Display subscores if present (for full indices endpoint)
