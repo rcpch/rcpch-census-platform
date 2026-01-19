@@ -1,6 +1,6 @@
 const map = new maplibregl.Map({
   container: "map",
-  style: "https://tiles.stadiamaps.com/styles/alidade_smooth.json",
+  style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
   center: [-3.43, 55.37],
   zoom: 5,
   refreshExpired: true,
