@@ -248,6 +248,12 @@
       
       console.log('API Response:', data);
       
+      // For quantile endpoint, extract the "result" object
+      let displayData = data;
+      if (endpoint === 'quantile' && data.result) {
+        displayData = data.result;
+      }
+      
       const title = document.createElement('h2');
       title.className = 'text-2xl font-bold mb-6';
       title.style.color = '#0d0d58';
@@ -263,15 +269,15 @@
       `;
       resultsDiv.appendChild(debugCard);
 
-      // Display all fields from the response
-      const allFields = Object.keys(data);
+      // Display all fields from the response (using displayData instead of data)
+      const allFields = Object.keys(displayData);
       
       if (allFields.length > 0) {
         const grid = document.createElement('div');
         grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
         
         allFields.forEach(field => {
-          const value = data[field];
+          const value = displayData[field];
           if (value !== null && value !== undefined && value !== '') {
             const card = document.createElement('div');
             card.className = 'bg-base-100 border border-gray-200 rounded-lg p-4';

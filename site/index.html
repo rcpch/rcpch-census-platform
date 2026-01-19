@@ -80,6 +80,7 @@
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
             font-size: 0.8rem;
+            max-width: 250px;
         }
         
         .legend-title { 
@@ -99,6 +100,7 @@
             display: flex; 
             align-items: center; 
             gap: 10px; 
+            font-size: 0.75rem;
         }
         
         .color-box { 
@@ -106,6 +108,7 @@
             height: 12px; 
             border: 1px solid #ddd; 
             border-radius: 2px; 
+            flex-shrink: 0;
         }
 
         .maplibregl-popup {
@@ -186,15 +189,14 @@
     </div>
 </div>
 
-<!-- Legend -->
+<!-- Legend (content will be populated dynamically) -->
 <div class="legend">
-    <div class="legend-title">Deprivation Decile</div>
+    <div class="legend-title">Deprivation Decile (All Nations)</div>
     <div class="legend-scale">
-        <div class="legend-item"><div class="color-box" style="background: #08306b;"></div> 1 (Most Deprived)</div>
-        <div class="legend-item"><div class="color-box" style="background: #3182bd;"></div> 3</div>
-        <div class="legend-item"><div class="color-box" style="background: #9ecae1;"></div> 5</div>
-        <div class="legend-item"><div class="color-box" style="background: #deebf7;"></div> 8</div>
-        <div class="legend-item"><div class="color-box" style="background: #f7fbff;"></div> 10 (Least Deprived)</div>
+        <div class="legend-item"><div class="color-box" style="background: #67000d;"></div> England - Most Deprived</div>
+        <div class="legend-item"><div class="color-box" style="background: #08306b;"></div> Scotland - Most Deprived</div>
+        <div class="legend-item"><div class="color-box" style="background: #00441b;"></div> Wales - Most Deprived</div>
+        <div class="legend-item"><div class="color-box" style="background: #7f2704;"></div> N. Ireland - Most Deprived</div>
         <div class="legend-item"><div class="color-box" style="background: #cccccc;"></div> No Data</div>
     </div>
 </div>

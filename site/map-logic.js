@@ -3,21 +3,20 @@ const map = new maplibregl.Map({
   style: "https://tiles.stadiamaps.com/styles/alidade_smooth.json",
   center: [-3.43, 55.37],
   zoom: 5,
-  refreshExpired: true, // Helps with local dev updates
+  refreshExpired: true,
 });
 
 function getTilesBaseUrl() {
   const params = new URLSearchParams(window.location.search);
   const fromQuery = params.get("tilesBase");
-  if (fromQuery) return fromQuery.replace(/\/+$|/, "");
+  if (fromQuery) return fromQuery.replace(/\/+$/, "");
 
   const meta = document.querySelector('meta[name="rcpch-tiles-base-url"]');
   const fromMeta = meta?.getAttribute("content")?.trim();
-  if (fromMeta) return fromMeta.replace(/\/+$|/, "");
+  if (fromMeta) return fromMeta.replace(/\/+$/, "");
 
-  // Use injected config if present (from config.js)
   if (typeof window.PUBLIC_TILES_URL === "string" && window.PUBLIC_TILES_URL) {
-    return window.PUBLIC_TILES_URL.replace(/\/+$|/, "");
+    return window.PUBLIC_TILES_URL.replace(/\/+$/, "");
   }
 
   if (
@@ -27,74 +26,143 @@ function getTilesBaseUrl() {
     return "http://localhost:7800";
   }
 
-  return "";
+  return "https://api.rcpch.ac.uk/deprivation/v2/tiles";
 }
 
 const TILES_BASE_URL = getTilesBaseUrl();
 if (!TILES_BASE_URL) {
   console.warn(
-    "No tiles base URL configured. Set ?tilesBase=https://<host>/tiles, the rcpch-tiles-base-url meta tag, or inject window.PUBLIC_TILES_URL."
+    "No tiles base URL configured. Set ?tilesBase=https://<host>/tiles, the rcpch-tiles-base-url meta tag, or inject window.PUBLIC_TILES_URL.",
   );
 }
 
-// State management
 let currentEra = "2021";
 
 function getViewName(era, zoom) {
-  // Matches your SQL view suffixes
   const zoomSuffix = zoom <= 4 ? "z0_4" : zoom <= 7 ? "z5_7" : "z8_10";
   return `public.uk_master_${era}_${zoomSuffix}`;
+}
+
+function getColorExpression() {
+  return [
+    "case",
+    ["==", ["get", "imd_decile"], 0],
+    "#cccccc", // No data
+
+    // England - Reds (darkest = most deprived)
+    ["==", ["get", "nation"], "england"],
+    [
+      "interpolate",
+      ["linear"],
+      ["get", "imd_decile"],
+      1,
+      "#67000d", // Dark red
+      3,
+      "#a50f15",
+      5,
+      "#ef3b2c",
+      7,
+      "#fb6a4a",
+      10,
+      "#fee5d9", // Light red
+    ],
+
+    // Scotland - Blues
+    ["==", ["get", "nation"], "scotland"],
+    [
+      "interpolate",
+      ["linear"],
+      ["get", "imd_decile"],
+      1,
+      "#08306b", // Dark blue
+      3,
+      "#2171b5",
+      5,
+      "#6baed6",
+      7,
+      "#bdd7e7",
+      10,
+      "#eff3ff", // Light blue
+    ],
+
+    // Wales - Greens
+    ["==", ["get", "nation"], "wales"],
+    [
+      "interpolate",
+      ["linear"],
+      ["get", "imd_decile"],
+      1,
+      "#00441b", // Dark green
+      3,
+      "#238b45",
+      5,
+      "#74c476",
+      7,
+      "#bae4b3",
+      10,
+      "#edf8e9", // Light green
+    ],
+
+    // Northern Ireland - Yellows/Oranges
+    ["==", ["get", "nation"], "northern_ireland"],
+    [
+      "interpolate",
+      ["linear"],
+      ["get", "imd_decile"],
+      1,
+      "#7f2704", // Dark orange
+      3,
+      "#d94801",
+      5,
+      "#fd8d3c",
+      7,
+      "#fdbe85",
+      10,
+      "#feedde", // Light yellow
+    ],
+
+    // Fallback
+    "#cccccc",
+  ];
 }
 
 function updateMapSource() {
   const newLayer = getViewName(currentEra, map.getZoom());
   const newTiles = [`${TILES_BASE_URL}/${newLayer}/{z}/{x}/{y}.pbf`];
 
-  const source = map.getSource("deprivation-source");
-  if (source) {
-    // 1. Update the tiles on the source
-    source.setTiles(newTiles);
+  const currentFilter = map.getFilter("deprivation-layer");
 
-    // 2. We must recreate the layer to change the 'source-layer'
-    if (map.getLayer("deprivation-layer")) {
-      // Record the current nation filter so we can re-apply it
-      const currentFilter = map.getFilter("deprivation-layer");
-
-      map.removeLayer("deprivation-layer");
-
-      map.addLayer({
-        id: "deprivation-layer",
-        type: "fill",
-        source: "deprivation-source",
-        "source-layer": newLayer, // This is the vital part
-        paint: {
-          "fill-color": [
-            "case",
-            ["==", ["get", "imd_decile"], 0],
-            "#cccccc",
-            [
-              "interpolate",
-              ["linear"],
-              ["get", "imd_decile"],
-              1,
-              "#08306b",
-              10,
-              "#f7fbff",
-            ],
-          ],
-          "fill-opacity": 0.7,
-          "fill-outline-color": "rgba(255, 255, 255, 0.2)",
-        },
-      });
-
-      // 3. Re-apply the filter (England/Scotland/etc) if one was active
-      if (currentFilter) {
-        map.setFilter("deprivation-layer", currentFilter);
-      }
-
-      console.log(`Switched to table: ${newLayer}`);
-    }
+  if (map.getLayer("deprivation-layer")) {
+    map.removeLayer("deprivation-layer");
   }
+  if (map.getSource("deprivation-source")) {
+    map.removeSource("deprivation-source");
+  }
+
+  map.addSource("deprivation-source", {
+    type: "vector",
+    tiles: newTiles,
+    minzoom: 0,
+    maxzoom: 14,
+  });
+
+  map.addLayer({
+    id: "deprivation-layer",
+    type: "fill",
+    source: "deprivation-source",
+    "source-layer": newLayer,
+    paint: {
+      "fill-color": getColorExpression(),
+      "fill-opacity": 0.7,
+      "fill-outline-color": "rgba(255, 255, 255, 0.2)",
+    },
+  });
+
+  if (currentFilter) {
+    map.setFilter("deprivation-layer", currentFilter);
+  }
+
+  console.log(`Switched to table: ${newLayer}, tiles: ${newTiles[0]}`);
 }
 
 map.on("load", () => {
@@ -113,45 +181,26 @@ map.on("load", () => {
     source: "deprivation-source",
     "source-layer": initialLayer,
     paint: {
-      "fill-color": [
-        "case",
-        ["==", ["get", "imd_decile"], 0],
-        "#cccccc", // Gray fallback
-        [
-          "interpolate",
-          ["linear"],
-          ["get", "imd_decile"],
-          1,
-          "#08306b",
-          10,
-          "#f7fbff",
-        ],
-      ],
+      "fill-color": getColorExpression(),
       "fill-opacity": 0.7,
-      "fill-outline-color": "rgba(255, 255, 255, 0.2)", // Subtle outlines
+      "fill-outline-color": "rgba(255, 255, 255, 0.2)",
     },
   });
 
-  // --- AUTOMATIC ZOOM SWITCHING ---
-  // This ensures that when a user zooms from 4 to 5,
-  // the source switches from the z0_4 table to the z5_7 table.
   map.on("zoomend", updateMapSource);
 
-  // Create a single popup instance (reused on hover)
   const popup = new maplibregl.Popup({
     closeButton: false,
     closeOnClick: false,
   });
 
   map.on("mousemove", "deprivation-layer", (e) => {
-    // Change the cursor style as a UI cue
     map.getCanvas().style.cursor = "pointer";
 
     const feature = e.features[0];
     const props = feature.properties;
     const decile = props.imd_decile;
 
-    // Create the HTML content for the popup
     const content = `
       <div style="padding: 5px;">
         <strong style="display: block; margin-bottom: 5px; border-bottom: 1px solid #ccc;">
@@ -165,7 +214,6 @@ map.on("load", () => {
       </div>
     `;
 
-    // Position and display the popup
     popup.setLngLat(e.lngLat).setHTML(content).addTo(map);
   });
 
@@ -175,16 +223,80 @@ map.on("load", () => {
   });
 });
 
-// --- THE ERA TOGGLE ---
 document.getElementById("era-toggle").addEventListener("change", (e) => {
-  currentEra = e.target.value; // Update state
-  updateMapSource(); // Trigger update
+  currentEra = e.target.value;
+  updateMapSource();
 });
 
 document.getElementById("nation-filter").addEventListener("change", (e) => {
   const selectedNation = e.target.value;
   map.setFilter(
     "deprivation-layer",
-    selectedNation === "all" ? null : ["==", ["get", "nation"], selectedNation]
+    selectedNation === "all" ? null : ["==", ["get", "nation"], selectedNation],
   );
+
+  // Update legend
+  updateLegend(selectedNation);
 });
+
+function updateLegend(nation) {
+  const legendScale = document.querySelector(".legend-scale");
+
+  let colors, title;
+
+  if (nation === "all") {
+    title = "Deprivation Decile (All Nations)";
+    legendScale.innerHTML = `
+      <div class="legend-item"><div class="color-box" style="background: #67000d;"></div> England - Most Deprived</div>
+      <div class="legend-item"><div class="color-box" style="background: #08306b;"></div> Scotland - Most Deprived</div>
+      <div class="legend-item"><div class="color-box" style="background: #00441b;"></div> Wales - Most Deprived</div>
+      <div class="legend-item"><div class="color-box" style="background: #7f2704;"></div> N. Ireland - Most Deprived</div>
+      <div class="legend-item"><div class="color-box" style="background: #cccccc;"></div> No Data</div>
+    `;
+  } else if (nation === "england") {
+    title = "England Deprivation Decile";
+    legendScale.innerHTML = `
+      <div class="legend-item"><div class="color-box" style="background: #67000d;"></div> 1 (Most Deprived)</div>
+      <div class="legend-item"><div class="color-box" style="background: #a50f15;"></div> 3</div>
+      <div class="legend-item"><div class="color-box" style="background: #ef3b2c;"></div> 5</div>
+      <div class="legend-item"><div class="color-box" style="background: #fb6a4a;"></div> 7</div>
+      <div class="legend-item"><div class="color-box" style="background: #fee5d9;"></div> 10 (Least Deprived)</div>
+      <div class="legend-item"><div class="color-box" style="background: #cccccc;"></div> No Data</div>
+    `;
+  } else if (nation === "scotland") {
+    title = "Scotland Deprivation Decile";
+    legendScale.innerHTML = `
+      <div class="legend-item"><div class="color-box" style="background: #08306b;"></div> 1 (Most Deprived)</div>
+      <div class="legend-item"><div class="color-box" style="background: #2171b5;"></div> 3</div>
+      <div class="legend-item"><div class="color-box" style="background: #6baed6;"></div> 5</div>
+      <div class="legend-item"><div class="color-box" style="background: #bdd7e7;"></div> 7</div>
+      <div class="legend-item"><div class="color-box" style="background: #eff3ff;"></div> 10 (Least Deprived)</div>
+      <div class="legend-item"><div class="color-box" style="background: #cccccc;"></div> No Data</div>
+    `;
+  } else if (nation === "wales") {
+    title = "Wales Deprivation Decile";
+    legendScale.innerHTML = `
+      <div class="legend-item"><div class="color-box" style="background: #00441b;"></div> 1 (Most Deprived)</div>
+      <div class="legend-item"><div class="color-box" style="background: #238b45;"></div> 3</div>
+      <div class="legend-item"><div class="color-box" style="background: #74c476;"></div> 5</div>
+      <div class="legend-item"><div class="color-box" style="background: #bae4b3;"></div> 7</div>
+      <div class="legend-item"><div class="color-box" style="background: #edf8e9;"></div> 10 (Least Deprived)</div>
+      <div class="legend-item"><div class="color-box" style="background: #cccccc;"></div> No Data</div>
+    `;
+  } else if (nation === "northern_ireland") {
+    title = "Northern Ireland Deprivation Decile";
+    legendScale.innerHTML = `
+      <div class="legend-item"><div class="color-box" style="background: #7f2704;"></div> 1 (Most Deprived)</div>
+      <div class="legend-item"><div class="color-box" style="background: #d94801;"></div> 3</div>
+      <div class="legend-item"><div class="color-box" style="background: #fd8d3c;"></div> 5</div>
+      <div class="legend-item"><div class="color-box" style="background: #fdbe85;"></div> 7</div>
+      <div class="legend-item"><div class="color-box" style="background: #feedde;"></div> 10 (Least Deprived)</div>
+      <div class="legend-item"><div class="color-box" style="background: #cccccc;"></div> No Data</div>
+    `;
+  }
+
+  document.querySelector(".legend-title").textContent = title;
+}
+
+// Initialize legend
+updateLegend("all");
