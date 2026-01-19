@@ -246,110 +246,54 @@
     function displayResults(data, endpoint) {
       resultsDiv.innerHTML = '';
       
+      console.log('API Response:', data);
+      
       const title = document.createElement('h2');
       title.className = 'text-2xl font-bold mb-6';
       title.style.color = '#0d0d58';
       title.textContent = endpoint === 'quantile' ? 'IMD Quantile Results' : 'Full IMD Indices';
       resultsDiv.appendChild(title);
 
-      // Display main fields
-      const mainFields = ['lsoa_code', 'lsoa_name', 'postcode', 'country', 'year'];
+      // Create a card to display raw JSON for debugging
+      const debugCard = document.createElement('details');
+      debugCard.className = 'mb-6';
+      debugCard.innerHTML = `
+        <summary class="cursor-pointer text-sm text-gray-600 hover:text-gray-800">Show raw API response</summary>
+        <pre class="mt-2 p-4 bg-gray-100 rounded text-xs overflow-auto">${JSON.stringify(data, null, 2)}</pre>
+      `;
+      resultsDiv.appendChild(debugCard);
+
+      // Display all fields from the response
+      const allFields = Object.keys(data);
       
-      const mainFieldsContainer = document.createElement('div');
-      mainFieldsContainer.className = 'space-y-3 mb-6';
-      
-      mainFields.forEach(field => {
-        if (data[field] !== undefined) {
-          const stat = document.createElement('div');
-          stat.className = 'stat bg-base-100 border border-gray-200 rounded-lg p-4';
-          stat.innerHTML = `
-            <div class="stat-title text-sm font-semibold text-gray-600">${formatFieldName(field)}</div>
-            <div class="stat-value text-2xl" style="color: #0d0d58;">${data[field]}</div>
-          `;
-          mainFieldsContainer.appendChild(stat);
-        }
-      });
-      resultsDiv.appendChild(mainFieldsContainer);
-
-      // Display IMD score/rank if present
-      if (data.index_of_multiple_deprivation_score !== undefined || data.index_of_multiple_deprivation_rank !== undefined) {
-        const imdContainer = document.createElement('div');
-        imdContainer.className = 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-6';
+      if (allFields.length > 0) {
+        const grid = document.createElement('div');
+        grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
         
-        if (data.index_of_multiple_deprivation_score !== undefined) {
-          const stat = document.createElement('div');
-          stat.className = 'stat bg-base-100 border border-gray-200 rounded-lg p-4';
-          stat.innerHTML = `
-            <div class="stat-title text-sm font-semibold text-gray-600">IMD Score</div>
-            <div class="stat-value text-3xl" style="color: #11a7f2;">${data.index_of_multiple_deprivation_score}</div>
-          `;
-          imdContainer.appendChild(stat);
-        }
-
-        if (data.index_of_multiple_deprivation_rank !== undefined) {
-          const stat = document.createElement('div');
-          stat.className = 'stat bg-base-100 border border-gray-200 rounded-lg p-4';
-          stat.innerHTML = `
-            <div class="stat-title text-sm font-semibold text-gray-600">IMD Rank</div>
-            <div class="stat-value text-3xl" style="color: #11a7f2;">${data.index_of_multiple_deprivation_rank}</div>
-          `;
-          imdContainer.appendChild(stat);
-        }
-        
-        resultsDiv.appendChild(imdContainer);
-      }
-
-      // Display quantile result
-      if (endpoint === 'quantile') {
-        // The API returns the quantile value directly in the response
-        const quantileValue = data.quantile || data.decile || data.quintile;
-        
-        if (quantileValue !== undefined) {
-          const stat = document.createElement('div');
-          stat.className = 'stat bg-base-100 border rounded-lg p-6 mb-6';
-          stat.style.borderColor = '#E00087';
-          stat.innerHTML = `
-            <div class="stat-title text-sm font-semibold text-gray-600">Quantile Result</div>
-            <div class="stat-value text-4xl" style="color: #E00087;">${quantileValue}</div>
-          `;
-          resultsDiv.appendChild(stat);
-        }
-      }
-
-      // Display subscores if present (for full indices endpoint)
-      if (endpoint === 'indices') {
-        const subscoreFields = Object.keys(data).filter(key => 
-          !mainFields.includes(key) && 
-          key !== 'index_of_multiple_deprivation_score' && 
-          key !== 'index_of_multiple_deprivation_rank'
-        );
-
-        if (subscoreFields.length > 0) {
-          const subscoresTitle = document.createElement('h3');
-          subscoresTitle.className = 'text-xl font-bold mb-4';
-          subscoresTitle.style.color = '#0d0d58';
-          subscoresTitle.textContent = 'Subscores';
-          resultsDiv.appendChild(subscoresTitle);
-
-          const grid = document.createElement('div');
-          grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
-
-          subscoreFields.forEach(field => {
+        allFields.forEach(field => {
+          if (data[field] !== null && data[field] !== undefined && data[field] !== '') {
             const card = document.createElement('div');
-            card.className = 'subscore-card rounded-lg p-4';
+            card.className = 'bg-base-100 border border-gray-200 rounded-lg p-4';
             card.innerHTML = `
               <div class="text-xs font-semibold text-gray-600 mb-1">${formatFieldName(field)}</div>
-              <div class="text-2xl font-bold" style="color: #0d0d58;">${data[field]}</div>
+              <div class="text-xl font-bold" style="color: #0d0d58;">${data[field]}</div>
             `;
             grid.appendChild(card);
-          });
-
-          resultsDiv.appendChild(grid);
-        }
+          }
+        });
+        
+        resultsDiv.appendChild(grid);
+      } else {
+        const emptyMsg = document.createElement('p');
+        emptyMsg.className = 'text-gray-600';
+        emptyMsg.textContent = 'No data returned from API';
+        resultsDiv.appendChild(emptyMsg);
       }
-
+      
       resultsDiv.classList.remove('hidden');
     }
+
+
 
     function displayError(message) {
       resultsDiv.innerHTML = `
