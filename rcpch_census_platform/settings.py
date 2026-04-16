@@ -16,7 +16,6 @@ import os
 
 # third party imports
 from django.core.management.utils import get_random_secret_key
-from azure.identity import DefaultAzureCredential
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -98,39 +97,24 @@ TEMPLATES = [
 WSGI_APPLICATION = "rcpch_census_platform.wsgi.application"
 
 
-def get_db_password():
-    """
-    Returns the static password for local dev or
-    a dynamic Entra ID token for production.
-    """
-    if DEBUG:
-        return os.environ.get("POSTGRES_PASSWORD")
-
-    # If not in Debug, fetch token from Azure
-    try:
-        scope = "https://ossrdbms-aad.database.windows.net/.default"
-        credential = DefaultAzureCredential()
-        token = credential.get_token(scope)
-        return token.token
-    except Exception as e:
-        # Fallback or log error for production debugging
-        print(f"Error fetching Entra ID token: {e}")
-        return os.environ.get("POSTGRES_PASSWORD")
-
-
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
+#
+# In production the custom backend (db_backend.py) fetches a fresh Azure Entra ID
+# token on every new connection, avoiding "access token has expired" errors.
+# In local dev (DEBUG=True) POSTGRES_PASSWORD is used as a plain password instead.
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.contrib.gis.db.backends.postgis",
+        "ENGINE": "rcpch_census_platform.db_backend",
         "NAME": os.environ.get("POSTGRES_DB"),
         "USER": os.environ.get("POSTGRES_USER"),
-        "PASSWORD": get_db_password(),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD"),  # used only in DEBUG mode
         "HOST": os.environ.get("POSTGRES_DB_HOST"),
         "PORT": os.environ.get("POSTGRES_DB_PORT"),
         "ATOMIC_REQUESTS": False,
-        "options": {"sslmode": "require" if not DEBUG else "disable"},
+        "CONN_MAX_AGE": 0,  # never cache connections; ensures a fresh token is used each time
+        "OPTIONS": {"sslmode": "require" if not DEBUG else "disable"},
     }
 }
 
