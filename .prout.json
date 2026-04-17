@@ -1,5 +1,6 @@
 {
   "checkpoints": {
-    "LIVE": { "url": "https://rcpch-census-engine.azurewebsites.net/", "overdue": "10M" }
+    "LIVE-v1": { "url": "https://rcpch-census-engine.azurewebsites.net/", "overdue": "10M" },
+    "LIVE-v2": { "url": "https://rcpch-census-platform-v2.greenrock-df7c746b.uksouth.azurecontainerapps.io/", "overdue": "10M" },
   }
 }
