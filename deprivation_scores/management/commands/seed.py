@@ -131,12 +131,12 @@ class Command(BaseCommand):
         def get_uk_master_view_sql(view_name, geom_suffix, boundary_year, imd_year):
             """
             Creates UK Master View combining all 4 nations with IMD data.
-            
+
             Boundary year mapping:
             - England/Wales LSOAs: 2011 (for IMD 2019) or 2021 (for IMD 2025)
             - Scotland datazones: Always 2011
             - N. Ireland SOAs: Always 2001
-            
+
             IMD year mapping:
             - England: 2019 or 2025 (passed as imd_year)
             - Wales: Always 2019
@@ -146,11 +146,11 @@ class Command(BaseCommand):
             actual_geom_col = (
                 "geom_3857" if geom_suffix == "3857" else f"geom_3857_{geom_suffix}"
             )
-            
+
             # Fixed boundary years for Scotland and NI
             scotland_boundary_year = 2011
             ni_boundary_year = 2001
-            
+
             # Fixed IMD years for Wales, Scotland and NI
             wales_imd_year = 2019
             scotland_imd_year = 2020
@@ -249,7 +249,6 @@ class Command(BaseCommand):
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
-            
             # Section 2: Cleanup
             "DROP TABLE IF EXISTS public.uk_master_2011_z0_4 CASCADE;",
             "DROP TABLE IF EXISTS public.uk_master_2011_z5_7 CASCADE;",
@@ -259,22 +258,27 @@ class Command(BaseCommand):
             "DROP TABLE IF EXISTS public.uk_master_2021_z8_10 CASCADE;",
             "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z0_4 CASCADE;",
             "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z0_4 CASCADE;",
-            
             # Section 3: Geoprocessing (WGS84 -> Web Mercator 3857)
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_MakeValid(geom_3857) WHERE NOT ST_IsValid(geom_3857);",
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_datazone SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_soa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_localauthority SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            
             # Section 4: Simplification
-            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 5)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 0.5)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 20)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 10)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 2)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_soa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 10)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
-            
+            # Clear existing simplified columns first so re-runs always apply the current tolerances.
+            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = NULL, geom_3857_simp_z5_7 = NULL WHERE geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = NULL, geom_3857_simp_z5_7 = NULL WHERE geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = NULL, geom_3857_simp_z5_7 = NULL WHERE geom_3857 IS NOT NULL;",
+            # z0-4: national overview (~1,500 m tolerance in Web Mercator metres).
+            # At zoom 4 a pixel represents ~9,800 m, so sub-1,500 m detail is invisible noise.
+            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            # z5-7: regional/city overview (~200 m tolerance).
+            # At zoom 7 a pixel represents ~1,200 m; 200 m gives clean borough-level outlines.
+            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
             # Section 5: Spatial indexing & clustering
             "CREATE INDEX IF NOT EXISTS idx_lsoa_3857 ON deprivation_scores_lsoa USING GIST (geom_3857);",
             "CREATE INDEX IF NOT EXISTS idx_datazone_3857 ON deprivation_scores_datazone USING GIST (geom_3857);",
@@ -285,7 +289,6 @@ class Command(BaseCommand):
             "CLUSTER deprivation_scores_lsoa USING idx_lsoa_3857;",
             "CLUSTER deprivation_scores_datazone USING idx_datazone_3857;",
             "CLUSTER deprivation_scores_soa USING idx_soa_3857;",
-            
             # Section 6: LSOA Views
             get_lsoa_view_sql("lsoa_tiles_2011_z0_4", "geom_3857_simp_z0_4", 2011),
             get_lsoa_view_sql("lsoa_tiles_2011_z5_7", "geom_3857_simp_z5_7", 2011),
@@ -293,7 +296,6 @@ class Command(BaseCommand):
             get_lsoa_view_sql("lsoa_tiles_2021_z0_4", "geom_3857_simp_z0_4", 2021),
             get_lsoa_view_sql("lsoa_tiles_2021_z5_7", "geom_3857_simp_z5_7", 2021),
             get_lsoa_view_sql("lsoa_tiles_2021_z8_10", "geom_3857", 2021),
-            
             # Section 7: UK Master Views
             get_uk_master_view_sql("uk_master_2011_z0_4", "simp_z0_4", 2011, 2019),
             get_uk_master_view_sql("uk_master_2011_z5_7", "simp_z5_7", 2011, 2019),
@@ -301,9 +303,7 @@ class Command(BaseCommand):
             get_uk_master_view_sql("uk_master_2021_z0_4", "simp_z0_4", 2021, 2025),
             get_uk_master_view_sql("uk_master_2021_z5_7", "simp_z5_7", 2021, 2025),
             get_uk_master_view_sql("uk_master_2021_z8_10", "3857", 2021, 2025),
-            
             "CREATE OR REPLACE VIEW public.la_tiles AS SELECT year, geom_3857 AS geom, local_authority_district_code AS lad_code FROM deprivation_scores_localauthority;",
-            
             # Section 8: Final housekeeping
             "GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;",
             "ANALYZE deprivation_scores_lsoa;",
@@ -323,9 +323,9 @@ class Command(BaseCommand):
                 stmt = statement.strip()
                 if not stmt:
                     continue
-                    
+
                 print(f"[POSTPROCESS] Executing: {stmt[:100]}...")
-                
+
                 try:
                     cursor.execute(stmt)
                     print(f"[POSTPROCESS] Success")
@@ -333,7 +333,7 @@ class Command(BaseCommand):
                     err_msg = f"SQL Error: {e}"
                     self.stderr.write(self.style.ERROR(err_msg))
                     print(f"[POSTPROCESS] ERROR: {err_msg}")
-                    
+
         print("[POSTPROCESS] SQL post-processing complete.")
 
         self.stdout.write(
@@ -705,11 +705,12 @@ class Command(BaseCommand):
         )
 
         def table_or_view_exists(cursor, name):
-            if '.' in name:
-                schema, rel = name.split('.', 1)
+            if "." in name:
+                schema, rel = name.split(".", 1)
             else:
-                schema, rel = 'public', name
-            cursor.execute("""
+                schema, rel = "public", name
+            cursor.execute(
+                """
                 SELECT EXISTS (
                     SELECT 1 FROM information_schema.tables 
                     WHERE table_schema=%s AND table_name=%s
@@ -717,7 +718,9 @@ class Command(BaseCommand):
                     SELECT 1 FROM information_schema.views 
                     WHERE table_schema=%s AND table_name=%s
                 )
-            """, [schema, rel, schema, rel])
+            """,
+                [schema, rel, schema, rel],
+            )
             return cursor.fetchone()[0]
 
         with connection.cursor() as cursor:
@@ -734,7 +737,11 @@ class Command(BaseCommand):
                 results_2011 = cursor.fetchall()
                 nations_2011 = {row[0]: row[1] for row in results_2011}
             else:
-                self.stdout.write(self.style.WARNING("  Skipping 2011 view check: public.uk_master_2011_z8_10 does not exist."))
+                self.stdout.write(
+                    self.style.WARNING(
+                        "  Skipping 2011 view check: public.uk_master_2011_z8_10 does not exist."
+                    )
+                )
                 nations_2011 = {}
 
             # 2. Check the 2021 Master View
@@ -750,7 +757,11 @@ class Command(BaseCommand):
                 results_2021 = cursor.fetchall()
                 nations_2021 = {row[0]: row[1] for row in results_2021}
             else:
-                self.stdout.write(self.style.WARNING("  Skipping 2021 view check: public.uk_master_2021_z8_10 does not exist."))
+                self.stdout.write(
+                    self.style.WARNING(
+                        "  Skipping 2021 view check: public.uk_master_2021_z8_10 does not exist."
+                    )
+                )
                 nations_2021 = {}
 
             expected_nations = ["england", "wales", "scotland", "northern_ireland"]
@@ -786,7 +797,11 @@ class Command(BaseCommand):
                         )
                     )
             else:
-                self.stdout.write(self.style.WARNING("  Skipping coordinate system check: public.uk_master_2021_z8_10 does not exist."))
+                self.stdout.write(
+                    self.style.WARNING(
+                        "  Skipping coordinate system check: public.uk_master_2021_z8_10 does not exist."
+                    )
+                )
 
         self.stdout.write(self.style.SUCCESS("✨ Validation Complete.\n"))
 
@@ -897,7 +912,7 @@ class Command(BaseCommand):
             self._run_post_processing_sql()
             self.test_geometries()
             return
-        
+
         if options["mode"] == "test_geometries":
             self.test_geometries()
             return
