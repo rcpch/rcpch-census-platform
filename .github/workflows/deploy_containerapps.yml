@@ -40,6 +40,9 @@ jobs:
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
+      - name: Burn in build info
+        run: s/get-build-info > build_info.json
+
       - name: Build and push web image
         shell: bash
         run: |
