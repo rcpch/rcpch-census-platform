@@ -1,7 +1,9 @@
 import pytest
 from django.db import connection
 
-_SKIP_REASON = "uk_master tile tables not present — run 'seed --mode process_geometries' first"
+_SKIP_REASON = (
+    "uk_master tile tables not present — run 'seed --mode process_geometries' first"
+)
 
 
 def _skip_if_no_tile_tables(cursor):
