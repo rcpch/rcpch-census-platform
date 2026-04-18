@@ -155,6 +155,38 @@ Misc:
 - `s/get-build-info`
   - Outputs current git hash and branch JSON.
 
+## Publishing and deployment docs
+
+For full operator guidance, use these docs in `site/docs/`:
+
+- `site/docs/database-dump-and-publish.md`
+  - Local dump build/test and GitHub Release publication (including chunk splitting for large dumps).
+- `site/docs/managed-database-seeding.md`
+  - Restoring a release dump into Azure Database for PostgreSQL (typically from Azure Container Apps via `s/restore-db`).
+- `site/docs/deploy.md`
+  - End-to-end deployment architecture and sequence (dump publication, DB seed/restore, app deploy, verification).
+
+If these docs and this file disagree, treat `site/docs/*.md` as the source of truth and update this summary.
+
+## Recommended release/deploy workflow (high-level)
+
+For this project's large database footprint, the intended workflow is:
+
+1. Build and test the seeded database dump locally (`s/build-dump`).
+2. Publish the dump to GitHub Releases (`s/release-dump`), with automatic split parts for large artifacts.
+3. In Azure, restore that released dump into the managed PostgreSQL instance (`s/restore-db`, usually executed from the web container).
+4. Deploy/update application containers (Django/nginx/pg_tileserv) separately.
+
+Why this is preferred:
+
+- Keeps heavy seed/build work local and reproducible.
+- Uses versioned release artifacts for rollback and auditability.
+- Decouples data lifecycle from app container rollout.
+
+Practical note:
+
+- App deployment does not seed the managed database automatically; restore/seed is a separate operator step.
+
 ## Agent implementation notes
 
 - For map property changes, prioritize `seed.py` post-processing SQL over frontend workarounds.
