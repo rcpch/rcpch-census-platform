@@ -53,14 +53,18 @@ To achieve fast rendering on the frontend:
 
 This section summarizes what the map currently renders by view. Use this as the quick reference for boundary year, IMD year, and local authority metadata in tile properties.
 
-| View | Nation | Boundary Type/Year (`year`) | IMD Dataset/Year (`imd_year`) | Local Authority in Tiles |
-| :--- | :--- | :--- | :--- | :--- |
-| All UK (`uk_master_2011_*`) | England | LSOA 2011 | IMD 2019 | LAD code/name/year from 2019 LA table |
-| All UK (`uk_master_2011_*`) | Wales | LSOA 2011 | WIMD 2019 | LAD code/name/year from 2019 LA table |
-| All UK (`uk_master_2011_*`) | Scotland | DataZone 2011 | SIMD 2020 | LA code/name/year from 2011 Scotland-linked LA table |
-| All UK (`uk_master_2011_*`) | Northern Ireland | SOA 2001 | NIMDM 2017 | `la_code`/`la_name`/`la_year` are `NULL` |
-| England-only (era = 2011) | England | LSOA 2011 | IMD 2019 | LAD code/name/year from 2019 LA table |
-| England-only (era = 2021) | England | LSOA 2021 | IMD 2025 | LAD code/name/year from 2024 LA table |
+| View | Nation | Boundary Type/Year (`year`) | IMD Dataset/Year (`imd_year`) | LA/LAD metadata year (`la_year`) | Match note |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| All UK (`uk_master_2011_*`) | England | LSOA 2011 | IMD 2019 | 2019 | Lookup-linked (2011 LSOAs reference 2019 LADs in source lookup file) |
+| All UK (`uk_master_2011_*`) | Wales | LSOA 2011 | WIMD 2019 | 2019 | Lookup-linked (2011 LSOAs reference 2019 LADs in source lookup file) |
+| All UK (`uk_master_2011_*`) | Scotland | DataZone 2011 | SIMD 2020 | 2011 | Lookup-linked (2011 DataZones reference 2011 LAs) |
+| All UK (`uk_master_2011_*`) | Northern Ireland | SOA 2001 | NIMDM 2017 | `NULL` | Not applicable in current layer (`la_*` fields are `NULL`) |
+| England-only (era = 2011) | England | LSOA 2011 | IMD 2019 | 2019 | Lookup-linked (2011 LSOAs reference 2019 LADs in source lookup file) |
+| England-only (era = 2021) | England | LSOA 2021 | IMD 2025 | 2024 | Lookup-linked (2021 LSOAs reference 2024 LADs in source lookup file) |
+
+### Important alignment caveat
+
+`la_*` fields are currently joined by the pre-seeded lookup relationships (LSOA/DataZone -> LocalAuthority), not by spatial overlay/intersection at runtime. This means they represent the mapped administrative relationship in the source datasets, not a geometric "best fit" recomputation inside tile SQL.
 
 ### Northern Ireland note
 

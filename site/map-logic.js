@@ -89,6 +89,10 @@ const DATASET_INFO = {
 let currentEra = "2021";
 let currentNation = "all";
 
+const LA_SOURCE_ID = "la-boundaries-source";
+const LA_LAYER_ID = "la-boundaries-layer";
+const LA_SOURCE_LAYER = "public.la_tiles";
+
 // Returns the tile era to actually request for the given nation selection.
 // Only England solo respects the era toggle; everything else uses 2011.
 function effectiveEra(nation) {
@@ -98,6 +102,155 @@ function effectiveEra(nation) {
 function getViewName(era, zoom) {
   const zoomSuffix = zoom <= 4 ? "z0_4" : zoom <= 7 ? "z5_7" : "z8_10";
   return `public.uk_master_${era}_${zoomSuffix}`;
+}
+
+function getLocalAuthorityYearForNation(nation) {
+  if (nation === "england") {
+    return currentNation === "england" && currentEra === "2021" ? 2024 : 2019;
+  }
+  if (nation === "wales") {
+    return 2019;
+  }
+  if (nation === "scotland") {
+    return 2011;
+  }
+  return null;
+}
+
+function getLocalAuthorityFilter() {
+  if (currentNation === "northern_ireland") {
+    return null;
+  }
+
+  if (currentNation === "england") {
+    return [
+      "all",
+      ["==", ["slice", ["get", "lad_code"], 0, 1], "E"],
+      ["==", ["get", "year"], getLocalAuthorityYearForNation("england")],
+    ];
+  }
+
+  if (currentNation === "wales") {
+    return [
+      "all",
+      ["==", ["slice", ["get", "lad_code"], 0, 1], "W"],
+      ["==", ["get", "year"], 2019],
+    ];
+  }
+
+  if (currentNation === "scotland") {
+    return [
+      "all",
+      ["==", ["slice", ["get", "lad_code"], 0, 1], "S"],
+      ["==", ["get", "year"], 2011],
+    ];
+  }
+
+  return [
+    "any",
+    [
+      "all",
+      ["==", ["slice", ["get", "lad_code"], 0, 1], "E"],
+      ["==", ["get", "year"], 2019],
+    ],
+    [
+      "all",
+      ["==", ["slice", ["get", "lad_code"], 0, 1], "W"],
+      ["==", ["get", "year"], 2019],
+    ],
+    [
+      "all",
+      ["==", ["slice", ["get", "lad_code"], 0, 1], "S"],
+      ["==", ["get", "year"], 2011],
+    ],
+  ];
+}
+
+function ensureLocalAuthoritySource() {
+  if (map.getSource(LA_SOURCE_ID)) {
+    return;
+  }
+
+  map.addSource(LA_SOURCE_ID, {
+    type: "vector",
+    tiles: [`${TILES_BASE_URL}/${LA_SOURCE_LAYER}/{z}/{x}/{y}.pbf`],
+    minzoom: 0,
+    maxzoom: 14,
+  });
+}
+
+function removeLocalAuthorityLayer() {
+  if (map.getLayer(LA_LAYER_ID)) {
+    map.removeLayer(LA_LAYER_ID);
+  }
+}
+
+function updateLocalAuthorityLayer() {
+  const laToggle = document.getElementById("la-toggle");
+  const requested = !!laToggle?.checked;
+
+  if (!requested || currentNation === "northern_ireland") {
+    removeLocalAuthorityLayer();
+    return;
+  }
+
+  ensureLocalAuthoritySource();
+
+  if (!map.getLayer(LA_LAYER_ID)) {
+    map.addLayer({
+      id: LA_LAYER_ID,
+      type: "line",
+      source: LA_SOURCE_ID,
+      "source-layer": LA_SOURCE_LAYER,
+      paint: {
+        "line-color": "rgba(55, 65, 81, 0.55)",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          4,
+          0.6,
+          7,
+          1.1,
+          10,
+          1.8,
+        ],
+        "line-opacity": 1,
+      },
+    });
+  }
+
+  // Keep LA boundaries above the deprivation fill layer after source/layer swaps.
+  map.moveLayer(LA_LAYER_ID);
+
+  const laFilter = getLocalAuthorityFilter();
+  if (laFilter) {
+    map.setFilter(LA_LAYER_ID, laFilter);
+  } else {
+    removeLocalAuthorityLayer();
+  }
+}
+
+function updateLocalAuthorityControlState() {
+  const laToggle = document.getElementById("la-toggle");
+  const laNote = document.getElementById("la-note");
+  const laGroup = document.getElementById("la-toggle-group");
+
+  const enabled = currentNation !== "northern_ireland";
+  laToggle.disabled = !enabled;
+  laGroup.style.opacity = enabled ? "1" : "0.45";
+
+  if (!enabled && laToggle.checked) {
+    laToggle.checked = false;
+  }
+
+  laNote.textContent = enabled
+    ? currentNation === "england" && currentEra === "2021"
+      ? "Using 2024 Local Authority boundaries"
+      : currentNation === "all"
+        ? "All UK: England/Wales 2019 + Scotland 2011 boundaries"
+        : "Showing matching Local Authority boundaries for this view"
+    : "Not available for Northern Ireland in this layer";
 }
 
 function getColorExpression() {
@@ -219,6 +372,8 @@ function updateMapSource() {
     map.setFilter("deprivation-layer", currentFilter);
   }
 
+  updateLocalAuthorityLayer();
+
   console.log(`Switched to table: ${newLayer}, tiles: ${newTiles[0]}`);
 }
 
@@ -245,6 +400,9 @@ map.on("load", () => {
   });
 
   map.on("zoomend", updateMapSource);
+
+  updateLocalAuthorityControlState();
+  updateLocalAuthorityLayer();
 
   const popup = new maplibregl.Popup({
     closeButton: false,
@@ -387,6 +545,8 @@ document.getElementById("era-toggle").addEventListener("change", (e) => {
   currentEra = e.target.value;
   updateMapSource();
   updateDatasetInfo(currentNation, currentEra);
+  updateLocalAuthorityControlState();
+  updateLocalAuthorityLayer();
 });
 
 document.getElementById("nation-filter").addEventListener("change", (e) => {
@@ -400,6 +560,12 @@ document.getElementById("nation-filter").addEventListener("change", (e) => {
   updateMapSource();
   updateLegend(selectedNation);
   updateDatasetInfo(selectedNation, currentEra);
+  updateLocalAuthorityControlState();
+  updateLocalAuthorityLayer();
+});
+
+document.getElementById("la-toggle").addEventListener("change", (e) => {
+  updateLocalAuthorityLayer();
 });
 
 function updateLegend(nation) {
