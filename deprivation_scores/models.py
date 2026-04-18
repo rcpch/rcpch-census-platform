@@ -693,3 +693,73 @@ class PopulationDensity(models.Model):
         verbose_name = "Population Density"
         verbose_name_plural = "Population Densities"
         unique_together = ("lsoa", "year")
+
+
+class NHSEnglishRegion(models.Model):
+    """NHS England Regions (April 2021)"""
+
+    nhser_code = models.CharField(
+        "NHS England Region Code (e.g., E40000001)", max_length=50
+    )
+    nhser_name = models.CharField(
+        "NHS England Region Name (e.g., East of England)", max_length=100
+    )
+    year = models.IntegerField("Boundary year", default=2021)
+
+    # Geometry column for region boundaries (EPSG:4326)
+    geom = gis_models.MultiPolygonField(srid=4326, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "NHS England Region"
+        verbose_name_plural = "NHS England Regions"
+        unique_together = ("nhser_code", "year")
+        indexes = [
+            models.Index(fields=["year"]),
+        ]
+
+    def __str__(self):
+        return f"{self.nhser_name} ({self.year})"
+
+
+class IntegratedCareBoard(models.Model):
+    """Integrated Care Boards (England, April 2023)"""
+
+    icb_code = models.CharField("ICB Code (e.g., E54000001)", max_length=50)
+    icb_name = models.CharField("ICB Name", max_length=100)
+    year = models.IntegerField("Boundary year", default=2023)
+
+    # Geometry column for ICB boundaries (EPSG:4326)
+    geom = gis_models.MultiPolygonField(srid=4326, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Integrated Care Board"
+        verbose_name_plural = "Integrated Care Boards"
+        unique_together = ("icb_code", "year")
+        indexes = [
+            models.Index(fields=["year"]),
+        ]
+
+    def __str__(self):
+        return f"{self.icb_name} ({self.year})"
+
+
+class LocalHealthBoard(models.Model):
+    """Local Health Boards (Wales, April 2022)"""
+
+    lhb_code = models.CharField("LHB Code (e.g., W11000001)", max_length=50)
+    lhb_name = models.CharField("LHB Name", max_length=100)
+    year = models.IntegerField("Boundary year", default=2022)
+
+    # Geometry column for LHB boundaries (EPSG:4326)
+    geom = gis_models.MultiPolygonField(srid=4326, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Local Health Board"
+        verbose_name_plural = "Local Health Boards"
+        unique_together = ("lhb_code", "year")
+        indexes = [
+            models.Index(fields=["year"]),
+        ]
+
+    def __str__(self):
+        return f"{self.lhb_name} ({self.year})"

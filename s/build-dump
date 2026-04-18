@@ -4,6 +4,115 @@
 
 set -e
 
+usage() {
+  cat <<'EOF'
+Usage: ./s/build-dump [--fresh | --existing] [--yes]
+
+Options:
+  --fresh      Always start from a fresh PostGIS container and reseed everything.
+  --existing   Reuse an existing build container and skip reseeding.
+  --yes        Auto-confirm prompts where safe.
+  --help       Show this help.
+
+Environment variables:
+  BUILD_DUMP_MODE=fresh|existing
+  BUILD_DUMP_YES=true|false
+  BUILD_DUMP_MIN_DISK_GB=30
+  BUILD_DUMP_MIN_DOCKER_MEM_GB=10
+  BUILD_DUMP_ENFORCE_RESOURCES=true|false
+EOF
+}
+
+BUILD_DUMP_MODE="${BUILD_DUMP_MODE:-}"
+BUILD_DUMP_YES="${BUILD_DUMP_YES:-false}"
+BUILD_DUMP_MIN_DISK_GB="${BUILD_DUMP_MIN_DISK_GB:-30}"
+BUILD_DUMP_MIN_DOCKER_MEM_GB="${BUILD_DUMP_MIN_DOCKER_MEM_GB:-10}"
+BUILD_DUMP_ENFORCE_RESOURCES="${BUILD_DUMP_ENFORCE_RESOURCES:-true}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --fresh)
+      BUILD_DUMP_MODE="fresh"
+      shift
+      ;;
+    --existing)
+      BUILD_DUMP_MODE="existing"
+      shift
+      ;;
+    --yes)
+      BUILD_DUMP_YES=true
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+confirm() {
+  local prompt="$1"
+
+  if [ "$BUILD_DUMP_YES" = true ]; then
+    echo "$prompt y"
+    return 0
+  fi
+
+  read -p "$prompt" -n 1 -r
+  echo
+  [[ $REPLY =~ ^[Yy]$ ]]
+}
+
+as_gb() {
+  local bytes="$1"
+  awk -v b="$bytes" 'BEGIN { printf "%.1f", b/1024/1024/1024 }'
+}
+
+resource_fail_or_warn() {
+  local message="$1"
+  if [ "$BUILD_DUMP_ENFORCE_RESOURCES" = "true" ]; then
+    echo "✗ $message"
+    exit 1
+  fi
+  echo "⚠️  $message"
+}
+
+check_resource_prereqs() {
+  echo ""
+  echo "Running resource preflight checks..."
+
+  local required_disk_kb=$((BUILD_DUMP_MIN_DISK_GB * 1024 * 1024))
+  local available_disk_kb
+  available_disk_kb=$(df -Pk . | awk 'NR==2 {print $4}')
+
+  if [[ ! "$available_disk_kb" =~ ^[0-9]+$ ]]; then
+    resource_fail_or_warn "Unable to determine free disk space for $PWD."
+  elif [ "$available_disk_kb" -lt "$required_disk_kb" ]; then
+    local available_disk_bytes=$((available_disk_kb * 1024))
+    resource_fail_or_warn "Insufficient disk space: available $(as_gb "$available_disk_bytes")GB, required ${BUILD_DUMP_MIN_DISK_GB}GB. Increase free disk space or lower BUILD_DUMP_MIN_DISK_GB."
+  else
+    local available_disk_bytes=$((available_disk_kb * 1024))
+    echo "✓ Disk space check passed: $(as_gb "$available_disk_bytes")GB available (threshold ${BUILD_DUMP_MIN_DISK_GB}GB)."
+  fi
+
+  local docker_mem_bytes
+  docker_mem_bytes=$(docker info --format '{{.MemTotal}}' 2>/dev/null || true)
+  local required_docker_mem_bytes=$((BUILD_DUMP_MIN_DOCKER_MEM_GB * 1024 * 1024 * 1024))
+
+  if [[ ! "$docker_mem_bytes" =~ ^[0-9]+$ ]] || [ "$docker_mem_bytes" -le 0 ]; then
+    resource_fail_or_warn "Unable to determine Docker memory allocation. Check Docker Desktop is running and try again."
+  elif [ "$docker_mem_bytes" -lt "$required_docker_mem_bytes" ]; then
+    resource_fail_or_warn "Docker memory too low: allocated $(as_gb "$docker_mem_bytes")GB, required ${BUILD_DUMP_MIN_DOCKER_MEM_GB}GB. Increase Docker memory and rerun."
+  else
+    echo "✓ Docker memory check passed: $(as_gb "$docker_mem_bytes")GB allocated (threshold ${BUILD_DUMP_MIN_DOCKER_MEM_GB}GB)."
+  fi
+}
+
 DUMP_DIR="postgis_dump_files"
 DUMP_FILE="${DUMP_DIR}/rcpch-census.dump"
 CONTAINER_NAME="rcpch-census-platform-db-1"
@@ -22,9 +131,7 @@ if [ -f /.dockerenv ] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
     echo "This script is designed to be run from the host machine."
     echo "It will proceed but may not work as expected."
     echo ""
-    read -p "Do you want to continue anyway? (y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  if ! confirm "Do you want to continue anyway? (y/n) "; then
         echo "Aborted."
         exit 1
     fi
@@ -45,9 +152,7 @@ fi
 
 if [ "$EXISTING_DUMP" = true ]; then
     echo "⚠️  Dump already exists: $DUMP_TYPE"
-    read -p "Do you want to rebuild it? (y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  if ! confirm "Do you want to rebuild it? (y/n) "; then
         echo "Using existing dump."
         exit 0
     fi
@@ -59,9 +164,14 @@ fi
 # Check if build container is already running
 if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
     echo "✓ Found running container: $CONTAINER_NAME"
-    read -p "Use existing container? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+  if [ "$BUILD_DUMP_MODE" = "fresh" ]; then
+    echo "BUILD_DUMP_MODE=fresh -> starting from a clean container"
+    echo "Cleaning up existing container and starting fresh..."
+    docker rm -f "$CONTAINER_NAME" || true
+  elif [ "$BUILD_DUMP_MODE" = "existing" ]; then
+    USING_EXISTING_CONTAINER=true
+    echo "BUILD_DUMP_MODE=existing -> using existing container..."
+  elif confirm "Use existing container? (y/n) "; then
         USING_EXISTING_CONTAINER=true
         echo "Using existing container..."
     else
@@ -76,6 +186,8 @@ fi
 
 # Start PostGIS container if not using existing one
 if [ "$USING_EXISTING_CONTAINER" = false ]; then
+  check_resource_prereqs
+
     echo ""
     echo "Starting PostGIS container..."
     docker run -d --name "$CONTAINER_NAME" \
@@ -115,6 +227,7 @@ if [ "$USING_EXISTING_CONTAINER" = false ]; then
       -e POSTGRES_DB=rcpchCensusdb \
       -e POSTGRES_DB_HOST=127.0.0.1 \
       -e POSTGRES_DB_PORT=5432 \
+      -e DEBUG=True \
       -e DJANGO_SECRET_KEY=dummy-build-key \
       -e WAIT_FOR_POPULATION=false \
       -e PYTHONUNBUFFERED=1 \
@@ -141,6 +254,7 @@ if [ "$USING_EXISTING_CONTAINER" = false ]; then
       -e POSTGRES_DB=rcpchCensusdb \
       -e POSTGRES_DB_HOST=127.0.0.1 \
       -e POSTGRES_DB_PORT=5432 \
+      -e DEBUG=True \
       -e DJANGO_SECRET_KEY=dummy-build-key \
       -e WAIT_FOR_POPULATION=false \
       -e PYTHONUNBUFFERED=1 \
@@ -169,6 +283,7 @@ if [ "$USING_EXISTING_CONTAINER" = false ]; then
       -e POSTGRES_DB=rcpchCensusdb \
       -e POSTGRES_DB_HOST=127.0.0.1 \
       -e POSTGRES_DB_PORT=5432 \
+      -e DEBUG=True \
       -e DJANGO_SECRET_KEY=dummy-build-key \
       -e WAIT_FOR_POPULATION=false \
       -e PYTHONUNBUFFERED=1 \
@@ -254,4 +369,4 @@ echo "=========================================="
 echo "✓ Dump file ready: $DUMP_FILE ($SIZE)"
 echo "=========================================="
 echo ""
-echo "Run './s/release-dump.sh' to create a GitHub release"
+echo "Run './s/release-dump' to create a GitHub release"

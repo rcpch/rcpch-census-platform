@@ -27,6 +27,18 @@ Run the following command from the project root:
 ./s/build-dump
 ```
 
+For a release-grade rebuild from scratch, prefer:
+
+```bash
+./s/build-dump --fresh --yes
+```
+
+To intentionally reuse an already-seeded local build container:
+
+```bash
+./s/build-dump --existing --yes
+```
+
 This script will:
 
 - Start a local PostGIS container for building the dump
@@ -36,25 +48,32 @@ This script will:
 - Clean up containers
 - Prompt before overwriting any existing dump
 
+`./s/build-dump` also supports:
+
+- `--fresh`: always removes any existing build container and reseeds from scratch
+- `--existing`: reuses the existing build container and skips reseeding
+- `--yes`: auto-confirms prompts where safe
+
 **Note**: This process can take 10-20 minutes depending on your system and the size of the dataset.
 
 ### 2. Release the Dump to GitHub
 
-After building and testing the dump locally, publish it:
+After building and testing the dump locally, publish it using environment variables to specify the dump file path and version tag:
 
 ```bash
+DUMP_FILE=./postgis_dump_files/rcpch-census.dump \
+RELEASE_VERSION=v1.1.0 \
 ./s/release-dump
 ```
 
+Replace `rcpch-census.dump` with the actual filename in `postgis_dump_files/` and `v1.1.0` with the version you are releasing (follow semantic versioning — see [Version Numbering Guidelines](#version-numbering-guidelines) below).
+
 This script will:
 
-- Check for the dump file (or prompt to build it if missing)
-- Authenticate with GitHub CLI (`gh`)
-- Suggest a new version number based on previous releases
-- Automatically split the dump into <2GB chunks if it exceeds 1.8GB (GitHub upload limit)
-- Prompt for release notes and release type (prerelease/draft/published)
-- Create a GitHub release and upload the dump (or split parts)
-- Provide instructions for manual download/reassembly if needed
+- Copy and rename the dump to `rcpch-census-{version}.dump`
+- Automatically split into <1.9GB chunks if the dump exceeds that (GitHub upload limit)
+- Create the GitHub release if it does not already exist
+- Upload all files to the release, overwriting any existing assets with the same name
 
 **Example split file naming**:
 - `rcpch-census-v1.2.0.dump.part-aa`
@@ -64,7 +83,7 @@ This script will:
 
 ### 3. Seeding the Azure Managed Database
 
-After releasing a new dump version, you need to manually seed (or re-seed) the Azure managed database. See the [Database Seeding Guide](./DATABASE_SEEDING.md) for detailed instructions.
+After releasing a new dump version, you need to manually seed (or re-seed) the Azure managed database. See the [Database Seeding Guide](./managed-database-seeding.md) for detailed instructions.
 
 **Quick reference**:
 ```bash
@@ -152,10 +171,25 @@ Follow semantic versioning:
 
 **Problem**: Dump creation fails
 
-- Check Docker is running and has sufficient resources (8GB+ RAM recommended)
+- Check Docker is running and has sufficient resources (10GB+ Docker memory recommended)
 - Ensure no port conflicts on 5432
 - Review logs for migration or seeding errors
 - Verify PostGIS extension is available in the container
+
+`s/build-dump` now runs preflight checks before reseeding and will fail early if resources are below threshold.
+
+Default thresholds:
+- `BUILD_DUMP_MIN_DISK_GB=30`
+- `BUILD_DUMP_MIN_DOCKER_MEM_GB=10`
+- `BUILD_DUMP_ENFORCE_RESOURCES=true`
+
+Override example (if you intentionally want lower thresholds):
+
+```bash
+BUILD_DUMP_MIN_DISK_GB=20 \
+BUILD_DUMP_MIN_DOCKER_MEM_GB=8 \
+./s/build-dump --fresh --yes
+```
 
 **Problem**: Dump test restoration fails
 
@@ -185,7 +219,7 @@ Follow semantic versioning:
 
 ### Restore Issues
 
-See the [Database Seeding Guide](./DATABASE_SEEDING.md) troubleshooting section for restore-related issues.
+See the [Database Seeding Guide](./managed-database-seeding.md) troubleshooting section for restore-related issues.
 
 ## Related Files and Scripts
 
@@ -197,7 +231,7 @@ See the [Database Seeding Guide](./DATABASE_SEEDING.md) troubleshooting section 
 
 ## Further Reading
 
-- [Database Seeding Guide](./DATABASE_SEEDING.md) - How to seed Azure managed databases
+- [Database Seeding Guide](./managed-database-seeding.md) - How to seed Azure managed databases
 - [PostgreSQL pg_dump Documentation](https://www.postgresql.org/docs/current/app-pgdump.html)
 - [GitHub Releases Documentation](https://docs.github.com/en/repositories/releasing-projects-on-github)
 

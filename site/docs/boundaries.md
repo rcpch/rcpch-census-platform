@@ -30,6 +30,28 @@ We use **BFC (Boundaries Full Clipped)** datasets to ensure high-fidelity bounda
 | **N. Ireland SOA** | 2011 | [NISRA FeatureServer](https://services3.arcgis.com/APHjSHuFMGWVZFgQ/arcgis/rest/services/SOA2011/FeatureServer/0/query) | `SOA_CODE` | `soa_code` |
 | **UK Local Authority** | 2019 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_December_2019_Boundaries_UK_BFC/FeatureServer/0/query) | `LAD19CD` | `local_authority_district_code` |
 | **UK Local Authority** | 2024 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_May_2024_Boundaries_UK_BFC/FeatureServer/0/query) | `LAD24CD` | `local_authority_district_code` |
+| **NHS England Regions** | 2021 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/NHS_England_Regions_April_2021_EN_BFC_2022/FeatureServer/0/query) | `NHSER21CD` | `nhser_code` |
+| **Integrated Care Boards** | 2023 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Integrated_Care_Boards_April_2023_EN_BFC/FeatureServer/0/query) | `ICB23CD` | `icb_code` |
+| **Local Health Boards** | 2022 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Health_Boards_April_2022_WA_BFC_2022/FeatureServer/0/query) | `LHB22CD` | `lhb_code` |
+
+## Conditional Import Behaviour
+
+`import_bfc_boundaries` runs a preflight completeness check for each configured dataset using table + year:
+
+* `total_rows`: rows present for that `year`
+* `spatialized_rows`: rows with non-null `geom`
+* `is_complete`: `total_rows > 0` and `total_rows == spatialized_rows`
+
+Default behaviour (without `--force`):
+
+* Complete datasets are skipped.
+* Incomplete datasets are imported.
+* A summary line is printed with run/skip counts.
+
+Force behaviour (with `--force`):
+
+* All configured datasets are reprocessed.
+* Existing geometry can be overwritten.
 
 ## Technical Note: Why we use Streaming over ogr2ogr
 
@@ -98,6 +120,22 @@ The following properties are exposed at all zoom levels:
 * `imd_rank`
 * `year`
 
+### Health Boundary Tables
+
+Health boundaries are exposed through dedicated views with consistent key names:
+
+* `public.nhser_tiles_2021`
+* `public.icb_tiles_2023`
+* `public.lhb_tiles_2022`
+
+Each exposes:
+
+* `code` (boundary code)
+* `area_name` (human-readable name)
+* `nation` (`england` or `wales`)
+* `year`
+* `geom`
+
 ### Why this matters
 
 Because pg_tileserv serves directly from these materialized tables, adding a column in the post-processing SQL makes it available immediately in tile properties after rebuilding the tables.
@@ -109,6 +147,9 @@ Confirm what is actually served by querying the pg_tileserv metadata endpoints d
 ```bash
 curl http://localhost:7800/public.uk_master_2021_z8_10.json | jq '.properties[] | .name'
 curl http://localhost:7800/public.lsoa_tiles_2021_z8_10.json | jq '.properties[] | .name'
+curl http://localhost:7800/public.nhser_tiles_2021.json | jq '.properties[] | .name'
+curl http://localhost:7800/public.icb_tiles_2023.json | jq '.properties[] | .name'
+curl http://localhost:7800/public.lhb_tiles_2022.json | jq '.properties[] | .name'
 ```
 
 This is the authoritative source of truth for what the frontend receives. If a property appears in the SQL `SELECT` but not in these metadata responses, the tile tables have not been rebuilt yet.

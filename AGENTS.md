@@ -124,6 +124,21 @@ Use:
 - `python manage.py seed --mode __all__`
 - then `python manage.py seed --mode import_bfc_boundaries`
 
+## Health Boundaries Import (NHS Regions, ICBs, Local Health Boards)
+
+Added April 2026. Three new health administrative boundaries imported via BFC (Boundaries Full Clipped) from ONS:
+
+| Boundary Type | Year | Nation | Endpoint Code | Django Column | Record Count |
+| --- | --- | --- | --- | --- | --- |
+| NHS England Regions | 2021 | England | NHSER21CD | `nhser_code` | 7 |
+| Integrated Care Boards | 2023 | England | ICB23CD | `icb_code` | ~42 |
+| Local Health Boards | 2022 | Wales | LHB22CD | `lhb_code` | 7 |
+
+All map to 2021 LSOA boundaries. Imported as part of `import_bfc_boundaries` mode. Models include:
+- `NHSEnglishRegion`, `IntegratedCareBoard`, `LocalHealthBoard` in `deprivation_scores/models.py`
+- Unique constraint on `(code, year)` to support multi-year versioning
+- Full geometry processing (3857 transform, simplification, spatial indexes)
+
 ## Convenience scripts in s/
 
 Primary helper scripts:
@@ -158,6 +173,8 @@ Database dump/release workflow helpers:
 
 - `s/build-dump`
   - Creates a local PostGIS container, runs migrations and seed modes, builds a compressed pg_dump, and performs a restore test.
+  - For release-grade dumps, prefer `./s/build-dump --fresh --yes` to force a clean rebuild from scratch.
+  - `./s/build-dump --existing --yes` reuses the current build container and skips reseeding.
 - `s/release-dump`
   - Publishes dump artifacts to GitHub Releases; auto-splits large dumps.
 - `s/restore-db`
