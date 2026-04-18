@@ -136,6 +136,8 @@ Primary helper scripts:
   - Runs `makemigrations` then `migrate`.
 - `s/pg-tiles`
   - Starts pg_tileserv service via compose.
+- `s/test`
+  - Runs pytest with pass-through flags; uses running web container when available, otherwise starts a one-off test container.
 - `s/wait-for-db.sh`
   - Waits for DB readiness; optionally waits for seeded/populated tables when `WAIT_FOR_POPULATION=true`.
 
