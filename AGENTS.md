@@ -60,6 +60,24 @@ Materialized table families:
   - `public.lsoa_tiles_2021_z5_7`
   - `public.lsoa_tiles_2021_z8_10`
 
+## Dataset/Boundary Source Of Truth
+
+To avoid doc drift, treat `site/docs/boundaries.md` as the canonical source for:
+
+- Boundary dataset endpoints and code mappings
+- Boundary year vs IMD year behaviour
+- Tile property contracts exposed by pg_tileserv
+
+Current map behaviour summary (quick reference only):
+
+| View | England | Wales | Scotland | N. Ireland |
+| --- | --- | --- | --- | --- |
+| All UK | 2011 LSOA + 2019 IMD | 2011 LSOA + 2019 WIMD | 2011 DataZone + 2020 SIMD | 2001 SOA + 2017 NIMDM |
+| England-only (era toggle = 2021) | 2021 LSOA + 2025 IMD | n/a | n/a | n/a |
+| England-only (era toggle = 2011) | 2011 LSOA + 2019 IMD | n/a | n/a | n/a |
+
+If this summary conflicts with `site/docs/boundaries.md`, update this section to match `site/docs/boundaries.md`.
+
 ## Exposed tile properties
 
 As of current implementation:
@@ -67,6 +85,9 @@ As of current implementation:
 - `public.uk_master_*` properties include:
   - `code`
   - `area_name`
+  - `la_code` (England/Wales/Scotland; `NULL` for N. Ireland)
+  - `la_name` (England/Wales/Scotland; `NULL` for N. Ireland)
+  - `la_year` (England/Wales/Scotland; `NULL` for N. Ireland)
   - `imd_decile`
   - `imd_year`
   - `nation`

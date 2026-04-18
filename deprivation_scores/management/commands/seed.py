@@ -170,12 +170,17 @@ class Command(BaseCommand):
                 {imd_year}::int AS imd_year, 
                 l.lsoa_code::text AS code, 
                 l.lsoa_name::text AS area_name,
+                la.local_authority_district_code::text AS la_code,
+                la.local_authority_district_name::text AS la_name,
+                la.year::int AS la_year,
                 ST_MakeValid(ST_Multi(l.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'england'::text AS nation,
                 COALESCE(e.imd_decile, 0)::int AS imd_decile
             FROM deprivation_scores_lsoa l
             LEFT JOIN deprivation_scores_englishindexmultipledeprivation e 
                 ON e.lsoa_id = l.id AND e.year = {imd_year}
+            LEFT JOIN deprivation_scores_localauthority la
+                ON la.id = l.local_authority_district_id
             WHERE l.lsoa_code LIKE 'E%' 
                 AND l.{actual_geom_col} IS NOT NULL 
                 AND l.year = {boundary_year}
@@ -188,12 +193,17 @@ class Command(BaseCommand):
                 {wales_imd_year}::int AS imd_year, 
                 l.lsoa_code::text AS code, 
                 l.lsoa_name::text AS area_name,
+                la.local_authority_district_code::text AS la_code,
+                la.local_authority_district_name::text AS la_name,
+                la.year::int AS la_year,
                 ST_MakeValid(ST_Multi(l.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'wales'::text AS nation,
                 COALESCE(w.imd_decile, 0)::int AS imd_decile
             FROM deprivation_scores_lsoa l
             LEFT JOIN deprivation_scores_welshindexmultipledeprivation w 
                 ON w.lsoa_id = l.id AND w.year = {wales_imd_year}
+            LEFT JOIN deprivation_scores_localauthority la
+                ON la.id = l.local_authority_district_id
             WHERE l.lsoa_code LIKE 'W%' 
                 AND l.{actual_geom_col} IS NOT NULL 
                 AND l.year = {boundary_year}
@@ -206,12 +216,17 @@ class Command(BaseCommand):
                 {scotland_imd_year}::int AS imd_year, 
                 d.data_zone_code::text AS code, 
                 d.data_zone_name::text AS area_name,
+                la.local_authority_district_code::text AS la_code,
+                la.local_authority_district_name::text AS la_name,
+                la.year::int AS la_year,
                 ST_MakeValid(ST_Multi(d.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'scotland'::text AS nation,
                 COALESCE(WIDTH_BUCKET(s.imd_rank, 1, 6977, 10), 0)::int AS imd_decile
             FROM deprivation_scores_datazone d
             LEFT JOIN deprivation_scores_scottishindexmultipledeprivation s 
                 ON s.data_zone_id = d.id AND s.year = {scotland_imd_year}
+            LEFT JOIN deprivation_scores_localauthority la
+                ON la.id = d.local_authority_id
             WHERE d.{actual_geom_col} IS NOT NULL 
                 AND d.year = {scotland_boundary_year}
 
@@ -223,6 +238,9 @@ class Command(BaseCommand):
                 {ni_imd_year}::int AS imd_year, 
                 so.soa_code::text AS code, 
                 so.soa_name::text AS area_name,
+                NULL::text AS la_code,
+                NULL::text AS la_name,
+                NULL::int AS la_year,
                 ST_MakeValid(ST_Multi(so.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'northern_ireland'::text AS nation,
                 COALESCE(WIDTH_BUCKET(ni.imd_rank, 1, 891, 10), 0)::int AS imd_decile

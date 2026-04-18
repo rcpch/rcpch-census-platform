@@ -276,6 +276,24 @@ map.on("load", () => {
         "soa_code",
       ]) || "Unknown code";
     const imdYear = getPropCaseInsensitive(props, ["imd_year", "year"]);
+    const localAuthorityCode = getPropCaseInsensitive(props, [
+      "la_code",
+      "lad_code",
+      "local_authority_code",
+      "local_authority_district_code",
+    ]);
+    const localAuthorityName = getPropCaseInsensitive(props, [
+      "la_name",
+      "lad_name",
+      "local_authority_name",
+      "local_authority_district_name",
+    ]);
+    const localAuthorityYear = getPropCaseInsensitive(props, [
+      "la_year",
+      "lad_year",
+      "local_authority_year",
+      "local_authority_district_year",
+    ]);
 
     const areaLabel = nation
       ? `${String(nation).replace(/_/g, " ").toUpperCase()}`
@@ -291,6 +309,14 @@ map.on("load", () => {
         : null;
     const boundariesLabel = datasetEntry ? datasetEntry.boundaries : eraKey;
     const imdLabel = datasetEntry ? datasetEntry.imd : (imdYear ?? "Unknown");
+    const localAuthorityLine =
+      nation === "northern_ireland"
+        ? "<div><strong>Local Government District:</strong> Not currently mapped in this layer</div>"
+        : `
+          <div><strong>Local Authority Name:</strong> ${localAuthorityName || "Unknown"}</div>
+          <div><strong>Local Authority Code:</strong> ${localAuthorityCode || "Unknown"}</div>
+          <div><strong>Local Authority Year:</strong> ${localAuthorityYear || "Unknown"}</div>
+        `;
 
     const content = `
       <div style="padding: 5px;">
@@ -299,6 +325,7 @@ map.on("load", () => {
         </strong>
         <div><strong>Name:</strong> ${areaName}</div>
         <div><strong>Code:</strong> ${areaCode}</div>
+        ${localAuthorityLine}
         <div><strong>Decile:</strong> ${decile === 0 ? "No Data" : decile}</div>
         <div style="margin-top: 5px; font-size: 0.8em; color: #666;">
           Boundaries: ${boundariesLabel} | Index: ${imdLabel}

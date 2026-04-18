@@ -49,6 +49,23 @@ To achieve fast rendering on the frontend:
     * `<era>` is either `2011` (IMD 2019 England / 2019 Wales) or `2021` (IMD 2025 England / 2019 Wales).
 3. **CDN**: Tiles are cached at the edge via a CDN to ensure sub-second map interactivity.
 
+## Current Dataset Mapping (Map Behaviour)
+
+This section summarizes what the map currently renders by view. Use this as the quick reference for boundary year, IMD year, and local authority metadata in tile properties.
+
+| View | Nation | Boundary Type/Year (`year`) | IMD Dataset/Year (`imd_year`) | Local Authority in Tiles |
+| :--- | :--- | :--- | :--- | :--- |
+| All UK (`uk_master_2011_*`) | England | LSOA 2011 | IMD 2019 | LAD code/name/year from 2019 LA table |
+| All UK (`uk_master_2011_*`) | Wales | LSOA 2011 | WIMD 2019 | LAD code/name/year from 2019 LA table |
+| All UK (`uk_master_2011_*`) | Scotland | DataZone 2011 | SIMD 2020 | LA code/name/year from 2011 Scotland-linked LA table |
+| All UK (`uk_master_2011_*`) | Northern Ireland | SOA 2001 | NIMDM 2017 | `la_code`/`la_name`/`la_year` are `NULL` |
+| England-only (era = 2011) | England | LSOA 2011 | IMD 2019 | LAD code/name/year from 2019 LA table |
+| England-only (era = 2021) | England | LSOA 2021 | IMD 2025 | LAD code/name/year from 2024 LA table |
+
+### Northern Ireland note
+
+Northern Ireland does not use the same Local Authority District model as England/Wales/Scotland in this dataset. Tooltips should treat `la_*` fields as not applicable for NI and can show a message such as: "Northern Ireland uses Local Government Districts, not LAD fields in this layer."
+
 ## Tile Properties Exposed
 
 The post-processing SQL materializes tile-serving tables and explicitly controls the attributes exposed by pg_tileserv.
@@ -59,6 +76,9 @@ The following properties are exposed at all zoom levels:
 
 * `code`: Area code (`lsoa_code`, `data_zone_code`, or `soa_code`)
 * `area_name`: Human-readable name (`lsoa_name`, `data_zone_name`, or `soa_name`)
+* `la_code`: Local authority code for England/Wales/Scotland (`NULL` for Northern Ireland)
+* `la_name`: Local authority name for England/Wales/Scotland (`NULL` for Northern Ireland)
+* `la_year`: Local authority reference year for England/Wales/Scotland (`NULL` for Northern Ireland)
 * `imd_decile`: Decile used for choropleth colouring
 * `imd_year`: IMD publication year for that nation in the selected era
 * `nation`: `england`, `wales`, `scotland`, or `northern_ireland`
