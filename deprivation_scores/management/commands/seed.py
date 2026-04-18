@@ -113,6 +113,7 @@ class Command(BaseCommand):
                 l.year::int as year,
                 l.{geom_column}::geometry(MultiPolygon, 3857) AS geom,
                 l.lsoa_code::text,
+                l.lsoa_name::text AS area_name,
                 COALESCE(e.imd_decile, w.imd_decile, 0)::int as imd_decile,
                 COALESCE(e.imd_rank, w.imd_rank, 0)::int as imd_rank
             FROM deprivation_scores_lsoa l
@@ -168,6 +169,7 @@ class Command(BaseCommand):
                 l.year::int AS year, 
                 {imd_year}::int AS imd_year, 
                 l.lsoa_code::text AS code, 
+                l.lsoa_name::text AS area_name,
                 ST_MakeValid(ST_Multi(l.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'england'::text AS nation,
                 COALESCE(e.imd_decile, 0)::int AS imd_decile
@@ -185,6 +187,7 @@ class Command(BaseCommand):
                 l.year::int AS year, 
                 {wales_imd_year}::int AS imd_year, 
                 l.lsoa_code::text AS code, 
+                l.lsoa_name::text AS area_name,
                 ST_MakeValid(ST_Multi(l.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'wales'::text AS nation,
                 COALESCE(w.imd_decile, 0)::int AS imd_decile
@@ -202,6 +205,7 @@ class Command(BaseCommand):
                 d.year::int AS year, 
                 {scotland_imd_year}::int AS imd_year, 
                 d.data_zone_code::text AS code, 
+                d.data_zone_name::text AS area_name,
                 ST_MakeValid(ST_Multi(d.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'scotland'::text AS nation,
                 COALESCE(WIDTH_BUCKET(s.imd_rank, 1, 6977, 10), 0)::int AS imd_decile
@@ -218,6 +222,7 @@ class Command(BaseCommand):
                 so.year::int AS year, 
                 {ni_imd_year}::int AS imd_year, 
                 so.soa_code::text AS code, 
+                so.soa_name::text AS area_name,
                 ST_MakeValid(ST_Multi(so.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'northern_ireland'::text AS nation,
                 COALESCE(WIDTH_BUCKET(ni.imd_rank, 1, 891, 10), 0)::int AS imd_decile

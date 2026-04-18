@@ -33,7 +33,7 @@ We use **BFC (Boundaries Full Clipped)** datasets to ensure high-fidelity bounda
 
 ## Technical Note: Why we use Streaming over ogr2ogr
 
-While `ogr2ogr` is a standard tool for spatial data migration, this project utilizes a custom Python streaming implementation via `requests` and `GeoPandas`. This approach was chosen to handle the **ArcGIS resultRecordCount** limits more gracefully and to avoid external binary dependencies in the web container. 
+While `ogr2ogr` is a standard tool for spatial data migration, this project utilizes a custom Python streaming implementation via `requests` and `GeoPandas`. This approach was chosen to handle the **ArcGIS resultRecordCount** limits more gracefully and to avoid external binary dependencies in the web container.
 
 The **2024 Local Authority** endpoint, in particular, is sensitive to large requests; therefore, we implement a strict `chunk_size` (e.g., 100 records) to prevent timeout errors and 500-responses from the ArcGIS server. This streaming method ensures that we only move the necessary identifier and geometry fields into the database, keeping memory usage predictable during the enrichment process.
 
@@ -43,10 +43,63 @@ To achieve fast rendering on the frontend:
 
 1. **pg_tileserv**: A dedicated Go-based container connects to the database and serves the SQL views as **MVT (Mapbox Vector Tiles)**.
 2. **Resolution Switching**: The frontend automatically requests different views based on zoom level:
-    * `z0-z4`: Uses `uk_master_tiles_z0_4` (High simplification).
-    * `z5-z7`: Uses `uk_master_tiles_z5_7` (Medium simplification).
-    * `z8+`: Uses `uk_master_tiles_z8_10` (Full detail BFC).
+    * `z0-z4`: Uses `public.uk_master_<era>_z0_4` (high simplification).
+    * `z5-z7`: Uses `public.uk_master_<era>_z5_7` (medium simplification).
+    * `z8+`: Uses `public.uk_master_<era>_z8_10` (full detail BFC).
+    * `<era>` is either `2011` (IMD 2019 England / 2019 Wales) or `2021` (IMD 2025 England / 2019 Wales).
 3. **CDN**: Tiles are cached at the edge via a CDN to ensure sub-second map interactivity.
+
+## Tile Properties Exposed
+
+The post-processing SQL materializes tile-serving tables and explicitly controls the attributes exposed by pg_tileserv.
+
+### UK Master Tables (`public.uk_master_*`)
+
+The following properties are exposed at all zoom levels:
+
+* `code`: Area code (`lsoa_code`, `data_zone_code`, or `soa_code`)
+* `area_name`: Human-readable name (`lsoa_name`, `data_zone_name`, or `soa_name`)
+* `imd_decile`: Decile used for choropleth colouring
+* `imd_year`: IMD publication year for that nation in the selected era
+* `nation`: `england`, `wales`, `scotland`, or `northern_ireland`
+* `year`: Boundary year
+
+### LSOA-only Tables (`public.lsoa_tiles_*`)
+
+The following properties are exposed at all zoom levels:
+
+* `lsoa_code`
+* `area_name` (from `lsoa_name`)
+* `imd_decile`
+* `imd_rank`
+* `year`
+
+### Why this matters
+
+Because pg_tileserv serves directly from these materialized tables, adding a column in the post-processing SQL makes it available immediately in tile properties after rebuilding the tables.
+
+### Verifying exposed properties
+
+Confirm what is actually served by querying the pg_tileserv metadata endpoints directly:
+
+```bash
+curl http://localhost:7800/public.uk_master_2021_z8_10.json | jq '.properties[] | .name'
+curl http://localhost:7800/public.lsoa_tiles_2021_z8_10.json | jq '.properties[] | .name'
+```
+
+This is the authoritative source of truth for what the frontend receives. If a property appears in the SQL `SELECT` but not in these metadata responses, the tile tables have not been rebuilt yet.
+
+### Frontend property lookup robustness
+
+MapLibre GL JS decodes MVT properties and surfaces them as a plain JavaScript object on `feature.properties`. Property key casing is preserved from the PostGIS column name, so consistent snake_case aliases in the SQL (e.g. `area_name`, `imd_decile`) are important.
+
+`map-logic.js` uses a `getPropCaseInsensitive()` helper that tries an ordered list of candidate keys and falls back to a case-insensitive scan of the property object. This guards against silent lookup failures if aliases change. When adding new tile properties, add the canonical key as the first candidate in the relevant `getPropCaseInsensitive()` call in `site/map-logic.js`.
+
+On first hover the map logs the following to the browser console to assist debugging:
+
+* Tile base URL
+* Exact property keys received from the tile
+* A sample properties object
 
 ## How to Run
 
@@ -58,8 +111,14 @@ python manage.py seed --mode import_bfc_boundaries
 
 To update or overwrite existing geometries, use the `--force` flag.
 
+If you only changed exposed tile properties (for example adding `area_name`), you can rebuild just the post-processed tile tables without re-downloading boundaries:
+
+```bash
+python manage.py seed --mode process_geometries
+```
+
 ## References
 
-PostGIS Reference: https://postgis.net/docs/
-ONS Geoportal: https://geoportal.statistics.gov.uk/
-pg_tileserv: https://github.com/CrunchyData/pg_tileserv
+* PostGIS Reference: <https://postgis.net/docs/>
+* ONS Geoportal: <https://geoportal.statistics.gov.uk/>
+* pg_tileserv: <https://github.com/CrunchyData/pg_tileserv>

@@ -36,6 +36,30 @@ if (!TILES_BASE_URL) {
   );
 }
 
+function getPropCaseInsensitive(props, candidateKeys) {
+  if (!props) return undefined;
+
+  for (const key of candidateKeys) {
+    if (props[key] !== undefined && props[key] !== null) {
+      return props[key];
+    }
+  }
+
+  const lowerMap = Object.create(null);
+  for (const key of Object.keys(props)) {
+    lowerMap[key.toLowerCase()] = props[key];
+  }
+
+  for (const key of candidateKeys) {
+    const value = lowerMap[key.toLowerCase()];
+    if (value !== undefined && value !== null) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
 let currentEra = "2021";
 
 function getViewName(era, zoom) {
@@ -199,17 +223,41 @@ map.on("load", () => {
 
     const feature = e.features[0];
     const props = feature.properties;
-    const decile = props.imd_decile;
+
+    const decile = getPropCaseInsensitive(props, ["imd_decile"]);
+    const nation = getPropCaseInsensitive(props, ["nation"]);
+    const areaName =
+      getPropCaseInsensitive(props, [
+        "area_name",
+        "areaname",
+        "name",
+        "lsoa_name",
+        "data_zone_name",
+        "soa_name",
+      ]) || "Unknown area";
+    const areaCode =
+      getPropCaseInsensitive(props, [
+        "code",
+        "lsoa_code",
+        "data_zone_code",
+        "soa_code",
+      ]) || "Unknown code";
+    const imdYear = getPropCaseInsensitive(props, ["imd_year", "year"]);
+
+    const areaLabel = nation
+      ? `${String(nation).replace(/_/g, " ").toUpperCase()} AREA`
+      : "AREA";
 
     const content = `
       <div style="padding: 5px;">
         <strong style="display: block; margin-bottom: 5px; border-bottom: 1px solid #ccc;">
-          ${props.nation.toUpperCase()} LSOA
+          ${areaLabel}
         </strong>
-        <div><strong>Code:</strong> ${props.code}</div>
+        <div><strong>Name:</strong> ${areaName}</div>
+        <div><strong>Code:</strong> ${areaCode}</div>
         <div><strong>Decile:</strong> ${decile === 0 ? "No Data" : decile}</div>
         <div style="margin-top: 5px; font-size: 0.8em; color: #666;">
-          Era: ${currentEra} | Data Year: ${props.imd_year}
+          Era: ${currentEra} | Data Year: ${imdYear ?? "Unknown"}
         </div>
       </div>
     `;
