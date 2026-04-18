@@ -2,6 +2,26 @@ import pytest
 from django.db import connection
 
 
+def _uk_master_tables_exist():
+    """Return True if the uk_master materialized tile tables have been created."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name = 'uk_master_2011_z8_10'
+            """
+        )
+        return cursor.fetchone()[0] == 1
+
+
+requires_tile_tables = pytest.mark.skipif(
+    not _uk_master_tables_exist(),
+    reason="uk_master tile tables not present — run 'seed --mode process_geometries' first",
+)
+
+
+@requires_tile_tables
 @pytest.mark.django_db
 def test_uk_master_tables_expose_local_authority_fields():
     """UK master tile tables should expose LA metadata columns for tooltips."""
@@ -31,6 +51,7 @@ def test_uk_master_tables_expose_local_authority_fields():
     assert found["uk_master_2021_z8_10"] == expected_columns
 
 
+@requires_tile_tables
 @pytest.mark.django_db
 def test_uk_master_2011_local_authority_population_by_nation():
     """
