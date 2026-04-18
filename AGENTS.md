@@ -141,6 +141,19 @@ Primary helper scripts:
 - `s/wait-for-db.sh`
   - Waits for DB readiness; optionally waits for seeded/populated tables when `WAIT_FOR_POPULATION=true`.
 
+## Git hooks (one-time setup)
+
+A pre-push hook lives in `.githooks/pre-push`. Activate it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+What it does on every `git push`:
+
+- If `uk_master_*` tile tables exist locally → runs `tests/test_uk_master_local_authority_fields.py` and **blocks the push on failure**.
+- If tables are absent (i.e. `process_geometries` has not been run) → prints a reminder and **allows the push**, matching CI behaviour (tests are skipped there too).
+
 Database dump/release workflow helpers:
 
 - `s/build-dump`
