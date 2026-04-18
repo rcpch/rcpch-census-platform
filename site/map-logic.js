@@ -36,11 +36,221 @@ if (!TILES_BASE_URL) {
   );
 }
 
+function getPropCaseInsensitive(props, candidateKeys) {
+  if (!props) return undefined;
+
+  for (const key of candidateKeys) {
+    if (props[key] !== undefined && props[key] !== null) {
+      return props[key];
+    }
+  }
+
+  const lowerMap = Object.create(null);
+  for (const key of Object.keys(props)) {
+    lowerMap[key.toLowerCase()] = props[key];
+  }
+
+  for (const key of candidateKeys) {
+    const value = lowerMap[key.toLowerCase()];
+    if (value !== undefined && value !== null) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+// Per-nation, per-era dataset facts
+// Scotland and NI are always on 2011-era boundaries regardless of era toggle.
+// Wales has no published 2025 WIMD, so this map uses 2019 WIMD on 2011 LSOAs.
+// (2021 Welsh boundaries may exist but are not used in the current UK-wide dataset.)
+// The era toggle therefore only affects England.
+// For the All UK view we always use uk_master_2011_* so all 4 nations appear.
+const DATASET_INFO = {
+  england: {
+    2021: { imd: "2025 IMD", boundaries: "2021 LSOAs" },
+    2011: { imd: "2019 IMD", boundaries: "2011 LSOAs" },
+  },
+  wales: {
+    2011: {
+      imd: "2019 WIMD",
+      boundaries: "2011 LSOAs",
+      note: "No 2025 WIMD published",
+    },
+  },
+  scotland: {
+    2011: { imd: "2020 SIMD", boundaries: "2011 DataZones" },
+  },
+  northern_ireland: {
+    2011: { imd: "2017 NIMDM", boundaries: "2001 SOAs" },
+  },
+};
+
 let currentEra = "2021";
+let currentNation = "all";
+
+const LA_SOURCE_ID = "la-boundaries-source";
+const LA_LAYER_ID = "la-boundaries-layer";
+const LA_SOURCE_LAYER = "public.la_tiles";
+
+// Returns the tile era to actually request for the given nation selection.
+// Only England solo respects the era toggle; everything else uses 2011.
+function effectiveEra(nation) {
+  return nation === "england" ? currentEra : "2011";
+}
 
 function getViewName(era, zoom) {
   const zoomSuffix = zoom <= 4 ? "z0_4" : zoom <= 7 ? "z5_7" : "z8_10";
   return `public.uk_master_${era}_${zoomSuffix}`;
+}
+
+function getLocalAuthorityYearForNation(nation) {
+  if (nation === "england") {
+    return currentNation === "england" && currentEra === "2021" ? 2024 : 2019;
+  }
+  if (nation === "wales") {
+    return 2019;
+  }
+  if (nation === "scotland") {
+    return 2011;
+  }
+  return null;
+}
+
+function getLocalAuthorityFilter() {
+  if (currentNation === "northern_ireland") {
+    return null;
+  }
+
+  if (currentNation === "england") {
+    return [
+      "all",
+      ["==", ["slice", ["get", "lad_code"], 0, 1], "E"],
+      ["==", ["get", "year"], getLocalAuthorityYearForNation("england")],
+    ];
+  }
+
+  if (currentNation === "wales") {
+    return [
+      "all",
+      ["==", ["slice", ["get", "lad_code"], 0, 1], "W"],
+      ["==", ["get", "year"], 2019],
+    ];
+  }
+
+  if (currentNation === "scotland") {
+    return [
+      "all",
+      ["==", ["slice", ["get", "lad_code"], 0, 1], "S"],
+      ["==", ["get", "year"], 2011],
+    ];
+  }
+
+  return [
+    "any",
+    [
+      "all",
+      ["==", ["slice", ["get", "lad_code"], 0, 1], "E"],
+      ["==", ["get", "year"], 2019],
+    ],
+    [
+      "all",
+      ["==", ["slice", ["get", "lad_code"], 0, 1], "W"],
+      ["==", ["get", "year"], 2019],
+    ],
+    [
+      "all",
+      ["==", ["slice", ["get", "lad_code"], 0, 1], "S"],
+      ["==", ["get", "year"], 2011],
+    ],
+  ];
+}
+
+function ensureLocalAuthoritySource() {
+  if (map.getSource(LA_SOURCE_ID)) {
+    return;
+  }
+
+  map.addSource(LA_SOURCE_ID, {
+    type: "vector",
+    tiles: [`${TILES_BASE_URL}/${LA_SOURCE_LAYER}/{z}/{x}/{y}.pbf`],
+    minzoom: 0,
+    maxzoom: 14,
+  });
+}
+
+function removeLocalAuthorityLayer() {
+  if (map.getLayer(LA_LAYER_ID)) {
+    map.removeLayer(LA_LAYER_ID);
+  }
+}
+
+function updateLocalAuthorityLayer() {
+  const laToggle = document.getElementById("la-toggle");
+  const requested = !!laToggle?.checked;
+
+  if (!requested || currentNation === "northern_ireland") {
+    removeLocalAuthorityLayer();
+    return;
+  }
+
+  ensureLocalAuthoritySource();
+
+  if (!map.getLayer(LA_LAYER_ID)) {
+    map.addLayer({
+      id: LA_LAYER_ID,
+      type: "line",
+      source: LA_SOURCE_ID,
+      "source-layer": LA_SOURCE_LAYER,
+      paint: {
+        "line-color": "rgba(55, 65, 81, 0.55)",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          4,
+          0.6,
+          7,
+          1.1,
+          10,
+          1.8,
+        ],
+        "line-opacity": 1,
+      },
+    });
+  }
+
+  // Keep LA boundaries above the deprivation fill layer after source/layer swaps.
+  map.moveLayer(LA_LAYER_ID);
+
+  const laFilter = getLocalAuthorityFilter();
+  if (laFilter) {
+    map.setFilter(LA_LAYER_ID, laFilter);
+  } else {
+    removeLocalAuthorityLayer();
+  }
+}
+
+function updateLocalAuthorityControlState() {
+  const laToggle = document.getElementById("la-toggle");
+  const laNote = document.getElementById("la-note");
+  const laGroup = document.getElementById("la-toggle-group");
+
+  const enabled = currentNation !== "northern_ireland";
+  laToggle.disabled = !enabled;
+  laGroup.style.opacity = enabled ? "1" : "0.45";
+
+  if (!enabled && laToggle.checked) {
+    laToggle.checked = false;
+  }
+
+  laNote.textContent = enabled
+    ? currentNation === "england" && currentEra === "2021"
+      ? "Using 2024 Local Authority boundaries"
+      : currentNation === "all"
+        ? "All UK: England/Wales 2019 + Scotland 2011 boundaries"
+        : "Showing matching Local Authority boundaries for this view"
+    : "Not available for Northern Ireland in this layer";
 }
 
 function getColorExpression() {
@@ -127,7 +337,7 @@ function getColorExpression() {
 }
 
 function updateMapSource() {
-  const newLayer = getViewName(currentEra, map.getZoom());
+  const newLayer = getViewName(effectiveEra(currentNation), map.getZoom());
   const newTiles = [`${TILES_BASE_URL}/${newLayer}/{z}/{x}/{y}.pbf`];
 
   const currentFilter = map.getFilter("deprivation-layer");
@@ -162,11 +372,13 @@ function updateMapSource() {
     map.setFilter("deprivation-layer", currentFilter);
   }
 
+  updateLocalAuthorityLayer();
+
   console.log(`Switched to table: ${newLayer}, tiles: ${newTiles[0]}`);
 }
 
 map.on("load", () => {
-  const initialLayer = getViewName(currentEra, map.getZoom());
+  const initialLayer = getViewName(effectiveEra(currentNation), map.getZoom());
 
   map.addSource("deprivation-source", {
     type: "vector",
@@ -189,6 +401,9 @@ map.on("load", () => {
 
   map.on("zoomend", updateMapSource);
 
+  updateLocalAuthorityControlState();
+  updateLocalAuthorityLayer();
+
   const popup = new maplibregl.Popup({
     closeButton: false,
     closeOnClick: false,
@@ -199,17 +414,79 @@ map.on("load", () => {
 
     const feature = e.features[0];
     const props = feature.properties;
-    const decile = props.imd_decile;
+
+    const decile = getPropCaseInsensitive(props, ["imd_decile"]);
+    const nation = getPropCaseInsensitive(props, ["nation"]);
+    const areaName =
+      getPropCaseInsensitive(props, [
+        "area_name",
+        "areaname",
+        "name",
+        "lsoa_name",
+        "data_zone_name",
+        "soa_name",
+      ]) || "Unknown area";
+    const areaCode =
+      getPropCaseInsensitive(props, [
+        "code",
+        "lsoa_code",
+        "data_zone_code",
+        "soa_code",
+      ]) || "Unknown code";
+    const imdYear = getPropCaseInsensitive(props, ["imd_year", "year"]);
+    const localAuthorityCode = getPropCaseInsensitive(props, [
+      "la_code",
+      "lad_code",
+      "local_authority_code",
+      "local_authority_district_code",
+    ]);
+    const localAuthorityName = getPropCaseInsensitive(props, [
+      "la_name",
+      "lad_name",
+      "local_authority_name",
+      "local_authority_district_name",
+    ]);
+    const localAuthorityYear = getPropCaseInsensitive(props, [
+      "la_year",
+      "lad_year",
+      "local_authority_year",
+      "local_authority_district_year",
+    ]);
+
+    const areaLabel = nation
+      ? `${String(nation).replace(/_/g, " ").toUpperCase()}`
+      : "Area";
+
+    // Look up the canonical boundary and IMD descriptions from DATASET_INFO
+    // so the tooltip always reflects the actual dataset for each nation,
+    // not just the raw era key (which would show "2011" for NI instead of "2001 SOAs").
+    const eraKey = effectiveEra(nation);
+    const datasetEntry =
+      nation && DATASET_INFO[nation] && DATASET_INFO[nation][eraKey]
+        ? DATASET_INFO[nation][eraKey]
+        : null;
+    const boundariesLabel = datasetEntry ? datasetEntry.boundaries : eraKey;
+    const imdLabel = datasetEntry ? datasetEntry.imd : (imdYear ?? "Unknown");
+    const localAuthorityLine =
+      nation === "northern_ireland"
+        ? "<div><strong>Local Government District:</strong> Not currently mapped in this layer</div>"
+        : `
+          <div><strong>Local Authority Name:</strong> ${localAuthorityName || "Unknown"}</div>
+          <div><strong>Local Authority Code:</strong> ${localAuthorityCode || "Unknown"}</div>
+          <div><strong>Local Authority Year:</strong> ${localAuthorityYear || "Unknown"}</div>
+        `;
 
     const content = `
       <div style="padding: 5px;">
         <strong style="display: block; margin-bottom: 5px; border-bottom: 1px solid #ccc;">
-          ${props.nation.toUpperCase()} LSOA
+          ${areaLabel}
         </strong>
-        <div><strong>Code:</strong> ${props.code}</div>
+        <div><strong>Name:</strong> ${areaName}</div>
+        <div><strong>Code:</strong> ${areaCode}</div>
+        ${localAuthorityLine}
         <div><strong>Decile:</strong> ${decile === 0 ? "No Data" : decile}</div>
         <div style="margin-top: 5px; font-size: 0.8em; color: #666;">
-          Era: ${currentEra} | Data Year: ${props.imd_year}
+          Boundaries: ${boundariesLabel} | Index: ${imdLabel}
         </div>
       </div>
     `;
@@ -223,20 +500,72 @@ map.on("load", () => {
   });
 });
 
+function updateDatasetInfo(selectedNation, era) {
+  const infoEl = document.getElementById("dataset-info");
+  const noteEl = document.getElementById("era-note");
+  const eraGroup = document.getElementById("era-toggle-group");
+  const eraSelect = document.getElementById("era-toggle");
+
+  const LABELS = {
+    england: "England",
+    wales: "Wales",
+    scotland: "Scotland",
+    northern_ireland: "N. Ireland",
+  };
+
+  // Era toggle is only meaningful when England is the sole selected nation.
+  const eraActive = selectedNation === "england";
+  eraGroup.style.opacity = eraActive ? "1" : "0.45";
+  eraSelect.disabled = !eraActive;
+  noteEl.textContent = eraActive
+    ? ""
+    : selectedNation === "all"
+      ? "All UK always shows latest data per country"
+      : "Era selector applies to England only";
+
+  const nations =
+    selectedNation === "all"
+      ? ["england", "wales", "scotland", "northern_ireland"]
+      : [selectedNation];
+
+  const lines = nations.map((n) => {
+    // England uses chosen era; all others are fixed on 2011.
+    const eraKey = n === "england" ? era : "2011";
+    const d = DATASET_INFO[n][eraKey];
+    const noteStr = d.note
+      ? ` <span style="color:#9a6700;font-style:italic;">(${d.note})</span>`
+      : "";
+    return `<div><strong>${LABELS[n]}:</strong> ${d.imd} &middot; ${d.boundaries}${noteStr}</div>`;
+  });
+
+  infoEl.innerHTML = lines.join("");
+}
+
 document.getElementById("era-toggle").addEventListener("change", (e) => {
   currentEra = e.target.value;
   updateMapSource();
+  updateDatasetInfo(currentNation, currentEra);
+  updateLocalAuthorityControlState();
+  updateLocalAuthorityLayer();
 });
 
 document.getElementById("nation-filter").addEventListener("change", (e) => {
-  const selectedNation = e.target.value;
+  currentNation = e.target.value;
+  const selectedNation = currentNation;
   map.setFilter(
     "deprivation-layer",
     selectedNation === "all" ? null : ["==", ["get", "nation"], selectedNation],
   );
-
-  // Update legend
+  // Changing nation may change the effective era (England→2021, others→2011)
+  updateMapSource();
   updateLegend(selectedNation);
+  updateDatasetInfo(selectedNation, currentEra);
+  updateLocalAuthorityControlState();
+  updateLocalAuthorityLayer();
+});
+
+document.getElementById("la-toggle").addEventListener("change", (e) => {
+  updateLocalAuthorityLayer();
 });
 
 function updateLegend(nation) {
@@ -298,5 +627,6 @@ function updateLegend(nation) {
   document.querySelector(".legend-title").textContent = title;
 }
 
-// Initialize legend
+// Initialize legend and dataset info panel
 updateLegend("all");
+updateDatasetInfo("all", currentEra);

@@ -1,0 +1,44 @@
+#!/bin/bash -e
+
+# Convenience script: run pytest either locally or via docker compose web container.
+# Usage examples:
+#   ./s/test
+#   ./s/test -q tests/test_uk_master_local_authority_fields.py
+
+COMPOSE_FILE="docker-compose-postgis.yml"
+
+run_local() {
+  echo "✨ Running pytest locally"
+  pytest "$@"
+}
+
+run_in_web_exec() {
+  echo "✨ Running pytest in running web container"
+  docker compose -f "$COMPOSE_FILE" exec -T web pytest "$@"
+}
+
+run_in_web_run() {
+  echo "✨ Running pytest in one-off web container"
+  mkdir -p datadb
+  docker compose -f "$COMPOSE_FILE" up -d db
+  docker compose -f "$COMPOSE_FILE" run --rm web pytest "$@"
+}
+
+# If already inside a container, run directly.
+if [[ -f "/.dockerenv" ]]; then
+  run_local "$@"
+  exit 0
+fi
+
+# If docker compose is unavailable, fallback to local pytest.
+if ! command -v docker >/dev/null 2>&1; then
+  run_local "$@"
+  exit 0
+fi
+
+# Prefer using an already-running web container.
+if docker compose -f "$COMPOSE_FILE" ps --status running --services 2>/dev/null | grep -qx "web"; then
+  run_in_web_exec "$@"
+else
+  run_in_web_run "$@"
+fi

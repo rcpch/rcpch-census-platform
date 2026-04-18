@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# .githooks/pre-push
+#
+# Runs the uk_master tile table tests before pushing.
+# If the tile tables don't exist locally (i.e. process_geometries hasn't been
+# run), prints a reminder and allows the push to proceed.
+# If the tables exist and the tests fail, the push is blocked.
+#
+# One-time setup per developer:
+#   git config core.hooksPath .githooks
+
+set -euo pipefail
+
+YELLOW='\033[0;33m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+RESET='\033[0m'
+
+TEST_FILE="tests/test_uk_master_local_authority_fields.py"
+
+echo ""
+echo "==> pre-push: checking uk_master tile table tests..."
+
+# Work out how to invoke pytest (mirrors s/test logic)
+if [ -f "/.dockerenv" ]; then
+    RUN_PYTEST="python -m pytest"
+elif docker compose ps web 2>/dev/null | grep -q "running"; then
+    RUN_PYTEST="docker compose exec -T web python -m pytest"
+else
+    RUN_PYTEST="python -m pytest"
+fi
+
+# Run with -v so skip/pass/fail is visible; capture exit code without set -e
+set +e
+$RUN_PYTEST "$TEST_FILE" -v --tb=short 2>&1
+EXIT_CODE=$?
+set -e
+
+if [ $EXIT_CODE -eq 0 ]; then
+    echo -e "${GREEN}==> pre-push: tile table tests passed.${RESET}"
+    exit 0
+fi
+
+# pytest exit code 5 means "no tests collected" (all skipped counts as 0 collected)
+# exit code 0 with skips still exits 0 — if we get here, something failed.
+
+# Check whether the skip was the reason (tables absent) — re-run quietly to inspect
+SKIP_CHECK=$($RUN_PYTEST "$TEST_FILE" --co -q 2>&1 || true)
+if echo "$SKIP_CHECK" | grep -q "skipped"; then
+    echo ""
+    echo -e "${YELLOW}==> pre-push: tile table tests were skipped (uk_master tables not found).${RESET}"
+    echo -e "${YELLOW}    To validate LA metadata in tiles, run:${RESET}"
+    echo -e "${YELLOW}      python manage.py seed --mode process_geometries${RESET}"
+    echo -e "${YELLOW}    then push again. Allowing push to proceed.${RESET}"
+    echo ""
+    exit 0
+fi
+
+echo ""
+echo -e "${RED}==> pre-push: tile table tests FAILED. Fix the failures before pushing.${RESET}"
+echo ""
+exit 1
