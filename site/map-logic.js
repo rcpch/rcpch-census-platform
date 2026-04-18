@@ -244,9 +244,16 @@ map.on("load", () => {
       ]) || "Unknown code";
     const imdYear = getPropCaseInsensitive(props, ["imd_year", "year"]);
 
+    const areaTypeLabel =
+      {
+        england: "LSOA",
+        wales: "LSOA",
+        scotland: "Data Zone",
+        northern_ireland: "SOA",
+      }[nation] || "Area";
     const areaLabel = nation
-      ? `${String(nation).replace(/_/g, " ").toUpperCase()} AREA`
-      : "AREA";
+      ? `${String(nation).replace(/_/g, " ").toUpperCase()} — ${areaTypeLabel}`
+      : "Area";
 
     const content = `
       <div style="padding: 5px;">
@@ -257,7 +264,7 @@ map.on("load", () => {
         <div><strong>Code:</strong> ${areaCode}</div>
         <div><strong>Decile:</strong> ${decile === 0 ? "No Data" : decile}</div>
         <div style="margin-top: 5px; font-size: 0.8em; color: #666;">
-          Era: ${currentEra} | Data Year: ${imdYear ?? "Unknown"}
+          Boundary Year: ${currentEra} | IMD Data Year: ${imdYear ?? "Unknown"}
         </div>
       </div>
     `;
