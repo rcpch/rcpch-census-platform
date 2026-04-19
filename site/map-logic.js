@@ -93,6 +93,45 @@ const LA_SOURCE_ID = "la-boundaries-source";
 const LA_LAYER_ID = "la-boundaries-layer";
 const LA_SOURCE_LAYER = "public.la_tiles";
 
+const HEALTH_BOUNDARIES = {
+  nhser: {
+    sourceId: "nhser-boundaries-source",
+    layerId: "nhser-boundaries-layer",
+    sourceLayer: "public.nhser_tiles_2021",
+    toggleId: "nhser-toggle",
+    groupId: "nhser-toggle-group",
+    noteId: "nhser-note",
+    color: "rgba(55, 65, 81, 0.85)",
+    widthBase: 1.5,
+    enabledIn: ["all", "england"],
+    disabledNote: "England only",
+  },
+  icb: {
+    sourceId: "icb-boundaries-source",
+    layerId: "icb-boundaries-layer",
+    sourceLayer: "public.icb_tiles_2023",
+    toggleId: "icb-toggle",
+    groupId: "icb-toggle-group",
+    noteId: "icb-note",
+    color: "rgba(127, 29, 29, 0.82)",
+    widthBase: 1.25,
+    enabledIn: ["all", "england"],
+    disabledNote: "England only",
+  },
+  lhb: {
+    sourceId: "lhb-boundaries-source",
+    layerId: "lhb-boundaries-layer",
+    sourceLayer: "public.lhb_tiles_2022",
+    toggleId: "lhb-toggle",
+    groupId: "lhb-toggle-group",
+    noteId: "lhb-note",
+    color: "rgba(22, 101, 52, 0.78)",
+    widthBase: 1.4,
+    enabledIn: ["all", "wales"],
+    disabledNote: "Wales only",
+  },
+};
+
 // Returns the tile era to actually request for the given nation selection.
 // Only England solo respects the era toggle; everything else uses 2011.
 function effectiveEra(nation) {
@@ -253,6 +292,87 @@ function updateLocalAuthorityControlState() {
     : "Not available for Northern Ireland in this layer";
 }
 
+function isHealthBoundaryEnabledForCurrentNation(config) {
+  return config.enabledIn.includes(currentNation);
+}
+
+function ensureHealthBoundarySource(config) {
+  if (map.getSource(config.sourceId)) {
+    return;
+  }
+
+  map.addSource(config.sourceId, {
+    type: "vector",
+    tiles: [`${TILES_BASE_URL}/${config.sourceLayer}/{z}/{x}/{y}.pbf`],
+    minzoom: 0,
+    maxzoom: 14,
+  });
+}
+
+function removeHealthBoundaryLayer(config) {
+  if (map.getLayer(config.layerId)) {
+    map.removeLayer(config.layerId);
+  }
+}
+
+function updateHealthBoundaryLayer(boundaryKey) {
+  const config = HEALTH_BOUNDARIES[boundaryKey];
+  const toggle = document.getElementById(config.toggleId);
+  const requested = !!toggle?.checked;
+  const enabled = isHealthBoundaryEnabledForCurrentNation(config);
+
+  if (!requested || !enabled) {
+    removeHealthBoundaryLayer(config);
+    return;
+  }
+
+  ensureHealthBoundarySource(config);
+
+  if (!map.getLayer(config.layerId)) {
+    map.addLayer({
+      id: config.layerId,
+      type: "line",
+      source: config.sourceId,
+      "source-layer": config.sourceLayer,
+      paint: {
+        "line-color": config.color,
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          4,
+          config.widthBase * 0.6,
+          7,
+          config.widthBase,
+          10,
+          config.widthBase * 1.4,
+        ],
+        "line-opacity": 1,
+      },
+    });
+  }
+
+  map.moveLayer(config.layerId);
+}
+
+function updateHealthBoundaryLayers() {
+  Object.keys(HEALTH_BOUNDARIES).forEach(updateHealthBoundaryLayer);
+}
+
+function updateHealthBoundaryControlState() {
+  Object.values(HEALTH_BOUNDARIES).forEach((config) => {
+    const toggle = document.getElementById(config.toggleId);
+    const group = document.getElementById(config.groupId);
+    const note = document.getElementById(config.noteId);
+    if (!toggle || !group || !note) return;
+
+    const enabled = isHealthBoundaryEnabledForCurrentNation(config);
+    toggle.disabled = !enabled;
+    group.style.opacity = enabled ? "1" : "0.45";
+    note.textContent = enabled ? "" : config.disabledNote;
+  });
+}
+
 function getColorExpression() {
   return [
     "case",
@@ -373,6 +493,7 @@ function updateMapSource() {
   }
 
   updateLocalAuthorityLayer();
+  updateHealthBoundaryLayers();
 
   console.log(`Switched to table: ${newLayer}, tiles: ${newTiles[0]}`);
 }
@@ -403,6 +524,8 @@ map.on("load", () => {
 
   updateLocalAuthorityControlState();
   updateLocalAuthorityLayer();
+  updateHealthBoundaryControlState();
+  updateHealthBoundaryLayers();
 
   const popup = new maplibregl.Popup({
     closeButton: false,
@@ -452,6 +575,20 @@ map.on("load", () => {
       "local_authority_year",
       "local_authority_district_year",
     ]);
+    const nhserCode = getPropCaseInsensitive(props, [
+      "nhser_code",
+      "nhs_region_code",
+      "nhser21cd",
+    ]);
+    const nhserName = getPropCaseInsensitive(props, [
+      "nhser_name",
+      "nhs_region_name",
+      "nhser21nm",
+    ]);
+    const icbCode = getPropCaseInsensitive(props, ["icb_code", "icb23cd"]);
+    const icbName = getPropCaseInsensitive(props, ["icb_name", "icb23nm"]);
+    const lhbCode = getPropCaseInsensitive(props, ["lhb_code", "lhb22cd"]);
+    const lhbName = getPropCaseInsensitive(props, ["lhb_name", "lhb22nm"]);
 
     const areaLabel = nation
       ? `${String(nation).replace(/_/g, " ").toUpperCase()}`
@@ -475,6 +612,20 @@ map.on("load", () => {
           <div><strong>Local Authority Code:</strong> ${localAuthorityCode || "Unknown"}</div>
           <div><strong>Local Authority Year:</strong> ${localAuthorityYear || "Unknown"}</div>
         `;
+    const healthBoundaryLine =
+      nation === "england"
+        ? `
+          <div><strong>NHS England Region:</strong> ${nhserName || "Not currently mapped in this layer"}</div>
+          <div><strong>NHS England Region Code:</strong> ${nhserCode || "Unknown"}</div>
+          <div><strong>Integrated Care Board:</strong> ${icbName || "Not currently mapped in this layer"}</div>
+          <div><strong>Integrated Care Board Code:</strong> ${icbCode || "Unknown"}</div>
+        `
+        : nation === "wales"
+          ? `
+            <div><strong>Local Health Board:</strong> ${lhbName || "Not currently mapped in this layer"}</div>
+            <div><strong>Local Health Board Code:</strong> ${lhbCode || "Unknown"}</div>
+          `
+          : "";
 
     const content = `
       <div style="padding: 5px;">
@@ -484,6 +635,7 @@ map.on("load", () => {
         <div><strong>Name:</strong> ${areaName}</div>
         <div><strong>Code:</strong> ${areaCode}</div>
         ${localAuthorityLine}
+        ${healthBoundaryLine}
         <div><strong>Decile:</strong> ${decile === 0 ? "No Data" : decile}</div>
         <div style="margin-top: 5px; font-size: 0.8em; color: #666;">
           Boundaries: ${boundariesLabel} | Index: ${imdLabel}
@@ -547,6 +699,8 @@ document.getElementById("era-toggle").addEventListener("change", (e) => {
   updateDatasetInfo(currentNation, currentEra);
   updateLocalAuthorityControlState();
   updateLocalAuthorityLayer();
+  updateHealthBoundaryControlState();
+  updateHealthBoundaryLayers();
 });
 
 document.getElementById("nation-filter").addEventListener("change", (e) => {
@@ -562,10 +716,24 @@ document.getElementById("nation-filter").addEventListener("change", (e) => {
   updateDatasetInfo(selectedNation, currentEra);
   updateLocalAuthorityControlState();
   updateLocalAuthorityLayer();
+  updateHealthBoundaryControlState();
+  updateHealthBoundaryLayers();
 });
 
 document.getElementById("la-toggle").addEventListener("change", (e) => {
   updateLocalAuthorityLayer();
+});
+
+document.getElementById("nhser-toggle").addEventListener("change", () => {
+  updateHealthBoundaryLayer("nhser");
+});
+
+document.getElementById("icb-toggle").addEventListener("change", () => {
+  updateHealthBoundaryLayer("icb");
+});
+
+document.getElementById("lhb-toggle").addEventListener("change", () => {
+  updateHealthBoundaryLayer("lhb");
 });
 
 function updateLegend(nation) {

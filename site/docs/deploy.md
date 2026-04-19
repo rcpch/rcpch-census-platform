@@ -34,7 +34,7 @@ Before deploying, ensure you have a published database dump:
    ```
    This creates a versioned GitHub release with the dump file (automatically split if >1.8GB).
 
-For detailed instructions, see [Database Dump Creation and Publication Guide](./DATABASE_DUMP_PUBLICATION.md).
+For detailed instructions, see [Database Dump Creation and Publication Guide](./database-dump-and-publish.md).
 
 ### 2. Database Seeding (One-Time or Updates)
 
@@ -62,7 +62,7 @@ az containerapp exec \
 - After publishing a new database dump version
 - When rolling back to a previous data version
 
-For detailed instructions, see [Database Seeding Guide](./DATABASE_SEEDING.md).
+For detailed instructions, see [Database Seeding Guide](./managed-database-seeding.md).
 
 ### 3. Application Deployment
 

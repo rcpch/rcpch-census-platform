@@ -76,6 +76,12 @@ Current map behaviour summary (quick reference only):
 | England-only (era toggle = 2021) | 2021 LSOA + 2025 IMD | n/a | n/a | n/a |
 | England-only (era toggle = 2011) | 2011 LSOA + 2019 IMD | n/a | n/a | n/a |
 
+Local authority boundary import summary:
+
+- England/Wales LA geometry is imported from the 2019 and 2024 ONS LAD BFC services.
+- Scotland LA geometry is imported from the 2011 GB LAD BFC service because the pre-seeded Scottish LocalAuthority rows are year `2011`.
+- The `public.la_tiles` overlay therefore uses year `2011` for Scotland and years `2019`/`2024` for England/Wales.
+
 If this summary conflicts with `site/docs/boundaries.md`, update this section to match `site/docs/boundaries.md`.
 
 ## Exposed tile properties
@@ -88,6 +94,12 @@ As of current implementation:
   - `la_code` (England/Wales/Scotland; `NULL` for N. Ireland)
   - `la_name` (England/Wales/Scotland; `NULL` for N. Ireland)
   - `la_year` (England/Wales/Scotland; `NULL` for N. Ireland)
+  - `nhser_code` (England only; `NULL` elsewhere)
+  - `nhser_name` (England only; `NULL` elsewhere)
+  - `icb_code` (England only; `NULL` elsewhere)
+  - `icb_name` (England only; `NULL` elsewhere)
+  - `lhb_code` (Wales only; `NULL` elsewhere)
+  - `lhb_name` (Wales only; `NULL` elsewhere)
   - `imd_decile`
   - `imd_year`
   - `nation`
@@ -124,6 +136,31 @@ Use:
 - `python manage.py seed --mode __all__`
 - then `python manage.py seed --mode import_bfc_boundaries`
 
+## Health Boundaries Import (NHS Regions, ICBs, Local Health Boards)
+
+Added April 2026. Three new health administrative boundaries imported via BFC (Boundaries Full Clipped) from ONS:
+
+| Boundary Type | Year | Nation | Endpoint Code | Django Column | Record Count |
+| --- | --- | --- | --- | --- | --- |
+| NHS England Regions | 2021 | England | NHSER21CD | `nhser_code` | 7 |
+| Integrated Care Boards | 2023 | England | ICB23CD | `icb_code` | ~42 |
+| Local Health Boards | 2022 | Wales | LHB22CD | `lhb_code` | 7 |
+
+All map to 2021 LSOA boundaries. Imported as part of `import_bfc_boundaries` mode. Models include:
+- `NHSEnglishRegion`, `IntegratedCareBoard`, `LocalHealthBoard` in `deprivation_scores/models.py`
+- Unique constraint on `(code, year)` to support multi-year versioning
+- Full geometry processing (3857 transform, simplification, spatial indexes)
+
+## Local Authority Boundary Imports
+
+Current Local Authority boundary sources are split by nation/year:
+
+| Boundary Type | Year | Nation Coverage | Endpoint Code | Django Column | Notes |
+| --- | --- | --- | --- | --- | --- |
+| Local Authority Districts | 2011 | Great Britain | `lad11cd` | `local_authority_district_code` | Used to spatialize the pre-seeded Scottish LA rows (`year = 2011`) |
+| Local Authority Districts | 2019 | England and Wales in current import flow | `lad19cd` | `local_authority_district_code` | Used for 2011-era England/Wales LA references |
+| Local Authority Districts | 2024 | England and Wales | `LAD24CD` | `local_authority_district_code` | Used for 2021-era England LA references |
+
 ## Convenience scripts in s/
 
 Primary helper scripts:
@@ -158,6 +195,8 @@ Database dump/release workflow helpers:
 
 - `s/build-dump`
   - Creates a local PostGIS container, runs migrations and seed modes, builds a compressed pg_dump, and performs a restore test.
+  - For release-grade dumps, prefer `./s/build-dump --fresh --yes` to force a clean rebuild from scratch.
+  - `./s/build-dump --existing --yes` reuses the current build container and skips reseeding.
 - `s/release-dump`
   - Publishes dump artifacts to GitHub Releases; auto-splits large dumps.
 - `s/restore-db`

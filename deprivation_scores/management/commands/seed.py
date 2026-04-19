@@ -1,9 +1,6 @@
-import gc
 import csv
 from enum import Enum
 import io
-import json
-import os
 from math import floor
 import requests
 from shapely.geometry import MultiPolygon
@@ -18,7 +15,6 @@ from django.conf import settings
 from ...models import (
     LSOA,
     LocalAuthority,
-    Ward,
     GreenSpace,
     DataZone,
     SOA,
@@ -28,7 +24,6 @@ from ...models import (
     NorthernIrelandIndexMultipleDeprivation,
     PopulationDensity,
 )
-from django.db import connection
 
 
 class QuantileType(Enum):
@@ -88,8 +83,47 @@ BOLD = "\033[1m"
 END = "\033[0m"
 
 
+def get_table_year_counts(table_name, year):
+    """Return total and spatialized row counts for a given table/year."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"SELECT COUNT(*) FROM {table_name} WHERE year = %s",
+            [year],
+        )
+        total_row = cursor.fetchone()
+        total_rows = total_row[0] if total_row else 0
+
+        cursor.execute(
+            f"SELECT COUNT(*) FROM {table_name} WHERE year = %s AND geom IS NOT NULL",
+            [year],
+        )
+        spatialized_row = cursor.fetchone()
+        spatialized_rows = spatialized_row[0] if spatialized_row else 0
+
+    return {
+        "total_rows": total_rows,
+        "spatialized_rows": spatialized_rows,
+    }
+
+
 class Command(BaseCommand):
     help = "seed database with census and IMD data for England, Wales, Scotland and Northern Ireland."
+
+    def _get_dataset_spatial_status(self, dataset):
+        table_name = dataset["table"]
+        year = dataset["year"]
+
+        counts = get_table_year_counts(table_name, year)
+        total_rows = counts["total_rows"]
+        spatialized_rows = counts["spatialized_rows"]
+
+        is_complete = total_rows > 0 and total_rows == spatialized_rows
+
+        return {
+            "total_rows": total_rows,
+            "spatialized_rows": spatialized_rows,
+            "is_complete": is_complete,
+        }
 
     def _run_post_processing_sql(self):
         self.stdout.write(
@@ -173,6 +207,12 @@ class Command(BaseCommand):
                 la.local_authority_district_code::text AS la_code,
                 la.local_authority_district_name::text AS la_name,
                 la.year::int AS la_year,
+                nh.nhser_code::text AS nhser_code,
+                nh.nhser_name::text AS nhser_name,
+                icb.icb_code::text AS icb_code,
+                icb.icb_name::text AS icb_name,
+                NULL::text AS lhb_code,
+                NULL::text AS lhb_name,
                 ST_MakeValid(ST_Multi(l.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'england'::text AS nation,
                 COALESCE(e.imd_decile, 0)::int AS imd_decile
@@ -181,6 +221,22 @@ class Command(BaseCommand):
                 ON e.lsoa_id = l.id AND e.year = {imd_year}
             LEFT JOIN deprivation_scores_localauthority la
                 ON la.id = l.local_authority_district_id
+            LEFT JOIN LATERAL (
+                SELECT r.nhser_code, r.nhser_name
+                FROM deprivation_scores_nhsenglishregion r
+                WHERE r.year = 2021
+                  AND r.geom_3857 IS NOT NULL
+                  AND ST_Contains(r.geom_3857, ST_PointOnSurface(l.{actual_geom_col}))
+                LIMIT 1
+            ) nh ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT b.icb_code, b.icb_name
+                FROM deprivation_scores_integratedcareboard b
+                WHERE b.year = 2023
+                  AND b.geom_3857 IS NOT NULL
+                  AND ST_Contains(b.geom_3857, ST_PointOnSurface(l.{actual_geom_col}))
+                LIMIT 1
+            ) icb ON TRUE
             WHERE l.lsoa_code LIKE 'E%' 
                 AND l.{actual_geom_col} IS NOT NULL 
                 AND l.year = {boundary_year}
@@ -196,6 +252,12 @@ class Command(BaseCommand):
                 la.local_authority_district_code::text AS la_code,
                 la.local_authority_district_name::text AS la_name,
                 la.year::int AS la_year,
+                NULL::text AS nhser_code,
+                NULL::text AS nhser_name,
+                NULL::text AS icb_code,
+                NULL::text AS icb_name,
+                lhb.lhb_code::text AS lhb_code,
+                lhb.lhb_name::text AS lhb_name,
                 ST_MakeValid(ST_Multi(l.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'wales'::text AS nation,
                 COALESCE(w.imd_decile, 0)::int AS imd_decile
@@ -204,6 +266,14 @@ class Command(BaseCommand):
                 ON w.lsoa_id = l.id AND w.year = {wales_imd_year}
             LEFT JOIN deprivation_scores_localauthority la
                 ON la.id = l.local_authority_district_id
+            LEFT JOIN LATERAL (
+                SELECT h.lhb_code, h.lhb_name
+                FROM deprivation_scores_localhealthboard h
+                WHERE h.year = 2022
+                  AND h.geom_3857 IS NOT NULL
+                  AND ST_Contains(h.geom_3857, ST_PointOnSurface(l.{actual_geom_col}))
+                LIMIT 1
+            ) lhb ON TRUE
             WHERE l.lsoa_code LIKE 'W%' 
                 AND l.{actual_geom_col} IS NOT NULL 
                 AND l.year = {boundary_year}
@@ -219,6 +289,12 @@ class Command(BaseCommand):
                 la.local_authority_district_code::text AS la_code,
                 la.local_authority_district_name::text AS la_name,
                 la.year::int AS la_year,
+                NULL::text AS nhser_code,
+                NULL::text AS nhser_name,
+                NULL::text AS icb_code,
+                NULL::text AS icb_name,
+                NULL::text AS lhb_code,
+                NULL::text AS lhb_name,
                 ST_MakeValid(ST_Multi(d.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'scotland'::text AS nation,
                 COALESCE(WIDTH_BUCKET(s.imd_rank, 1, 6977, 10), 0)::int AS imd_decile
@@ -241,6 +317,12 @@ class Command(BaseCommand):
                 NULL::text AS la_code,
                 NULL::text AS la_name,
                 NULL::int AS la_year,
+                NULL::text AS nhser_code,
+                NULL::text AS nhser_name,
+                NULL::text AS icb_code,
+                NULL::text AS icb_name,
+                NULL::text AS lhb_code,
+                NULL::text AS lhb_name,
                 ST_MakeValid(ST_Multi(so.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'northern_ireland'::text AS nation,
                 COALESCE(WIDTH_BUCKET(ni.imd_rank, 1, 891, 10), 0)::int AS imd_decile
@@ -272,6 +354,15 @@ class Command(BaseCommand):
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_nhsenglishregion ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_nhsenglishregion ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_nhsenglishregion ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_integratedcareboard ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_integratedcareboard ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_integratedcareboard ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_localhealthboard ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_localhealthboard ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_localhealthboard ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
             # Section 2: Cleanup
             "DROP TABLE IF EXISTS public.uk_master_2011_z0_4 CASCADE;",
             "DROP TABLE IF EXISTS public.uk_master_2011_z5_7 CASCADE;",
@@ -281,27 +372,42 @@ class Command(BaseCommand):
             "DROP TABLE IF EXISTS public.uk_master_2021_z8_10 CASCADE;",
             "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z0_4 CASCADE;",
             "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z0_4 CASCADE;",
+            "DROP VIEW IF EXISTS public.nhser_tiles_2021 CASCADE;",
+            "DROP VIEW IF EXISTS public.icb_tiles_2023 CASCADE;",
+            "DROP VIEW IF EXISTS public.lhb_tiles_2022 CASCADE;",
             # Section 3: Geoprocessing (WGS84 -> Web Mercator 3857)
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_MakeValid(geom_3857) WHERE NOT ST_IsValid(geom_3857);",
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_datazone SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_soa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             "UPDATE deprivation_scores_localauthority SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            "UPDATE deprivation_scores_nhsenglishregion SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            "UPDATE deprivation_scores_integratedcareboard SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            "UPDATE deprivation_scores_localhealthboard SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             # Section 4: Simplification
             # Clear existing simplified columns first so re-runs always apply the current tolerances.
             "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = NULL, geom_3857_simp_z5_7 = NULL WHERE geom_3857 IS NOT NULL;",
             "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = NULL, geom_3857_simp_z5_7 = NULL WHERE geom_3857 IS NOT NULL;",
             "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = NULL, geom_3857_simp_z5_7 = NULL WHERE geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_nhsenglishregion SET geom_3857_simp_z0_4 = NULL, geom_3857_simp_z5_7 = NULL WHERE geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_integratedcareboard SET geom_3857_simp_z0_4 = NULL, geom_3857_simp_z5_7 = NULL WHERE geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_localhealthboard SET geom_3857_simp_z0_4 = NULL, geom_3857_simp_z5_7 = NULL WHERE geom_3857 IS NOT NULL;",
             # z0-4: national overview (~1,500 m tolerance in Web Mercator metres).
             # At zoom 4 a pixel represents ~9,800 m, so sub-1,500 m detail is invisible noise.
             "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
             "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
             "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_nhsenglishregion SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_integratedcareboard SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_localhealthboard SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)) WHERE geom_3857_simp_z0_4 IS NULL AND geom_3857 IS NOT NULL;",
             # z5-7: regional/city overview (~200 m tolerance).
             # At zoom 7 a pixel represents ~1,200 m; 200 m gives clean borough-level outlines.
             "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
             "UPDATE deprivation_scores_datazone SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
             "UPDATE deprivation_scores_soa SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_nhsenglishregion SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_integratedcareboard SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_localhealthboard SET geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)) WHERE geom_3857_simp_z5_7 IS NULL AND geom_3857 IS NOT NULL;",
             # Section 5: Spatial indexing & clustering
             "CREATE INDEX IF NOT EXISTS idx_lsoa_3857 ON deprivation_scores_lsoa USING GIST (geom_3857);",
             "CREATE INDEX IF NOT EXISTS idx_datazone_3857 ON deprivation_scores_datazone USING GIST (geom_3857);",
@@ -309,9 +415,15 @@ class Command(BaseCommand):
             "CREATE INDEX IF NOT EXISTS idx_lsoa_year_id ON deprivation_scores_lsoa (year, id);",
             "CREATE INDEX IF NOT EXISTS idx_english_imd_year_lsoa ON deprivation_scores_englishindexmultipledeprivation (year, lsoa_id);",
             "CREATE INDEX IF NOT EXISTS idx_welsh_imd_year_lsoa ON deprivation_scores_welshindexmultipledeprivation (year, lsoa_id);",
+            "CREATE INDEX IF NOT EXISTS idx_nhsenglishregion_3857 ON deprivation_scores_nhsenglishregion USING GIST (geom_3857);",
+            "CREATE INDEX IF NOT EXISTS idx_integratedcareboard_3857 ON deprivation_scores_integratedcareboard USING GIST (geom_3857);",
+            "CREATE INDEX IF NOT EXISTS idx_localhealthboard_3857 ON deprivation_scores_localhealthboard USING GIST (geom_3857);",
             "CLUSTER deprivation_scores_lsoa USING idx_lsoa_3857;",
             "CLUSTER deprivation_scores_datazone USING idx_datazone_3857;",
             "CLUSTER deprivation_scores_soa USING idx_soa_3857;",
+            "CLUSTER deprivation_scores_nhsenglishregion USING idx_nhsenglishregion_3857;",
+            "CLUSTER deprivation_scores_integratedcareboard USING idx_integratedcareboard_3857;",
+            "CLUSTER deprivation_scores_localhealthboard USING idx_localhealthboard_3857;",
             # Section 6: LSOA Views
             get_lsoa_view_sql("lsoa_tiles_2011_z0_4", "geom_3857_simp_z0_4", 2011),
             get_lsoa_view_sql("lsoa_tiles_2011_z5_7", "geom_3857_simp_z5_7", 2011),
@@ -327,6 +439,9 @@ class Command(BaseCommand):
             get_uk_master_view_sql("uk_master_2021_z5_7", "simp_z5_7", 2021, 2025),
             get_uk_master_view_sql("uk_master_2021_z8_10", "3857", 2021, 2025),
             "CREATE OR REPLACE VIEW public.la_tiles AS SELECT year, geom_3857 AS geom, local_authority_district_code AS lad_code FROM deprivation_scores_localauthority;",
+            "CREATE OR REPLACE VIEW public.nhser_tiles_2021 AS SELECT year::int AS year, nhser_code::text AS code, nhser_name::text AS area_name, geom_3857::geometry(MultiPolygon, 3857) AS geom, 'england'::text AS nation FROM deprivation_scores_nhsenglishregion WHERE year = 2021 AND geom_3857 IS NOT NULL;",
+            "CREATE OR REPLACE VIEW public.icb_tiles_2023 AS SELECT year::int AS year, icb_code::text AS code, icb_name::text AS area_name, geom_3857::geometry(MultiPolygon, 3857) AS geom, 'england'::text AS nation FROM deprivation_scores_integratedcareboard WHERE year = 2023 AND geom_3857 IS NOT NULL;",
+            "CREATE OR REPLACE VIEW public.lhb_tiles_2022 AS SELECT year::int AS year, lhb_code::text AS code, lhb_name::text AS area_name, geom_3857::geometry(MultiPolygon, 3857) AS geom, 'wales'::text AS nation FROM deprivation_scores_localhealthboard WHERE year = 2022 AND geom_3857 IS NOT NULL;",
             # Section 8: Final housekeeping
             "GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;",
             "ANALYZE deprivation_scores_lsoa;",
@@ -351,7 +466,7 @@ class Command(BaseCommand):
 
                 try:
                     cursor.execute(stmt)
-                    print(f"[POSTPROCESS] Success")
+                    print("[POSTPROCESS] Success")
                 except Exception as e:
                     err_msg = f"SQL Error: {e}"
                     self.stderr.write(self.style.ERROR(err_msg))
@@ -370,20 +485,18 @@ class Command(BaseCommand):
         chunk_size = dataset.get("chunk_size", 1000)
         specific_code_col = dataset.get("code_column", "").lower()
         django_col = dataset.get("django_code_col")
+        source_name_col = dataset.get("name_column", "").lower()
+        django_name_col = dataset.get("django_name_col")
 
         # 1. Guard
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f"SELECT COUNT(*) FROM {table_name} WHERE year = %s AND geom IS NOT NULL",
-                [year],
-            )
-            if cursor.fetchone()[0] > 0 and not force:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"  {dataset['name']} already spatialized. Skipping."
-                    )
+        status = self._get_dataset_spatial_status(dataset)
+        if status["is_complete"] and not force:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"  {dataset['name']} already spatialized ({status['spatialized_rows']}/{status['total_rows']}). Skipping."
                 )
-                return
+            )
+            return
 
         try:
             # 2. Remote Download with simple progress log
@@ -397,7 +510,6 @@ class Command(BaseCommand):
 
                     # Step 1: Get all ObjectIDs (fast, no geometry)
                     base_url = source.split("?")[0]  # Remove existing query params
-                    separator = "&" if "?" in source else "?"
 
                     # Extract query params from original URL if they exist
                     query_params = {}
@@ -410,7 +522,7 @@ class Command(BaseCommand):
 
                     # Get ObjectIDs only
                     oid_url = f"{base_url}?where={query_params.get('where', '1=1')}&returnIdsOnly=true&f=json"
-                    self.stdout.write(f"  Fetching ObjectIDs...")
+                    self.stdout.write("  Fetching ObjectIDs...")
                     oid_response = requests.get(oid_url, timeout=300)
                     oid_response.raise_for_status()
                     oid_data = oid_response.json()
@@ -449,9 +561,9 @@ class Command(BaseCommand):
                         batch_url = (
                             f"{base_url}?objectIds={id_list}&outFields=*&f=geojson"
                         )
+                        indent = "  " * (depth + 1)
                         for attempt in range(max_retries):
                             try:
-                                indent = "  " * (depth + 1)
                                 self.stdout.write(
                                     f"{indent}Downloading batch {batch_ids[0]}-{batch_ids[-1]} (attempt {attempt+1})..."
                                 )
@@ -625,9 +737,13 @@ class Command(BaseCommand):
             )
 
             temp_table = f"temp_shapes_{year}"
-            self.stdout.write(f"  Uploading shapes to PostgreSQL...")
+            self.stdout.write("  Uploading shapes to PostgreSQL...")
 
-            final_gdf[[specific_code_col, "geometry"]].to_postgis(
+            upload_columns = [specific_code_col, "geometry"]
+            if source_name_col and source_name_col in final_gdf.columns:
+                upload_columns.insert(1, source_name_col)
+
+            final_gdf[upload_columns].to_postgis(
                 temp_table, engine, if_exists="replace", index=False
             )
 
@@ -643,16 +759,54 @@ class Command(BaseCommand):
                 )
 
             with connection.cursor() as cursor:
-                # Use explicit geometry cast to prevent any implicit simplification
+                # Health boundary tables may be empty initially; insert-or-update handles both fresh and existing rows.
+                if django_name_col and source_name_col:
+                    cursor.execute(
+                        f"""
+                        INSERT INTO {table_name} ({django_col}, {django_name_col}, year, geom)
+                        SELECT t.{specific_code_col}, t.{source_name_col}, %s,
+                               t.geometry::geometry(MultiPolygon, 4326)
+                        FROM {temp_table} t
+                        ON CONFLICT ({django_col}, year)
+                        DO UPDATE SET
+                            {django_name_col} = EXCLUDED.{django_name_col},
+                            geom = EXCLUDED.geom;
+                    """,
+                        [year],
+                    )
+                else:
+                    # Existing reference tables are pre-seeded; update geometry only.
+                    cursor.execute(
+                        f"""
+                        UPDATE {table_name} SET geom = t.geometry::geometry(MultiPolygon, 4326)
+                        FROM {temp_table} t
+                        WHERE {table_name}.{django_col} = t.{specific_code_col} AND {table_name}.year = %s;
+                    """,
+                        [year],
+                    )
+
+                # Apply code remapping for datasets where source codes differ from DB codes
+                # (e.g. Scottish councils renumbered in 2019 but stored as year=2011).
+                code_remapping = dataset.get("code_remapping", {})
+                for source_code, db_code in code_remapping.items():
+                    cursor.execute(
+                        f"""
+                        UPDATE {table_name} SET geom = t.geometry::geometry(MultiPolygon, 4326)
+                        FROM {temp_table} t
+                        WHERE t.{specific_code_col} = %s
+                          AND {table_name}.{django_col} = %s
+                          AND {table_name}.year = %s;
+                        """,
+                        [source_code, db_code, year],
+                    )
+                    self.stdout.write(f"  Code remap: {source_code} -> {db_code}")
+
                 cursor.execute(
-                    f"""
-                    UPDATE {table_name} SET geom = t.geometry::geometry(MultiPolygon, 4326)
-                    FROM {temp_table} t
-                    WHERE {table_name}.{django_col} = t.{specific_code_col} AND {table_name}.year = %s;
-                """,
+                    f"SELECT COUNT(*) FROM {table_name} WHERE year = %s AND geom IS NOT NULL;",
                     [year],
                 )
-                count = cursor.rowcount
+                count_row = cursor.fetchone()
+                count = count_row[0] if count_row else 0
 
                 # DEBUG: Check main table immediately after UPDATE
                 cursor.execute(
@@ -744,7 +898,8 @@ class Command(BaseCommand):
             """,
                 [schema, rel, schema, rel],
             )
-            return cursor.fetchone()[0]
+            exists_row = cursor.fetchone()
+            return exists_row[0] if exists_row else False
 
         with connection.cursor() as cursor:
             # 1. Check the 2011 Master View
@@ -858,6 +1013,27 @@ class Command(BaseCommand):
                 "code_column": "LSOA21CD",
             },
             {
+                "name": "LAD 2011 GB BFC",
+                # GB (not UK) = England + Wales + Scotland; supplies geometry for Scottish 2011 rows.
+                # Four Scottish councils were renumbered in 2019; their 2011 BFC codes differ from
+                # the codes stored in the DB (which came from a 2019-era lookup CSV). The
+                # code_remapping dict maps old BFC code -> current DB code so the import engine
+                # can patch those rows after the primary UPDATE.
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_December_2011_GB_BFC_2022/FeatureServer/0/query?where=1=1&outFields=*&f=geojson",
+                "table": "deprivation_scores_localauthority",
+                "django_code_col": "local_authority_district_code",
+                "year": 2011,
+                "code_column": "lad11cd",  # lowercase for this service
+                "chunk_size": 25,
+                "code_remapping": {
+                    # 2011 BFC code -> DB code (2019 code stored with year=2011)
+                    "S12000015": "S12000047",  # Fife
+                    "S12000024": "S12000048",  # Perth and Kinross
+                    "S12000044": "S12000050",  # North Lanarkshire
+                    "S12000046": "S12000049",  # Glasgow City
+                },
+            },
+            {
                 "name": "LAD 2024 BFC",
                 "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_May_2024_Boundaries_UK_BFC/FeatureServer/0/query?where=1=1&outFields=*&f=geojson",
                 "table": "deprivation_scores_localauthority",
@@ -893,6 +1069,39 @@ class Command(BaseCommand):
                 "year": 2001,
                 "code_column": "soa2011",
             },
+            {
+                "name": "NHS England Regions 2021 BFC",
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/NHS_England_Regions_April_2021_EN_BFC_2022/FeatureServer/0/query?where=1%3D1&outFields=*&f=geojson",
+                "table": "deprivation_scores_nhsenglishregion",
+                "django_code_col": "nhser_code",
+                "django_name_col": "nhser_name",
+                "year": 2021,
+                "code_column": "NHSER21CD",
+                "name_column": "NHSER21NM",
+                "chunk_size": 10,  # Only 7 regions, but use 10 for safety
+            },
+            {
+                "name": "Integrated Care Boards 2023 BFC",
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Integrated_Care_Boards_April_2023_EN_BFC/FeatureServer/0/query?where=1%3D1&outFields=*&f=geojson",
+                "table": "deprivation_scores_integratedcareboard",
+                "django_code_col": "icb_code",
+                "django_name_col": "icb_name",
+                "year": 2023,
+                "code_column": "ICB23CD",
+                "name_column": "ICB23NM",
+                "chunk_size": 20,  # ~42 ICBs
+            },
+            {
+                "name": "Local Health Boards 2022 BFC",
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Health_Boards_April_2022_WA_BFC_2022/FeatureServer/0/query?where=1%3D1&outFields=*&f=geojson",
+                "table": "deprivation_scores_localhealthboard",
+                "django_code_col": "lhb_code",
+                "django_name_col": "lhb_name",
+                "year": 2022,
+                "code_column": "LHB22CD",
+                "name_column": "LHB22NM",
+                "chunk_size": 10,  # 7 LHBs in Wales
+            },
         ]
 
         # Update your logic here
@@ -905,12 +1114,43 @@ class Command(BaseCommand):
                 + "\n"
             )
 
+            if not force:
+                self.stdout.write(
+                    "Preflight: checking boundary completeness by table/year..."
+                )
+
+            datasets_to_import = []
+            skipped_count = 0
             for ds in BFC_DATASETS:
-                # We now pass the entire dictionary 'ds' instead of individual arguments
+                status = self._get_dataset_spatial_status(ds)
+
+                if force:
+                    datasets_to_import.append(ds)
+                    self.stdout.write(
+                        f"  FORCE {ds['name']}: will reprocess ({status['spatialized_rows']}/{status['total_rows']} spatialized)."
+                    )
+                elif status["is_complete"]:
+                    skipped_count += 1
+                    self.stdout.write(
+                        f"  SKIP  {ds['name']}: complete ({status['spatialized_rows']}/{status['total_rows']})."
+                    )
+                else:
+                    datasets_to_import.append(ds)
+                    self.stdout.write(
+                        f"  RUN   {ds['name']}: incomplete ({status['spatialized_rows']}/{status['total_rows']})."
+                    )
+
+            for ds in datasets_to_import:
                 self._stream_bfc_import(
                     dataset=ds,
                     force=force,
                 )
+
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Boundary import preflight summary: run={len(datasets_to_import)}, skipped={skipped_count}, force={force}."
+                )
+            )
 
             # Run optimizations after all datasets are imported
             self._run_post_processing_sql()
@@ -2712,8 +2952,33 @@ def test_table_totals():
             "expected": 6976,
             "message": "ScottishIndexMultipleDeprivation should have 6976 rows.",
         },
+        {
+            "label": "NHSEnglishRegion",
+            "count": get_table_year_counts("deprivation_scores_nhsenglishregion", 2021)[
+                "spatialized_rows"
+            ],
+            "expected": 7,
+            "message": "NHSEnglishRegion should have 7 rows with geometries for year 2021.",
+        },
+        {
+            "label": "IntegratedCareBoard",
+            "count": get_table_year_counts(
+                "deprivation_scores_integratedcareboard", 2023
+            )["spatialized_rows"],
+            "expected": 42,
+            "message": "IntegratedCareBoard should have 42 rows with geometries for year 2023.",
+        },
+        {
+            "label": "LocalHealthBoard",
+            "count": get_table_year_counts("deprivation_scores_localhealthboard", 2022)[
+                "spatialized_rows"
+            ],
+            "expected": 7,
+            "message": "LocalHealthBoard should have 7 rows with geometries for year 2022.",
+        },
     ]
     for val in normal_vals:
+        label = val.get("label") or val["model"].__name__
         try:
             assert val["count"] == val["expected"]
         except AssertionError:
@@ -2721,9 +2986,7 @@ def test_table_totals():
                 "\n" + R + f"😬 {val['message']} But got {val['count']}." + W + "\n"
             )
             continue
-        sys.stdout.write(
-            W + f"✅ {val['model'].__name__} has {val['count']} records." + W + "\n"
-        )
+        sys.stdout.write(W + f"✅ {label} has {val['count']} records." + W + "\n")
 
 
 def image():

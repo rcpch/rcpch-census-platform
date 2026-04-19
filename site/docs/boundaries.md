@@ -28,8 +28,58 @@ We use **BFC (Boundaries Full Clipped)** datasets to ensure high-fidelity bounda
 | **England/Wales LSOA** | 2021 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LSOA_2021_EW_BFE_V10_RUC/FeatureServer/3/query) | `LSOA21CD` | `lsoa_code` |
 | **Scotland DataZone** | 2011 | [ScotGov MapServer](https://maps.gov.scot/server/rest/services/ScotGov/StatisticalUnits/MapServer/2/query) | `DataZone` | `data_zone_code` |
 | **N. Ireland SOA** | 2011 | [NISRA FeatureServer](https://services3.arcgis.com/APHjSHuFMGWVZFgQ/arcgis/rest/services/SOA2011/FeatureServer/0/query) | `SOA_CODE` | `soa_code` |
-| **UK Local Authority** | 2019 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_December_2019_Boundaries_UK_BFC/FeatureServer/0/query) | `LAD19CD` | `local_authority_district_code` |
-| **UK Local Authority** | 2024 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_May_2024_Boundaries_UK_BFC/FeatureServer/0/query) | `LAD24CD` | `local_authority_district_code` |
+| **Great Britain Local Authority** | 2011 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_December_2011_GB_BFC_2022/FeatureServer/0/query) | `lad11cd` | `local_authority_district_code` |
+| **England/Wales Local Authority** | 2019 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LAD_Dec_2019_Boundaries_UK_BFC_2022/FeatureServer/0/query) | `lad19cd` | `local_authority_district_code` |
+| **England/Wales Local Authority** | 2024 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_May_2024_Boundaries_UK_BFC/FeatureServer/0/query) | `LAD24CD` | `local_authority_district_code` |
+| **NHS England Regions** | 2021 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/NHS_England_Regions_April_2021_EN_BFC_2022/FeatureServer/0/query) | `NHSER21CD` | `nhser_code` |
+| **Integrated Care Boards** | 2023 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Integrated_Care_Boards_April_2023_EN_BFC/FeatureServer/0/query) | `ICB23CD` | `icb_code` |
+| **Local Health Boards** | 2022 | [ONS FeatureServer](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Health_Boards_April_2022_WA_BFC_2022/FeatureServer/0/query) | `LHB22CD` | `lhb_code` |
+
+### Local Authority import note
+
+Local authority geometries are intentionally split across three datasets in the current pipeline:
+
+* The 2011 GB LAD dataset supplies geometry for the pre-seeded Scottish `LocalAuthority` rows, which exist as `year = 2011`.
+* The 2019 LAD dataset supplies geometry for England and Wales local authorities used by the 2011-era map and `uk_master_2011_*` tables.
+* The 2024 LAD dataset supplies geometry for England local authorities used by the 2021-era England map.
+
+Although the 2019 endpoint is branded as UK in ONS, the current import flow relies on the 2011 GB dataset to spatialize Scottish local authorities.
+
+### Scottish LAD code remapping (2011 geometry -> current DB codes)
+
+Four Scottish councils were renumbered in 2019. The 2011 GB BFC geometry service still uses the older 2011 LAD codes, while the seeded `LocalAuthority` rows in this project use the newer codes from a 2019-era lookup source.
+
+To avoid re-seeding Scotland with legacy codes, `import_bfc_boundaries` applies a targeted code remap for these rows when importing the 2011 GB LAD dataset:
+
+* `S12000015` -> `S12000047` (Fife)
+* `S12000024` -> `S12000048` (Perth and Kinross)
+* `S12000044` -> `S12000050` (North Lanarkshire)
+* `S12000046` -> `S12000049` (Glasgow City)
+
+Practical effect:
+
+* The geometry source remains authoritative for 2011 boundaries.
+* Tile properties and tooltip LA codes stay aligned with currently used Scottish LA codes.
+* A preflight status such as `28/32` for `LAD 2011 GB BFC` indicates this remap path has not yet been applied in that environment.
+
+## Conditional Import Behaviour
+
+`import_bfc_boundaries` runs a preflight completeness check for each configured dataset using table + year:
+
+* `total_rows`: rows present for that `year`
+* `spatialized_rows`: rows with non-null `geom`
+* `is_complete`: `total_rows > 0` and `total_rows == spatialized_rows`
+
+Default behaviour (without `--force`):
+
+* Complete datasets are skipped.
+* Incomplete datasets are imported.
+* A summary line is printed with run/skip counts.
+
+Force behaviour (with `--force`):
+
+* All configured datasets are reprocessed.
+* Existing geometry can be overwritten.
 
 ## Technical Note: Why we use Streaming over ogr2ogr
 
@@ -62,6 +112,11 @@ This section summarizes what the map currently renders by view. Use this as the 
 | England-only (era = 2011) | England | LSOA 2011 | IMD 2019 | 2019 | Lookup-linked (2011 LSOAs reference 2019 LADs in source lookup file) |
 | England-only (era = 2021) | England | LSOA 2021 | IMD 2025 | 2024 | Lookup-linked (2021 LSOAs reference 2024 LADs in source lookup file) |
 
+For the standalone `public.la_tiles` overlay source, the year mapping is currently:
+
+* England/Wales: `2019` and `2024`
+* Scotland: `2011`
+
 ### Important alignment caveat
 
 `la_*` fields are currently joined by the pre-seeded lookup relationships (LSOA/DataZone -> LocalAuthority), not by spatial overlay/intersection at runtime. This means they represent the mapped administrative relationship in the source datasets, not a geometric "best fit" recomputation inside tile SQL.
@@ -83,6 +138,12 @@ The following properties are exposed at all zoom levels:
 * `la_code`: Local authority code for England/Wales/Scotland (`NULL` for Northern Ireland)
 * `la_name`: Local authority name for England/Wales/Scotland (`NULL` for Northern Ireland)
 * `la_year`: Local authority reference year for England/Wales/Scotland (`NULL` for Northern Ireland)
+* `nhser_code`: NHS England Region code (`NULL` outside England)
+* `nhser_name`: NHS England Region name (`NULL` outside England)
+* `icb_code`: Integrated Care Board code (`NULL` outside England)
+* `icb_name`: Integrated Care Board name (`NULL` outside England)
+* `lhb_code`: Local Health Board code (`NULL` outside Wales)
+* `lhb_name`: Local Health Board name (`NULL` outside Wales)
 * `imd_decile`: Decile used for choropleth colouring
 * `imd_year`: IMD publication year for that nation in the selected era
 * `nation`: `england`, `wales`, `scotland`, or `northern_ireland`
@@ -98,6 +159,22 @@ The following properties are exposed at all zoom levels:
 * `imd_rank`
 * `year`
 
+### Health Boundary Tables
+
+Health boundaries are exposed through dedicated views with consistent key names:
+
+* `public.nhser_tiles_2021`
+* `public.icb_tiles_2023`
+* `public.lhb_tiles_2022`
+
+Each exposes:
+
+* `code` (boundary code)
+* `area_name` (human-readable name)
+* `nation` (`england` or `wales`)
+* `year`
+* `geom`
+
 ### Why this matters
 
 Because pg_tileserv serves directly from these materialized tables, adding a column in the post-processing SQL makes it available immediately in tile properties after rebuilding the tables.
@@ -109,6 +186,9 @@ Confirm what is actually served by querying the pg_tileserv metadata endpoints d
 ```bash
 curl http://localhost:7800/public.uk_master_2021_z8_10.json | jq '.properties[] | .name'
 curl http://localhost:7800/public.lsoa_tiles_2021_z8_10.json | jq '.properties[] | .name'
+curl http://localhost:7800/public.nhser_tiles_2021.json | jq '.properties[] | .name'
+curl http://localhost:7800/public.icb_tiles_2023.json | jq '.properties[] | .name'
+curl http://localhost:7800/public.lhb_tiles_2022.json | jq '.properties[] | .name'
 ```
 
 This is the authoritative source of truth for what the frontend receives. If a property appears in the SQL `SELECT` but not in these metadata responses, the tile tables have not been rebuilt yet.

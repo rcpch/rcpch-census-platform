@@ -377,8 +377,8 @@ az containerapp exec \
 
 ## Related Documentation
 
-- [Database Dump Creation and Publication Guide](./DATABASE_DUMP_PUBLICATION.md) - How to create and release dumps
-- [Deployment Guide](./DEPLOYMENT.md) - Full application deployment workflow
+- [Database Dump Creation and Publication Guide](./database-dump-and-publish.md) - How to create and release dumps
+- [Deployment Guide](./deploy.md) - Full application deployment workflow
 - [Azure Container Apps Documentation](https://learn.microsoft.com/en-us/azure/container-apps/)
 - [Azure Database for PostgreSQL Documentation](https://learn.microsoft.com/en-us/azure/postgresql/)
 
