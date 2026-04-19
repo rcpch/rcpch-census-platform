@@ -207,6 +207,12 @@ class Command(BaseCommand):
                 la.local_authority_district_code::text AS la_code,
                 la.local_authority_district_name::text AS la_name,
                 la.year::int AS la_year,
+                nh.nhser_code::text AS nhser_code,
+                nh.nhser_name::text AS nhser_name,
+                icb.icb_code::text AS icb_code,
+                icb.icb_name::text AS icb_name,
+                NULL::text AS lhb_code,
+                NULL::text AS lhb_name,
                 ST_MakeValid(ST_Multi(l.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'england'::text AS nation,
                 COALESCE(e.imd_decile, 0)::int AS imd_decile
@@ -215,6 +221,22 @@ class Command(BaseCommand):
                 ON e.lsoa_id = l.id AND e.year = {imd_year}
             LEFT JOIN deprivation_scores_localauthority la
                 ON la.id = l.local_authority_district_id
+            LEFT JOIN LATERAL (
+                SELECT r.nhser_code, r.nhser_name
+                FROM deprivation_scores_nhsenglishregion r
+                WHERE r.year = 2021
+                  AND r.geom_3857 IS NOT NULL
+                  AND ST_Contains(r.geom_3857, ST_PointOnSurface(l.{actual_geom_col}))
+                LIMIT 1
+            ) nh ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT b.icb_code, b.icb_name
+                FROM deprivation_scores_integratedcareboard b
+                WHERE b.year = 2023
+                  AND b.geom_3857 IS NOT NULL
+                  AND ST_Contains(b.geom_3857, ST_PointOnSurface(l.{actual_geom_col}))
+                LIMIT 1
+            ) icb ON TRUE
             WHERE l.lsoa_code LIKE 'E%' 
                 AND l.{actual_geom_col} IS NOT NULL 
                 AND l.year = {boundary_year}
@@ -230,6 +252,12 @@ class Command(BaseCommand):
                 la.local_authority_district_code::text AS la_code,
                 la.local_authority_district_name::text AS la_name,
                 la.year::int AS la_year,
+                NULL::text AS nhser_code,
+                NULL::text AS nhser_name,
+                NULL::text AS icb_code,
+                NULL::text AS icb_name,
+                lhb.lhb_code::text AS lhb_code,
+                lhb.lhb_name::text AS lhb_name,
                 ST_MakeValid(ST_Multi(l.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'wales'::text AS nation,
                 COALESCE(w.imd_decile, 0)::int AS imd_decile
@@ -238,6 +266,14 @@ class Command(BaseCommand):
                 ON w.lsoa_id = l.id AND w.year = {wales_imd_year}
             LEFT JOIN deprivation_scores_localauthority la
                 ON la.id = l.local_authority_district_id
+            LEFT JOIN LATERAL (
+                SELECT h.lhb_code, h.lhb_name
+                FROM deprivation_scores_localhealthboard h
+                WHERE h.year = 2022
+                  AND h.geom_3857 IS NOT NULL
+                  AND ST_Contains(h.geom_3857, ST_PointOnSurface(l.{actual_geom_col}))
+                LIMIT 1
+            ) lhb ON TRUE
             WHERE l.lsoa_code LIKE 'W%' 
                 AND l.{actual_geom_col} IS NOT NULL 
                 AND l.year = {boundary_year}
@@ -253,6 +289,12 @@ class Command(BaseCommand):
                 la.local_authority_district_code::text AS la_code,
                 la.local_authority_district_name::text AS la_name,
                 la.year::int AS la_year,
+                NULL::text AS nhser_code,
+                NULL::text AS nhser_name,
+                NULL::text AS icb_code,
+                NULL::text AS icb_name,
+                NULL::text AS lhb_code,
+                NULL::text AS lhb_name,
                 ST_MakeValid(ST_Multi(d.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'scotland'::text AS nation,
                 COALESCE(WIDTH_BUCKET(s.imd_rank, 1, 6977, 10), 0)::int AS imd_decile
@@ -275,6 +317,12 @@ class Command(BaseCommand):
                 NULL::text AS la_code,
                 NULL::text AS la_name,
                 NULL::int AS la_year,
+                NULL::text AS nhser_code,
+                NULL::text AS nhser_name,
+                NULL::text AS icb_code,
+                NULL::text AS icb_name,
+                NULL::text AS lhb_code,
+                NULL::text AS lhb_name,
                 ST_MakeValid(ST_Multi(so.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom, 
                 'northern_ireland'::text AS nation,
                 COALESCE(WIDTH_BUCKET(ni.imd_rank, 1, 891, 10), 0)::int AS imd_decile
@@ -947,6 +995,16 @@ class Command(BaseCommand):
                 "django_code_col": "lsoa_code",
                 "year": 2021,
                 "code_column": "LSOA21CD",
+            },
+            {
+                "name": "LAD 2011 GB BFC",
+                # GB (not UK) = England + Wales + Scotland; supplies geometry for Scottish 2011 rows
+                "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_December_2011_GB_BFC_2022/FeatureServer/0/query?where=1=1&outFields=*&f=geojson",
+                "table": "deprivation_scores_localauthority",
+                "django_code_col": "local_authority_district_code",
+                "year": 2011,
+                "code_column": "lad11cd",  # lowercase for this service
+                "chunk_size": 25,
             },
             {
                 "name": "LAD 2024 BFC",
