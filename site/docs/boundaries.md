@@ -45,6 +45,23 @@ Local authority geometries are intentionally split across three datasets in the 
 
 Although the 2019 endpoint is branded as UK in ONS, the current import flow relies on the 2011 GB dataset to spatialize Scottish local authorities.
 
+### Scottish LAD code remapping (2011 geometry -> current DB codes)
+
+Four Scottish councils were renumbered in 2019. The 2011 GB BFC geometry service still uses the older 2011 LAD codes, while the seeded `LocalAuthority` rows in this project use the newer codes from a 2019-era lookup source.
+
+To avoid re-seeding Scotland with legacy codes, `import_bfc_boundaries` applies a targeted code remap for these rows when importing the 2011 GB LAD dataset:
+
+* `S12000015` -> `S12000047` (Fife)
+* `S12000024` -> `S12000048` (Perth and Kinross)
+* `S12000044` -> `S12000050` (North Lanarkshire)
+* `S12000046` -> `S12000049` (Glasgow City)
+
+Practical effect:
+
+* The geometry source remains authoritative for 2011 boundaries.
+* Tile properties and tooltip LA codes stay aligned with currently used Scottish LA codes.
+* A preflight status such as `28/32` for `LAD 2011 GB BFC` indicates this remap path has not yet been applied in that environment.
+
 ## Conditional Import Behaviour
 
 `import_bfc_boundaries` runs a preflight completeness check for each configured dataset using table + year:

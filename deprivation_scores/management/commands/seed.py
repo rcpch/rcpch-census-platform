@@ -785,6 +785,22 @@ class Command(BaseCommand):
                         [year],
                     )
 
+                # Apply code remapping for datasets where source codes differ from DB codes
+                # (e.g. Scottish councils renumbered in 2019 but stored as year=2011).
+                code_remapping = dataset.get("code_remapping", {})
+                for source_code, db_code in code_remapping.items():
+                    cursor.execute(
+                        f"""
+                        UPDATE {table_name} SET geom = t.geometry::geometry(MultiPolygon, 4326)
+                        FROM {temp_table} t
+                        WHERE t.{specific_code_col} = %s
+                          AND {table_name}.{django_col} = %s
+                          AND {table_name}.year = %s;
+                        """,
+                        [source_code, db_code, year],
+                    )
+                    self.stdout.write(f"  Code remap: {source_code} -> {db_code}")
+
                 cursor.execute(
                     f"SELECT COUNT(*) FROM {table_name} WHERE year = %s AND geom IS NOT NULL;",
                     [year],
@@ -998,13 +1014,24 @@ class Command(BaseCommand):
             },
             {
                 "name": "LAD 2011 GB BFC",
-                # GB (not UK) = England + Wales + Scotland; supplies geometry for Scottish 2011 rows
+                # GB (not UK) = England + Wales + Scotland; supplies geometry for Scottish 2011 rows.
+                # Four Scottish councils were renumbered in 2019; their 2011 BFC codes differ from
+                # the codes stored in the DB (which came from a 2019-era lookup CSV). The
+                # code_remapping dict maps old BFC code -> current DB code so the import engine
+                # can patch those rows after the primary UPDATE.
                 "url": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_December_2011_GB_BFC_2022/FeatureServer/0/query?where=1=1&outFields=*&f=geojson",
                 "table": "deprivation_scores_localauthority",
                 "django_code_col": "local_authority_district_code",
                 "year": 2011,
                 "code_column": "lad11cd",  # lowercase for this service
                 "chunk_size": 25,
+                "code_remapping": {
+                    # 2011 BFC code -> DB code (2019 code stored with year=2011)
+                    "S12000015": "S12000047",  # Fife
+                    "S12000024": "S12000048",  # Perth and Kinross
+                    "S12000044": "S12000050",  # North Lanarkshire
+                    "S12000046": "S12000049",  # Glasgow City
+                },
             },
             {
                 "name": "LAD 2024 BFC",
