@@ -49,16 +49,20 @@ Materialized table families:
   - `public.uk_master_2011_z0_4`
   - `public.uk_master_2011_z5_7`
   - `public.uk_master_2011_z8_10`
+  - `public.uk_master_2011_z11_14`
   - `public.uk_master_2021_z0_4`
   - `public.uk_master_2021_z5_7`
   - `public.uk_master_2021_z8_10`
+  - `public.uk_master_2021_z11_14`
 - LSOA-focused tables:
   - `public.lsoa_tiles_2011_z0_4`
   - `public.lsoa_tiles_2011_z5_7`
   - `public.lsoa_tiles_2011_z8_10`
+  - `public.lsoa_tiles_2011_z11_14`
   - `public.lsoa_tiles_2021_z0_4`
   - `public.lsoa_tiles_2021_z5_7`
   - `public.lsoa_tiles_2021_z8_10`
+  - `public.lsoa_tiles_2021_z11_14`
 
 ## Dataset/Boundary Source Of Truth
 
