@@ -139,7 +139,8 @@ function effectiveEra(nation) {
 }
 
 function getViewName(era, zoom) {
-  const zoomSuffix = zoom <= 4 ? "z0_4" : zoom <= 7 ? "z5_7" : "z8_10";
+  const zoomSuffix =
+    zoom <= 4 ? "z0_4" : zoom <= 7 ? "z5_7" : zoom <= 10 ? "z8_10" : "z11_14";
   return `public.uk_master_${era}_${zoomSuffix}`;
 }
 
