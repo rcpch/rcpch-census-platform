@@ -82,6 +82,7 @@ properties:
           - name: TILES_BASE_URL
             secretRef: tiles-base-url
         resources:
-          cpu: 0.5
-          memory: 1.0Gi
+          # 23/04/26 - increased to see if it improves initial rendering performance of each tile
+          cpu: 2.5
+          memory: 5.0Gi
   
