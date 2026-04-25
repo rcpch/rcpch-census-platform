@@ -76,6 +76,7 @@ This script will:
 - Upload all files to the release, overwriting any existing assets with the same name
 
 **Example split file naming**:
+
 - `rcpch-census-v1.2.0.dump.part-aa`
 - `rcpch-census-v1.2.0.dump.part-ab`
 - `rcpch-census-v1.2.0.dump.part-ac`
@@ -179,6 +180,7 @@ Follow semantic versioning:
 `s/build-dump` now runs preflight checks before reseeding and will fail early if resources are below threshold.
 
 Default thresholds:
+
 - `BUILD_DUMP_MIN_DISK_GB=30`
 - `BUILD_DUMP_MIN_DOCKER_MEM_GB=10`
 - `BUILD_DUMP_ENFORCE_RESOURCES=true`
