@@ -137,9 +137,8 @@ class Command(BaseCommand):
         def get_lsoa_view_sql(view_name, geom_column, boundary_year):
             """Creates individual England/Wales Table filtered by boundary year"""
             return f"""
-            -- 1. Clean up both types to prevent the conflict error
+            -- 1. Clean up table (main cleanup section handles views)
             DROP TABLE IF EXISTS public.{view_name} CASCADE;
-            DROP VIEW IF EXISTS public.{view_name} CASCADE;
 
             -- 2. Create as a TABLE, not a VIEW
             CREATE TABLE public.{view_name} AS
@@ -192,9 +191,8 @@ class Command(BaseCommand):
             ni_imd_year = 2017
 
             return f"""
-            -- 1. Clean up existing objects (both table and view types)
+            -- 1. Clean up table (main cleanup section handles views)
             DROP TABLE IF EXISTS public.{view_name} CASCADE;
-            DROP VIEW IF EXISTS public.{view_name} CASCADE;
 
             -- 2. Materialize the data into a physical TABLE for performance
             CREATE TABLE public.{view_name} AS
@@ -381,9 +379,14 @@ class Command(BaseCommand):
             "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z11_14 CASCADE;",
             "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z11_14 CASCADE;",
             "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z0_4 CASCADE;",
+            "DROP VIEW IF EXISTS public.la_tiles CASCADE;",
             "DROP VIEW IF EXISTS public.nhser_tiles_2021 CASCADE;",
             "DROP VIEW IF EXISTS public.icb_tiles_2023 CASCADE;",
             "DROP VIEW IF EXISTS public.lhb_tiles_2022 CASCADE;",
+            "DROP TABLE IF EXISTS public.la_tiles CASCADE;",
+            "DROP TABLE IF EXISTS public.nhser_tiles_2021 CASCADE;",
+            "DROP TABLE IF EXISTS public.icb_tiles_2023 CASCADE;",
+            "DROP TABLE IF EXISTS public.lhb_tiles_2022 CASCADE;",
             # Section 3: Geoprocessing (WGS84 -> Web Mercator 3857)
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_MakeValid(geom_3857) WHERE NOT ST_IsValid(geom_3857);",
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
@@ -426,6 +429,7 @@ class Command(BaseCommand):
             "CREATE INDEX IF NOT EXISTS idx_localhealthboard_simp_z0_4 ON deprivation_scores_localhealthboard USING GIST (geom_3857_simp_z0_4);",
             "CREATE INDEX IF NOT EXISTS idx_localhealthboard_simp_z5_7 ON deprivation_scores_localhealthboard USING GIST (geom_3857_simp_z5_7);",
             "CREATE INDEX IF NOT EXISTS idx_localhealthboard_simp_z8_10 ON deprivation_scores_localhealthboard USING GIST (geom_3857_simp_z8_10);",
+            "CREATE INDEX IF NOT EXISTS idx_localauthority_3857 ON deprivation_scores_localauthority USING GIST (geom_3857);",
             "CREATE INDEX IF NOT EXISTS idx_nhsenglishregion_3857 ON deprivation_scores_nhsenglishregion USING GIST (geom_3857);",
             "CREATE INDEX IF NOT EXISTS idx_integratedcareboard_3857 ON deprivation_scores_integratedcareboard USING GIST (geom_3857);",
             "CREATE INDEX IF NOT EXISTS idx_localhealthboard_3857 ON deprivation_scores_localhealthboard USING GIST (geom_3857);",
@@ -435,6 +439,7 @@ class Command(BaseCommand):
             "CLUSTER deprivation_scores_lsoa USING idx_lsoa_simp_z5_7;",
             "CLUSTER deprivation_scores_datazone USING idx_datazone_simp_z5_7;",
             "CLUSTER deprivation_scores_soa USING idx_soa_simp_z5_7;",
+            "CLUSTER deprivation_scores_localauthority USING idx_localauthority_3857;",
             "CLUSTER deprivation_scores_nhsenglishregion USING idx_nhsenglishregion_simp_z5_7;",
             "CLUSTER deprivation_scores_integratedcareboard USING idx_integratedcareboard_simp_z5_7;",
             "CLUSTER deprivation_scores_localhealthboard USING idx_localhealthboard_simp_z5_7;",
@@ -458,10 +463,18 @@ class Command(BaseCommand):
             # z11-14: raw geometry — no simplification, prevents gap artifacts at high zoom
             get_uk_master_view_sql("uk_master_2011_z11_14", "3857", 2011, 2019),
             get_uk_master_view_sql("uk_master_2021_z11_14", "3857", 2021, 2025),
-            "CREATE OR REPLACE VIEW public.la_tiles AS SELECT year, geom_3857 AS geom, local_authority_district_code AS lad_code FROM deprivation_scores_localauthority;",
-            "CREATE OR REPLACE VIEW public.nhser_tiles_2021 AS SELECT year::int AS year, nhser_code::text AS code, nhser_name::text AS area_name, geom_3857::geometry(MultiPolygon, 3857) AS geom, 'england'::text AS nation FROM deprivation_scores_nhsenglishregion WHERE year = 2021 AND geom_3857 IS NOT NULL;",
-            "CREATE OR REPLACE VIEW public.icb_tiles_2023 AS SELECT year::int AS year, icb_code::text AS code, icb_name::text AS area_name, geom_3857::geometry(MultiPolygon, 3857) AS geom, 'england'::text AS nation FROM deprivation_scores_integratedcareboard WHERE year = 2023 AND geom_3857 IS NOT NULL;",
-            "CREATE OR REPLACE VIEW public.lhb_tiles_2022 AS SELECT year::int AS year, lhb_code::text AS code, lhb_name::text AS area_name, geom_3857::geometry(MultiPolygon, 3857) AS geom, 'wales'::text AS nation FROM deprivation_scores_localhealthboard WHERE year = 2022 AND geom_3857 IS NOT NULL;",
+            "CREATE TABLE public.la_tiles AS SELECT year::int AS year, local_authority_district_code::text AS lad_code, ST_MakeValid(ST_Multi(geom_3857))::geometry(MultiPolygon, 3857) AS geom FROM deprivation_scores_localauthority WHERE geom_3857 IS NOT NULL;",
+            "CREATE INDEX idx_la_tiles_geom ON public.la_tiles USING GIST (geom);",
+            "ANALYZE public.la_tiles;",
+            "CREATE TABLE public.nhser_tiles_2021 AS SELECT year::int AS year, nhser_code::text AS code, nhser_name::text AS area_name, ST_MakeValid(ST_Multi(geom_3857))::geometry(MultiPolygon, 3857) AS geom, 'england'::text AS nation FROM deprivation_scores_nhsenglishregion WHERE year = 2021 AND geom_3857 IS NOT NULL;",
+            "CREATE INDEX idx_nhser_tiles_2021_geom ON public.nhser_tiles_2021 USING GIST (geom);",
+            "ANALYZE public.nhser_tiles_2021;",
+            "CREATE TABLE public.icb_tiles_2023 AS SELECT year::int AS year, icb_code::text AS code, icb_name::text AS area_name, ST_MakeValid(ST_Multi(geom_3857))::geometry(MultiPolygon, 3857) AS geom, 'england'::text AS nation FROM deprivation_scores_integratedcareboard WHERE year = 2023 AND geom_3857 IS NOT NULL;",
+            "CREATE INDEX idx_icb_tiles_2023_geom ON public.icb_tiles_2023 USING GIST (geom);",
+            "ANALYZE public.icb_tiles_2023;",
+            "CREATE TABLE public.lhb_tiles_2022 AS SELECT year::int AS year, lhb_code::text AS code, lhb_name::text AS area_name, ST_MakeValid(ST_Multi(geom_3857))::geometry(MultiPolygon, 3857) AS geom, 'wales'::text AS nation FROM deprivation_scores_localhealthboard WHERE year = 2022 AND geom_3857 IS NOT NULL;",
+            "CREATE INDEX idx_lhb_tiles_2022_geom ON public.lhb_tiles_2022 USING GIST (geom);",
+            "ANALYZE public.lhb_tiles_2022;",
             # Section 8: Final housekeeping
             "GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;",
             "ANALYZE deprivation_scores_lsoa;",
@@ -477,6 +490,10 @@ class Command(BaseCommand):
             "VACUUM ANALYZE public.uk_master_2021_z11_14;",
             "VACUUM ANALYZE public.lsoa_tiles_2011_z11_14;",
             "VACUUM ANALYZE public.lsoa_tiles_2021_z11_14;",
+            "VACUUM ANALYZE public.la_tiles;",
+            "VACUUM ANALYZE public.nhser_tiles_2021;",
+            "VACUUM ANALYZE public.icb_tiles_2023;",
+            "VACUUM ANALYZE public.lhb_tiles_2022;",
         ]
 
         print("[POSTPROCESS] Starting SQL post-processing...")
