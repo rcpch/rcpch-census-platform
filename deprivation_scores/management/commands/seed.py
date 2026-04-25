@@ -401,14 +401,82 @@ class Command(BaseCommand):
             "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z11_14 CASCADE;",
             "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z11_14 CASCADE;",
             "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z0_4 CASCADE;",
-            "DROP VIEW IF EXISTS public.la_tiles CASCADE;",
-            "DROP VIEW IF EXISTS public.nhser_tiles_2021 CASCADE;",
-            "DROP VIEW IF EXISTS public.icb_tiles_2023 CASCADE;",
-            "DROP VIEW IF EXISTS public.lhb_tiles_2022 CASCADE;",
-            "DROP TABLE IF EXISTS public.la_tiles CASCADE;",
-            "DROP TABLE IF EXISTS public.nhser_tiles_2021 CASCADE;",
-            "DROP TABLE IF EXISTS public.icb_tiles_2023 CASCADE;",
-            "DROP TABLE IF EXISTS public.lhb_tiles_2022 CASCADE;",
+            """
+            DO $$
+            DECLARE
+                relkind_char char;
+            BEGIN
+                SELECT c.relkind INTO relkind_char
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relname = 'la_tiles';
+
+                IF relkind_char = 'r' THEN
+                    EXECUTE 'DROP TABLE public.la_tiles CASCADE';
+                ELSIF relkind_char = 'v' THEN
+                    EXECUTE 'DROP VIEW public.la_tiles CASCADE';
+                ELSIF relkind_char = 'm' THEN
+                    EXECUTE 'DROP MATERIALIZED VIEW public.la_tiles CASCADE';
+                END IF;
+            END $$;
+            """,
+            """
+            DO $$
+            DECLARE
+                relkind_char char;
+            BEGIN
+                SELECT c.relkind INTO relkind_char
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relname = 'nhser_tiles_2021';
+
+                IF relkind_char = 'r' THEN
+                    EXECUTE 'DROP TABLE public.nhser_tiles_2021 CASCADE';
+                ELSIF relkind_char = 'v' THEN
+                    EXECUTE 'DROP VIEW public.nhser_tiles_2021 CASCADE';
+                ELSIF relkind_char = 'm' THEN
+                    EXECUTE 'DROP MATERIALIZED VIEW public.nhser_tiles_2021 CASCADE';
+                END IF;
+            END $$;
+            """,
+            """
+            DO $$
+            DECLARE
+                relkind_char char;
+            BEGIN
+                SELECT c.relkind INTO relkind_char
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relname = 'icb_tiles_2023';
+
+                IF relkind_char = 'r' THEN
+                    EXECUTE 'DROP TABLE public.icb_tiles_2023 CASCADE';
+                ELSIF relkind_char = 'v' THEN
+                    EXECUTE 'DROP VIEW public.icb_tiles_2023 CASCADE';
+                ELSIF relkind_char = 'm' THEN
+                    EXECUTE 'DROP MATERIALIZED VIEW public.icb_tiles_2023 CASCADE';
+                END IF;
+            END $$;
+            """,
+            """
+            DO $$
+            DECLARE
+                relkind_char char;
+            BEGIN
+                SELECT c.relkind INTO relkind_char
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relname = 'lhb_tiles_2022';
+
+                IF relkind_char = 'r' THEN
+                    EXECUTE 'DROP TABLE public.lhb_tiles_2022 CASCADE';
+                ELSIF relkind_char = 'v' THEN
+                    EXECUTE 'DROP VIEW public.lhb_tiles_2022 CASCADE';
+                ELSIF relkind_char = 'm' THEN
+                    EXECUTE 'DROP MATERIALIZED VIEW public.lhb_tiles_2022 CASCADE';
+                END IF;
+            END $$;
+            """,
             "DROP TABLE IF EXISTS public.nhser_tiles_2021_z0_4 CASCADE;",
             "DROP TABLE IF EXISTS public.nhser_tiles_2021_z5_7 CASCADE;",
             "DROP TABLE IF EXISTS public.nhser_tiles_2021_z8_10 CASCADE;",
