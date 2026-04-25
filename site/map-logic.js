@@ -97,7 +97,7 @@ const HEALTH_BOUNDARIES = {
   nhser: {
     sourceId: "nhser-boundaries-source",
     layerId: "nhser-boundaries-layer",
-    sourceLayer: "public.nhser_tiles_2021",
+    sourceLayerBase: "public.nhser_tiles_2021",
     toggleId: "nhser-toggle",
     groupId: "nhser-toggle-group",
     noteId: "nhser-note",
@@ -109,7 +109,7 @@ const HEALTH_BOUNDARIES = {
   icb: {
     sourceId: "icb-boundaries-source",
     layerId: "icb-boundaries-layer",
-    sourceLayer: "public.icb_tiles_2023",
+    sourceLayerBase: "public.icb_tiles_2023",
     toggleId: "icb-toggle",
     groupId: "icb-toggle-group",
     noteId: "icb-note",
@@ -121,7 +121,7 @@ const HEALTH_BOUNDARIES = {
   lhb: {
     sourceId: "lhb-boundaries-source",
     layerId: "lhb-boundaries-layer",
-    sourceLayer: "public.lhb_tiles_2022",
+    sourceLayerBase: "public.lhb_tiles_2022",
     toggleId: "lhb-toggle",
     groupId: "lhb-toggle-group",
     noteId: "lhb-note",
@@ -142,6 +142,12 @@ function getViewName(era, zoom) {
   const zoomSuffix =
     zoom <= 4 ? "z0_4" : zoom <= 7 ? "z5_7" : zoom <= 10 ? "z8_10" : "z11_14";
   return `public.uk_master_${era}_${zoomSuffix}`;
+}
+
+function getHealthBoundaryViewName(sourceLayerBase, zoom) {
+  const zoomSuffix =
+    zoom <= 4 ? "z0_4" : zoom <= 7 ? "z5_7" : zoom <= 10 ? "z8_10" : "z11_14";
+  return `${sourceLayerBase}_${zoomSuffix}`;
 }
 
 function getLocalAuthorityYearForNation(nation) {
@@ -298,16 +304,27 @@ function isHealthBoundaryEnabledForCurrentNation(config) {
 }
 
 function ensureHealthBoundarySource(config) {
+  const sourceLayer = getHealthBoundaryViewName(
+    config.sourceLayerBase,
+    map.getZoom(),
+  );
+
+  if (map.getLayer(config.layerId)) {
+    map.removeLayer(config.layerId);
+  }
+
   if (map.getSource(config.sourceId)) {
-    return;
+    map.removeSource(config.sourceId);
   }
 
   map.addSource(config.sourceId, {
     type: "vector",
-    tiles: [`${TILES_BASE_URL}/${config.sourceLayer}/{z}/{x}/{y}.pbf`],
+    tiles: [`${TILES_BASE_URL}/${sourceLayer}/{z}/{x}/{y}.pbf`],
     minzoom: 0,
     maxzoom: 14,
   });
+
+  return sourceLayer;
 }
 
 function removeHealthBoundaryLayer(config) {
@@ -327,14 +344,14 @@ function updateHealthBoundaryLayer(boundaryKey) {
     return;
   }
 
-  ensureHealthBoundarySource(config);
+  const sourceLayer = ensureHealthBoundarySource(config);
 
   if (!map.getLayer(config.layerId)) {
     map.addLayer({
       id: config.layerId,
       type: "line",
       source: config.sourceId,
-      "source-layer": config.sourceLayer,
+      "source-layer": sourceLayer,
       paint: {
         "line-color": config.color,
         "line-width": [
