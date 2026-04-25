@@ -1,11 +1,3 @@
-const map = new maplibregl.Map({
-  container: "map",
-  style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-  center: [-3.43, 55.37],
-  zoom: 5,
-  refreshExpired: true,
-});
-
 function getTilesBaseUrl() {
   const params = new URLSearchParams(window.location.search);
   const fromQuery = params.get("tilesBase");
@@ -36,36 +28,6 @@ if (!TILES_BASE_URL) {
   );
 }
 
-function getPropCaseInsensitive(props, candidateKeys) {
-  if (!props) return undefined;
-
-  for (const key of candidateKeys) {
-    if (props[key] !== undefined && props[key] !== null) {
-      return props[key];
-    }
-  }
-
-  const lowerMap = Object.create(null);
-  for (const key of Object.keys(props)) {
-    lowerMap[key.toLowerCase()] = props[key];
-  }
-
-  for (const key of candidateKeys) {
-    const value = lowerMap[key.toLowerCase()];
-    if (value !== undefined && value !== null) {
-      return value;
-    }
-  }
-
-  return undefined;
-}
-
-// Per-nation, per-era dataset facts
-// Scotland and NI are always on 2011-era boundaries regardless of era toggle.
-// Wales has no published 2025 WIMD, so this map uses 2019 WIMD on 2011 LSOAs.
-// (2021 Welsh boundaries may exist but are not used in the current UK-wide dataset.)
-// The era toggle therefore only affects England.
-// For the All UK view we always use uk_master_2011_* so all 4 nations appear.
 const DATASET_INFO = {
   england: {
     2021: { imd: "2025 IMD", boundaries: "2021 LSOAs" },
@@ -88,187 +50,74 @@ const DATASET_INFO = {
 
 let currentEra = "2021";
 let currentNation = "all";
-
-const LA_SOURCE_ID = "la-boundaries-source";
-const LA_LAYER_ID = "la-boundaries-layer";
-const LA_SOURCE_LAYER = "public.la_tiles";
+let mapInstance = null;
 
 const HEALTH_BOUNDARIES = {
   nhser: {
-    sourceId: "nhser-boundaries-source",
-    layerId: "nhser-boundaries-layer",
-    sourceLayer: "public.nhser_tiles_2021",
     toggleId: "nhser-toggle",
     groupId: "nhser-toggle-group",
     noteId: "nhser-note",
-    color: "rgba(55, 65, 81, 0.85)",
-    widthBase: 1.5,
     enabledIn: ["all", "england"],
     disabledNote: "England only",
   },
   icb: {
-    sourceId: "icb-boundaries-source",
-    layerId: "icb-boundaries-layer",
-    sourceLayer: "public.icb_tiles_2023",
     toggleId: "icb-toggle",
     groupId: "icb-toggle-group",
     noteId: "icb-note",
-    color: "rgba(127, 29, 29, 0.82)",
-    widthBase: 1.25,
     enabledIn: ["all", "england"],
     disabledNote: "England only",
   },
   lhb: {
-    sourceId: "lhb-boundaries-source",
-    layerId: "lhb-boundaries-layer",
-    sourceLayer: "public.lhb_tiles_2022",
     toggleId: "lhb-toggle",
     groupId: "lhb-toggle-group",
     noteId: "lhb-note",
-    color: "rgba(22, 101, 52, 0.78)",
-    widthBase: 1.4,
     enabledIn: ["all", "wales"],
     disabledNote: "Wales only",
   },
 };
 
-// Returns the tile era to actually request for the given nation selection.
-// Only England solo respects the era toggle; everything else uses 2011.
-function effectiveEra(nation) {
-  return nation === "england" ? currentEra : "2011";
+function isHealthBoundaryEnabledForCurrentNation(config) {
+  return config.enabledIn.includes(currentNation);
 }
 
-function getViewName(era, zoom) {
-  const zoomSuffix =
-    zoom <= 4 ? "z0_4" : zoom <= 7 ? "z5_7" : zoom <= 10 ? "z8_10" : "z11_14";
-  return `public.uk_master_${era}_${zoomSuffix}`;
-}
+function updateDatasetInfo(selectedNation, era) {
+  const infoEl = document.getElementById("dataset-info");
+  const noteEl = document.getElementById("era-note");
+  const eraGroup = document.getElementById("era-toggle-group");
+  const eraSelect = document.getElementById("era-toggle");
 
-function getLocalAuthorityYearForNation(nation) {
-  if (nation === "england") {
-    return currentNation === "england" && currentEra === "2021" ? 2024 : 2019;
-  }
-  if (nation === "wales") {
-    return 2019;
-  }
-  if (nation === "scotland") {
-    return 2011;
-  }
-  return null;
-}
+  const LABELS = {
+    england: "England",
+    wales: "Wales",
+    scotland: "Scotland",
+    northern_ireland: "N. Ireland",
+  };
 
-function getLocalAuthorityFilter() {
-  if (currentNation === "northern_ireland") {
-    return null;
-  }
+  const eraActive = selectedNation === "england";
+  eraGroup.style.opacity = eraActive ? "1" : "0.45";
+  eraSelect.disabled = !eraActive;
+  noteEl.textContent = eraActive
+    ? ""
+    : selectedNation === "all"
+      ? "All UK view uses 2011-era boundaries for all nations"
+      : "Era selector applies to England only";
 
-  if (currentNation === "england") {
-    return [
-      "all",
-      ["==", ["slice", ["get", "lad_code"], 0, 1], "E"],
-      ["==", ["get", "year"], getLocalAuthorityYearForNation("england")],
-    ];
-  }
+  const nations =
+    selectedNation === "all"
+      ? ["england", "wales", "scotland", "northern_ireland"]
+      : [selectedNation];
 
-  if (currentNation === "wales") {
-    return [
-      "all",
-      ["==", ["slice", ["get", "lad_code"], 0, 1], "W"],
-      ["==", ["get", "year"], 2019],
-    ];
-  }
-
-  if (currentNation === "scotland") {
-    return [
-      "all",
-      ["==", ["slice", ["get", "lad_code"], 0, 1], "S"],
-      ["==", ["get", "year"], 2011],
-    ];
-  }
-
-  return [
-    "any",
-    [
-      "all",
-      ["==", ["slice", ["get", "lad_code"], 0, 1], "E"],
-      ["==", ["get", "year"], 2019],
-    ],
-    [
-      "all",
-      ["==", ["slice", ["get", "lad_code"], 0, 1], "W"],
-      ["==", ["get", "year"], 2019],
-    ],
-    [
-      "all",
-      ["==", ["slice", ["get", "lad_code"], 0, 1], "S"],
-      ["==", ["get", "year"], 2011],
-    ],
-  ];
-}
-
-function ensureLocalAuthoritySource() {
-  if (map.getSource(LA_SOURCE_ID)) {
-    return;
-  }
-
-  map.addSource(LA_SOURCE_ID, {
-    type: "vector",
-    tiles: [`${TILES_BASE_URL}/${LA_SOURCE_LAYER}/{z}/{x}/{y}.pbf`],
-    minzoom: 0,
-    maxzoom: 14,
+  const lines = nations.map((n) => {
+    const eraKey =
+      selectedNation === "all" ? "2011" : n === "england" ? era : "2011";
+    const d = DATASET_INFO[n][eraKey];
+    const noteStr = d.note
+      ? ` <span style="color:#9a6700;font-style:italic;">(${d.note})</span>`
+      : "";
+    return `<div><strong>${LABELS[n]}:</strong> ${d.imd} &middot; ${d.boundaries}${noteStr}</div>`;
   });
-}
 
-function removeLocalAuthorityLayer() {
-  if (map.getLayer(LA_LAYER_ID)) {
-    map.removeLayer(LA_LAYER_ID);
-  }
-}
-
-function updateLocalAuthorityLayer() {
-  const laToggle = document.getElementById("la-toggle");
-  const requested = !!laToggle?.checked;
-
-  if (!requested || currentNation === "northern_ireland") {
-    removeLocalAuthorityLayer();
-    return;
-  }
-
-  ensureLocalAuthoritySource();
-
-  if (!map.getLayer(LA_LAYER_ID)) {
-    map.addLayer({
-      id: LA_LAYER_ID,
-      type: "line",
-      source: LA_SOURCE_ID,
-      "source-layer": LA_SOURCE_LAYER,
-      paint: {
-        "line-color": "rgba(55, 65, 81, 0.55)",
-        "line-width": [
-          "interpolate",
-          ["linear"],
-          ["zoom"],
-          4,
-          0.6,
-          7,
-          1.1,
-          10,
-          1.8,
-        ],
-        "line-opacity": 1,
-      },
-    });
-  }
-
-  // Keep LA boundaries above the deprivation fill layer after source/layer swaps.
-  map.moveLayer(LA_LAYER_ID);
-
-  const laFilter = getLocalAuthorityFilter();
-  if (laFilter) {
-    map.setFilter(LA_LAYER_ID, laFilter);
-  } else {
-    removeLocalAuthorityLayer();
-  }
+  infoEl.innerHTML = lines.join("");
 }
 
 function updateLocalAuthorityControlState() {
@@ -293,73 +142,6 @@ function updateLocalAuthorityControlState() {
     : "Not available for Northern Ireland in this layer";
 }
 
-function isHealthBoundaryEnabledForCurrentNation(config) {
-  return config.enabledIn.includes(currentNation);
-}
-
-function ensureHealthBoundarySource(config) {
-  if (map.getSource(config.sourceId)) {
-    return;
-  }
-
-  map.addSource(config.sourceId, {
-    type: "vector",
-    tiles: [`${TILES_BASE_URL}/${config.sourceLayer}/{z}/{x}/{y}.pbf`],
-    minzoom: 0,
-    maxzoom: 14,
-  });
-}
-
-function removeHealthBoundaryLayer(config) {
-  if (map.getLayer(config.layerId)) {
-    map.removeLayer(config.layerId);
-  }
-}
-
-function updateHealthBoundaryLayer(boundaryKey) {
-  const config = HEALTH_BOUNDARIES[boundaryKey];
-  const toggle = document.getElementById(config.toggleId);
-  const requested = !!toggle?.checked;
-  const enabled = isHealthBoundaryEnabledForCurrentNation(config);
-
-  if (!requested || !enabled) {
-    removeHealthBoundaryLayer(config);
-    return;
-  }
-
-  ensureHealthBoundarySource(config);
-
-  if (!map.getLayer(config.layerId)) {
-    map.addLayer({
-      id: config.layerId,
-      type: "line",
-      source: config.sourceId,
-      "source-layer": config.sourceLayer,
-      paint: {
-        "line-color": config.color,
-        "line-width": [
-          "interpolate",
-          ["linear"],
-          ["zoom"],
-          4,
-          config.widthBase * 0.6,
-          7,
-          config.widthBase,
-          10,
-          config.widthBase * 1.4,
-        ],
-        "line-opacity": 1,
-      },
-    });
-  }
-
-  map.moveLayer(config.layerId);
-}
-
-function updateHealthBoundaryLayers() {
-  Object.keys(HEALTH_BOUNDARIES).forEach(updateHealthBoundaryLayer);
-}
-
 function updateHealthBoundaryControlState() {
   Object.values(HEALTH_BOUNDARIES).forEach((config) => {
     const toggle = document.getElementById(config.toggleId);
@@ -371,431 +153,246 @@ function updateHealthBoundaryControlState() {
     toggle.disabled = !enabled;
     group.style.opacity = enabled ? "1" : "0.45";
     note.textContent = enabled ? "" : config.disabledNote;
+
+    if (!enabled && toggle.checked) {
+      toggle.checked = false;
+    }
   });
 }
 
-function getColorExpression() {
+function applyOverlayVisibility() {
+  if (!mapInstance) return;
+
+  const localAuthorityEnabled =
+    currentNation !== "northern_ireland" &&
+    !!document.getElementById("la-toggle")?.checked;
+
+  const nhserEnabled =
+    isHealthBoundaryEnabledForCurrentNation(HEALTH_BOUNDARIES.nhser) &&
+    !!document.getElementById("nhser-toggle")?.checked;
+
+  const icbEnabled =
+    isHealthBoundaryEnabledForCurrentNation(HEALTH_BOUNDARIES.icb) &&
+    !!document.getElementById("icb-toggle")?.checked;
+
+  const lhbEnabled =
+    isHealthBoundaryEnabledForCurrentNation(HEALTH_BOUNDARIES.lhb) &&
+    !!document.getElementById("lhb-toggle")?.checked;
+
+  mapInstance.setOverlayVisibility({
+    localAuthority: localAuthorityEnabled,
+    nhser: nhserEnabled,
+    icb: icbEnabled,
+    lhb: lhbEnabled,
+  });
+}
+
+function normalizeNation(nationText) {
+  return String(nationText || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+}
+
+function shouldShowTooltipRowForNation(rowKey, nation) {
+  if (rowKey === "nhser" || rowKey === "icb") return nation === "england";
+  if (rowKey === "lhb") return nation === "wales";
+  if (rowKey === "lad") {
+    return nation === "england" || nation === "wales" || nation === "scotland";
+  }
+  return true;
+}
+
+function getBoundaryTypeLabelForNation(nation) {
+  if (nation === "scotland") return "Data Zones";
+  if (nation === "northern_ireland") return "SOAs";
+  return "LSOAs";
+}
+
+function isMeaningfulTooltipValue(value) {
+  const compact = String(value || "")
+    .replace(/\s+/g, "")
+    .trim();
+  if (!compact) return false;
+  return !/^[-–()]+$/.test(compact);
+}
+
+function postProcessTooltipRows(rootEl) {
+  const popups = rootEl.querySelectorAll(".maplibregl-popup-content");
+  popups.forEach((popupEl) => {
+    const nationEl = popupEl.querySelector("[data-tooltip-nation]");
+    const nation = normalizeNation(nationEl?.textContent || "");
+    const boundaryLabelEl = popupEl.querySelector(
+      "[data-tooltip-boundary-label]",
+    );
+
+    if (boundaryLabelEl) {
+      boundaryLabelEl.textContent = `${getBoundaryTypeLabelForNation(nation)}:`;
+    }
+
+    const conditionalRows = popupEl.querySelectorAll("[data-tooltip-row]");
+
+    conditionalRows.forEach((rowEl) => {
+      const rowKey = rowEl.getAttribute("data-tooltip-row") || "";
+      const valueEl = rowEl.querySelector("[data-tooltip-value]");
+      const valueText = valueEl?.textContent || "";
+      const showForNation = shouldShowTooltipRowForNation(rowKey, nation);
+      const hasValue = isMeaningfulTooltipValue(valueText);
+      rowEl.style.display = showForNation && hasValue ? "block" : "none";
+    });
+  });
+}
+
+let tooltipPostProcessScheduled = false;
+
+function scheduleTooltipPostProcessor() {
+  if (tooltipPostProcessScheduled) return;
+
+  tooltipPostProcessScheduled = true;
+  window.requestAnimationFrame(() => {
+    tooltipPostProcessScheduled = false;
+    const mapEl = document.getElementById("map");
+    if (!mapEl) return;
+    postProcessTooltipRows(mapEl);
+  });
+}
+
+function installTooltipPostProcessor() {
+  const mapEl = document.getElementById("map");
+  if (!mapEl) return;
+
+  mapEl.addEventListener("mousemove", scheduleTooltipPostProcessor, {
+    passive: true,
+  });
+
+  mapEl.addEventListener("mouseenter", scheduleTooltipPostProcessor, {
+    passive: true,
+  });
+
+  scheduleTooltipPostProcessor();
+}
+
+function getTooltipTemplate() {
   return [
-    "case",
-    ["==", ["get", "imd_decile"], 0],
-    "#cccccc", // No data
-
-    // England - Reds (darkest = most deprived)
-    ["==", ["get", "nation"], "england"],
-    [
-      "interpolate",
-      ["linear"],
-      ["get", "imd_decile"],
-      1,
-      "#67000d", // Dark red
-      3,
-      "#a50f15",
-      5,
-      "#ef3b2c",
-      7,
-      "#fb6a4a",
-      10,
-      "#fee5d9", // Light red
-    ],
-
-    // Scotland - Blues
-    ["==", ["get", "nation"], "scotland"],
-    [
-      "interpolate",
-      ["linear"],
-      ["get", "imd_decile"],
-      1,
-      "#08306b", // Dark blue
-      3,
-      "#2171b5",
-      5,
-      "#6baed6",
-      7,
-      "#bdd7e7",
-      10,
-      "#eff3ff", // Light blue
-    ],
-
-    // Wales - Greens
-    ["==", ["get", "nation"], "wales"],
-    [
-      "interpolate",
-      ["linear"],
-      ["get", "imd_decile"],
-      1,
-      "#00441b", // Dark green
-      3,
-      "#238b45",
-      5,
-      "#74c476",
-      7,
-      "#bae4b3",
-      10,
-      "#edf8e9", // Light green
-    ],
-
-    // Northern Ireland - Yellows/Oranges
-    ["==", ["get", "nation"], "northern_ireland"],
-    [
-      "interpolate",
-      ["linear"],
-      ["get", "imd_decile"],
-      1,
-      "#7f2704", // Dark orange
-      3,
-      "#d94801",
-      5,
-      "#fd8d3c",
-      7,
-      "#fdbe85",
-      10,
-      "#feedde", // Light yellow
-    ],
-
-    // Fallback
-    "#cccccc",
-  ];
+    '<strong style="display:block;margin-bottom:3px;">{{areaName}}</strong>',
+    '<span data-tooltip-nation style="display:none;">{{nation}}</span>',
+    "<div><strong>Code:</strong> {{areaCode}}</div>",
+    "<div><strong>Decile:</strong> {{imdDecile}}</div>",
+    "<div><strong>Nation:</strong> {{nation}}</div>",
+    "<div><strong data-tooltip-boundary-label>LSOAs:</strong> {{boundaryYear}}</div>",
+    "<div><strong>Index Year:</strong> {{imdYear}}</div>",
+    '<div data-tooltip-row="lad"><strong>Local Authority:</strong> <span data-tooltip-value>{{laName}} ({{laCode}})</span></div>',
+    '<div data-tooltip-row="lad"><strong>LA Year:</strong> <span data-tooltip-value>{{laYear}}</span></div>',
+    '<div data-tooltip-row="nhser"><strong>NHSER:</strong> <span data-tooltip-value>{{nhserName}} ({{nhserCode}})</span></div>',
+    '<div data-tooltip-row="icb"><strong>ICB:</strong> <span data-tooltip-value>{{icbName}} ({{icbCode}})</span></div>',
+    '<div data-tooltip-row="lhb"><strong>LHB:</strong> <span data-tooltip-value>{{lhbName}} ({{lhbCode}})</span></div>',
+  ].join("");
 }
 
-function updateMapSource() {
-  const newLayer = getViewName(effectiveEra(currentNation), map.getZoom());
-  const newTiles = [`${TILES_BASE_URL}/${newLayer}/{z}/{x}/{y}.pbf`];
-
-  const currentFilter = map.getFilter("deprivation-layer");
-
-  if (map.getLayer("deprivation-layer")) {
-    map.removeLayer("deprivation-layer");
-  }
-  if (map.getSource("deprivation-source")) {
-    map.removeSource("deprivation-source");
+function initMap() {
+  if (
+    !window.RcpchImdMap ||
+    typeof window.RcpchImdMap.createImdMap !== "function"
+  ) {
+    console.error("RcpchImdMap bundle not loaded.");
+    return;
   }
 
-  map.addSource("deprivation-source", {
-    type: "vector",
-    tiles: newTiles,
-    minzoom: 0,
-    maxzoom: 14,
-  });
-
-  map.addLayer({
-    id: "deprivation-layer",
-    type: "fill",
-    source: "deprivation-source",
-    "source-layer": newLayer,
-    paint: {
-      "fill-color": getColorExpression(),
-      "fill-opacity": 0.7,
-      "fill-outline-color": "rgba(255, 255, 255, 0.2)",
+  mapInstance = window.RcpchImdMap.createImdMap({
+    container: "map",
+    tilesBaseUrl: TILES_BASE_URL,
+    initialNation: currentNation,
+    initialEra: currentEra,
+    areaTooltipMode: "template",
+    legendPosition: "bottom-right",
+    legendTitle: "Map layers",
+    showLegend: true,
+    style: {
+      choropleth: {
+        baseColorByNation: {
+          england: "#67000d",
+          scotland: "#08306b",
+          wales: "#00441b",
+          northern_ireland: "#7f2704",
+        },
+      },
+      boundaries: {
+        localAuthorityColor: "#374151",
+        localAuthorityWidth: 1,
+        nhserColor: "#1e40af",
+        nhserWidth: 1.5,
+        icbColor: "#9333ea",
+        icbWidth: 1.25,
+        lhbColor: "#166534",
+        lhbWidth: 1.4,
+      },
+      tooltip: {
+        backgroundColor: "#0d0d58",
+        textColor: "#ffffff",
+        borderColor: "#0d0d58",
+        areaLabel: "Area",
+        decileLabel: "IMD decile",
+        nationLabel: "Nation",
+        areaTooltipText: getTooltipTemplate(),
+      },
+      legend: {
+        width: 250,
+      },
+    },
+    onViewChange(view) {
+      currentNation = view.nation;
+      currentEra = view.era;
+      updateDatasetInfo(currentNation, currentEra);
+      updateLocalAuthorityControlState();
+      updateHealthBoundaryControlState();
+      applyOverlayVisibility();
+    },
+    onWarning(warning) {
+      console.warn("[rcpch-imd-map]", warning.code, warning.message);
     },
   });
 
-  if (currentFilter) {
-    map.setFilter("deprivation-layer", currentFilter);
-  }
-
-  updateLocalAuthorityLayer();
-  updateHealthBoundaryLayers();
-
-  console.log(`Switched to table: ${newLayer}, tiles: ${newTiles[0]}`);
-}
-
-map.on("load", () => {
-  const initialLayer = getViewName(effectiveEra(currentNation), map.getZoom());
-
-  map.addSource("deprivation-source", {
-    type: "vector",
-    tiles: [`${TILES_BASE_URL}/${initialLayer}/{z}/{x}/{y}.pbf`],
-    minzoom: 0,
-    maxzoom: 14,
-  });
-
-  map.addLayer({
-    id: "deprivation-layer",
-    type: "fill",
-    source: "deprivation-source",
-    "source-layer": initialLayer,
-    paint: {
-      "fill-color": getColorExpression(),
-      "fill-opacity": 0.7,
-      "fill-outline-color": "rgba(255, 255, 255, 0.2)",
-    },
-  });
-
-  map.on("zoomend", updateMapSource);
-
+  updateDatasetInfo(currentNation, currentEra);
   updateLocalAuthorityControlState();
-  updateLocalAuthorityLayer();
   updateHealthBoundaryControlState();
-  updateHealthBoundaryLayers();
-
-  const popup = new maplibregl.Popup({
-    closeButton: false,
-    closeOnClick: false,
-  });
-
-  map.on("mousemove", "deprivation-layer", (e) => {
-    map.getCanvas().style.cursor = "pointer";
-
-    const feature = e.features[0];
-    const props = feature.properties;
-
-    const decile = getPropCaseInsensitive(props, ["imd_decile"]);
-    const nation = getPropCaseInsensitive(props, ["nation"]);
-    const areaName =
-      getPropCaseInsensitive(props, [
-        "area_name",
-        "areaname",
-        "name",
-        "lsoa_name",
-        "data_zone_name",
-        "soa_name",
-      ]) || "Unknown area";
-    const areaCode =
-      getPropCaseInsensitive(props, [
-        "code",
-        "lsoa_code",
-        "data_zone_code",
-        "soa_code",
-      ]) || "Unknown code";
-    const imdYear = getPropCaseInsensitive(props, ["imd_year", "year"]);
-    const localAuthorityCode = getPropCaseInsensitive(props, [
-      "la_code",
-      "lad_code",
-      "local_authority_code",
-      "local_authority_district_code",
-    ]);
-    const localAuthorityName = getPropCaseInsensitive(props, [
-      "la_name",
-      "lad_name",
-      "local_authority_name",
-      "local_authority_district_name",
-    ]);
-    const localAuthorityYear = getPropCaseInsensitive(props, [
-      "la_year",
-      "lad_year",
-      "local_authority_year",
-      "local_authority_district_year",
-    ]);
-    const nhserCode = getPropCaseInsensitive(props, [
-      "nhser_code",
-      "nhs_region_code",
-      "nhser21cd",
-    ]);
-    const nhserName = getPropCaseInsensitive(props, [
-      "nhser_name",
-      "nhs_region_name",
-      "nhser21nm",
-    ]);
-    const icbCode = getPropCaseInsensitive(props, ["icb_code", "icb23cd"]);
-    const icbName = getPropCaseInsensitive(props, ["icb_name", "icb23nm"]);
-    const lhbCode = getPropCaseInsensitive(props, ["lhb_code", "lhb22cd"]);
-    const lhbName = getPropCaseInsensitive(props, ["lhb_name", "lhb22nm"]);
-
-    const areaLabel = nation
-      ? `${String(nation).replace(/_/g, " ").toUpperCase()}`
-      : "Area";
-
-    // Look up the canonical boundary and IMD descriptions from DATASET_INFO
-    // so the tooltip always reflects the actual dataset for each nation,
-    // not just the raw era key (which would show "2011" for NI instead of "2001 SOAs").
-    const eraKey = effectiveEra(nation);
-    const datasetEntry =
-      nation && DATASET_INFO[nation] && DATASET_INFO[nation][eraKey]
-        ? DATASET_INFO[nation][eraKey]
-        : null;
-    const boundariesLabel = datasetEntry ? datasetEntry.boundaries : eraKey;
-    const imdLabel = datasetEntry ? datasetEntry.imd : (imdYear ?? "Unknown");
-    const localAuthorityLine =
-      nation === "northern_ireland"
-        ? "<div><strong>Local Government District:</strong> Not currently mapped in this layer</div>"
-        : `
-          <div><strong>Local Authority Name:</strong> ${localAuthorityName || "Unknown"}</div>
-          <div><strong>Local Authority Code:</strong> ${localAuthorityCode || "Unknown"}</div>
-          <div><strong>Local Authority Year:</strong> ${localAuthorityYear || "Unknown"}</div>
-        `;
-    const healthBoundaryLine =
-      nation === "england"
-        ? `
-          <div><strong>NHS England Region:</strong> ${nhserName || "Not currently mapped in this layer"}</div>
-          <div><strong>NHS England Region Code:</strong> ${nhserCode || "Unknown"}</div>
-          <div><strong>Integrated Care Board:</strong> ${icbName || "Not currently mapped in this layer"}</div>
-          <div><strong>Integrated Care Board Code:</strong> ${icbCode || "Unknown"}</div>
-        `
-        : nation === "wales"
-          ? `
-            <div><strong>Local Health Board:</strong> ${lhbName || "Not currently mapped in this layer"}</div>
-            <div><strong>Local Health Board Code:</strong> ${lhbCode || "Unknown"}</div>
-          `
-          : "";
-
-    const content = `
-      <div style="padding: 5px;">
-        <strong style="display: block; margin-bottom: 5px; border-bottom: 1px solid #ccc;">
-          ${areaLabel}
-        </strong>
-        <div><strong>Name:</strong> ${areaName}</div>
-        <div><strong>Code:</strong> ${areaCode}</div>
-        ${localAuthorityLine}
-        ${healthBoundaryLine}
-        <div><strong>Decile:</strong> ${decile === 0 ? "No Data" : decile}</div>
-        <div style="margin-top: 5px; font-size: 0.8em; color: #666;">
-          Boundaries: ${boundariesLabel} | Index: ${imdLabel}
-        </div>
-      </div>
-    `;
-
-    popup.setLngLat(e.lngLat).setHTML(content).addTo(map);
-  });
-
-  map.on("mouseleave", "deprivation-layer", () => {
-    map.getCanvas().style.cursor = "";
-    popup.remove();
-  });
-});
-
-function updateDatasetInfo(selectedNation, era) {
-  const infoEl = document.getElementById("dataset-info");
-  const noteEl = document.getElementById("era-note");
-  const eraGroup = document.getElementById("era-toggle-group");
-  const eraSelect = document.getElementById("era-toggle");
-
-  const LABELS = {
-    england: "England",
-    wales: "Wales",
-    scotland: "Scotland",
-    northern_ireland: "N. Ireland",
-  };
-
-  // Era toggle is only meaningful when England is the sole selected nation.
-  const eraActive = selectedNation === "england";
-  eraGroup.style.opacity = eraActive ? "1" : "0.45";
-  eraSelect.disabled = !eraActive;
-  noteEl.textContent = eraActive
-    ? ""
-    : selectedNation === "all"
-      ? "All UK always shows latest data per country"
-      : "Era selector applies to England only";
-
-  const nations =
-    selectedNation === "all"
-      ? ["england", "wales", "scotland", "northern_ireland"]
-      : [selectedNation];
-
-  const lines = nations.map((n) => {
-    // England uses chosen era; all others are fixed on 2011.
-    const eraKey = n === "england" ? era : "2011";
-    const d = DATASET_INFO[n][eraKey];
-    const noteStr = d.note
-      ? ` <span style="color:#9a6700;font-style:italic;">(${d.note})</span>`
-      : "";
-    return `<div><strong>${LABELS[n]}:</strong> ${d.imd} &middot; ${d.boundaries}${noteStr}</div>`;
-  });
-
-  infoEl.innerHTML = lines.join("");
+  applyOverlayVisibility();
+  installTooltipPostProcessor();
 }
 
 document.getElementById("era-toggle").addEventListener("change", (e) => {
   currentEra = e.target.value;
-  updateMapSource();
+  if (!mapInstance) return;
+  mapInstance.setEra(currentEra);
   updateDatasetInfo(currentNation, currentEra);
   updateLocalAuthorityControlState();
-  updateLocalAuthorityLayer();
   updateHealthBoundaryControlState();
-  updateHealthBoundaryLayers();
+  applyOverlayVisibility();
 });
 
 document.getElementById("nation-filter").addEventListener("change", (e) => {
   currentNation = e.target.value;
-  const selectedNation = currentNation;
-  map.setFilter(
-    "deprivation-layer",
-    selectedNation === "all" ? null : ["==", ["get", "nation"], selectedNation],
-  );
-  // Changing nation may change the effective era (England→2021, others→2011)
-  updateMapSource();
-  updateLegend(selectedNation);
-  updateDatasetInfo(selectedNation, currentEra);
+  if (!mapInstance) return;
+  mapInstance.setNation(currentNation);
+  updateDatasetInfo(currentNation, currentEra);
   updateLocalAuthorityControlState();
-  updateLocalAuthorityLayer();
   updateHealthBoundaryControlState();
-  updateHealthBoundaryLayers();
+  applyOverlayVisibility();
 });
 
-document.getElementById("la-toggle").addEventListener("change", (e) => {
-  updateLocalAuthorityLayer();
+document.getElementById("la-toggle").addEventListener("change", () => {
+  applyOverlayVisibility();
 });
 
 document.getElementById("nhser-toggle").addEventListener("change", () => {
-  updateHealthBoundaryLayer("nhser");
+  applyOverlayVisibility();
 });
 
 document.getElementById("icb-toggle").addEventListener("change", () => {
-  updateHealthBoundaryLayer("icb");
+  applyOverlayVisibility();
 });
 
 document.getElementById("lhb-toggle").addEventListener("change", () => {
-  updateHealthBoundaryLayer("lhb");
+  applyOverlayVisibility();
 });
 
-function updateLegend(nation) {
-  const legendScale = document.querySelector(".legend-scale");
-
-  let colors, title;
-
-  if (nation === "all") {
-    title = "Deprivation Decile (All Nations)";
-    legendScale.innerHTML = `
-      <div class="legend-item"><div class="color-box" style="background: #67000d;"></div> England - Most Deprived</div>
-      <div class="legend-item"><div class="color-box" style="background: #08306b;"></div> Scotland - Most Deprived</div>
-      <div class="legend-item"><div class="color-box" style="background: #00441b;"></div> Wales - Most Deprived</div>
-      <div class="legend-item"><div class="color-box" style="background: #7f2704;"></div> N. Ireland - Most Deprived</div>
-      <div class="legend-item"><div class="color-box" style="background: #cccccc;"></div> No Data</div>
-    `;
-  } else if (nation === "england") {
-    title = "England Deprivation Decile";
-    legendScale.innerHTML = `
-      <div class="legend-item"><div class="color-box" style="background: #67000d;"></div> 1 (Most Deprived)</div>
-      <div class="legend-item"><div class="color-box" style="background: #a50f15;"></div> 3</div>
-      <div class="legend-item"><div class="color-box" style="background: #ef3b2c;"></div> 5</div>
-      <div class="legend-item"><div class="color-box" style="background: #fb6a4a;"></div> 7</div>
-      <div class="legend-item"><div class="color-box" style="background: #fee5d9;"></div> 10 (Least Deprived)</div>
-      <div class="legend-item"><div class="color-box" style="background: #cccccc;"></div> No Data</div>
-    `;
-  } else if (nation === "scotland") {
-    title = "Scotland Deprivation Decile";
-    legendScale.innerHTML = `
-      <div class="legend-item"><div class="color-box" style="background: #08306b;"></div> 1 (Most Deprived)</div>
-      <div class="legend-item"><div class="color-box" style="background: #2171b5;"></div> 3</div>
-      <div class="legend-item"><div class="color-box" style="background: #6baed6;"></div> 5</div>
-      <div class="legend-item"><div class="color-box" style="background: #bdd7e7;"></div> 7</div>
-      <div class="legend-item"><div class="color-box" style="background: #eff3ff;"></div> 10 (Least Deprived)</div>
-      <div class="legend-item"><div class="color-box" style="background: #cccccc;"></div> No Data</div>
-    `;
-  } else if (nation === "wales") {
-    title = "Wales Deprivation Decile";
-    legendScale.innerHTML = `
-      <div class="legend-item"><div class="color-box" style="background: #00441b;"></div> 1 (Most Deprived)</div>
-      <div class="legend-item"><div class="color-box" style="background: #238b45;"></div> 3</div>
-      <div class="legend-item"><div class="color-box" style="background: #74c476;"></div> 5</div>
-      <div class="legend-item"><div class="color-box" style="background: #bae4b3;"></div> 7</div>
-      <div class="legend-item"><div class="color-box" style="background: #edf8e9;"></div> 10 (Least Deprived)</div>
-      <div class="legend-item"><div class="color-box" style="background: #cccccc;"></div> No Data</div>
-    `;
-  } else if (nation === "northern_ireland") {
-    title = "Northern Ireland Deprivation Decile";
-    legendScale.innerHTML = `
-      <div class="legend-item"><div class="color-box" style="background: #7f2704;"></div> 1 (Most Deprived)</div>
-      <div class="legend-item"><div class="color-box" style="background: #d94801;"></div> 3</div>
-      <div class="legend-item"><div class="color-box" style="background: #fd8d3c;"></div> 5</div>
-      <div class="legend-item"><div class="color-box" style="background: #fdbe85;"></div> 7</div>
-      <div class="legend-item"><div class="color-box" style="background: #feedde;"></div> 10 (Least Deprived)</div>
-      <div class="legend-item"><div class="color-box" style="background: #cccccc;"></div> No Data</div>
-    `;
-  }
-
-  document.querySelector(".legend-title").textContent = title;
-}
-
-// Initialize legend and dataset info panel
-updateLegend("all");
-updateDatasetInfo("all", currentEra);
+initMap();

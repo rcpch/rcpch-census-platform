@@ -337,6 +337,28 @@ class Command(BaseCommand):
             ANALYZE public.{view_name};
             """
 
+        def get_health_boundary_view_sql(
+            view_name, source_table, code_column, name_column, year, nation, geom_column
+        ):
+            """Create a zoom-banded health boundary tile table."""
+            return f"""
+            DROP TABLE IF EXISTS public.{view_name} CASCADE;
+
+            CREATE TABLE public.{view_name} AS
+            SELECT
+                year::int AS year,
+                {code_column}::text AS code,
+                {name_column}::text AS area_name,
+                ST_MakeValid(ST_Multi({geom_column}))::geometry(MultiPolygon, 3857) AS geom,
+                '{nation}'::text AS nation
+            FROM {source_table}
+            WHERE year = {year}
+              AND {geom_column} IS NOT NULL;
+
+            CREATE INDEX idx_{view_name}_geom ON public.{view_name} USING GIST (geom);
+            ANALYZE public.{view_name};
+            """
+
         # --- SQL Statement List ---
 
         sql_statements = [
@@ -379,14 +401,94 @@ class Command(BaseCommand):
             "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z11_14 CASCADE;",
             "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z11_14 CASCADE;",
             "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z0_4 CASCADE;",
-            "DROP VIEW IF EXISTS public.la_tiles CASCADE;",
-            "DROP VIEW IF EXISTS public.nhser_tiles_2021 CASCADE;",
-            "DROP VIEW IF EXISTS public.icb_tiles_2023 CASCADE;",
-            "DROP VIEW IF EXISTS public.lhb_tiles_2022 CASCADE;",
-            "DROP TABLE IF EXISTS public.la_tiles CASCADE;",
-            "DROP TABLE IF EXISTS public.nhser_tiles_2021 CASCADE;",
-            "DROP TABLE IF EXISTS public.icb_tiles_2023 CASCADE;",
-            "DROP TABLE IF EXISTS public.lhb_tiles_2022 CASCADE;",
+            """
+            DO $$
+            DECLARE
+                relkind_char char;
+            BEGIN
+                SELECT c.relkind INTO relkind_char
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relname = 'la_tiles';
+
+                IF relkind_char = 'r' THEN
+                    EXECUTE 'DROP TABLE public.la_tiles CASCADE';
+                ELSIF relkind_char = 'v' THEN
+                    EXECUTE 'DROP VIEW public.la_tiles CASCADE';
+                ELSIF relkind_char = 'm' THEN
+                    EXECUTE 'DROP MATERIALIZED VIEW public.la_tiles CASCADE';
+                END IF;
+            END $$;
+            """,
+            """
+            DO $$
+            DECLARE
+                relkind_char char;
+            BEGIN
+                SELECT c.relkind INTO relkind_char
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relname = 'nhser_tiles_2021';
+
+                IF relkind_char = 'r' THEN
+                    EXECUTE 'DROP TABLE public.nhser_tiles_2021 CASCADE';
+                ELSIF relkind_char = 'v' THEN
+                    EXECUTE 'DROP VIEW public.nhser_tiles_2021 CASCADE';
+                ELSIF relkind_char = 'm' THEN
+                    EXECUTE 'DROP MATERIALIZED VIEW public.nhser_tiles_2021 CASCADE';
+                END IF;
+            END $$;
+            """,
+            """
+            DO $$
+            DECLARE
+                relkind_char char;
+            BEGIN
+                SELECT c.relkind INTO relkind_char
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relname = 'icb_tiles_2023';
+
+                IF relkind_char = 'r' THEN
+                    EXECUTE 'DROP TABLE public.icb_tiles_2023 CASCADE';
+                ELSIF relkind_char = 'v' THEN
+                    EXECUTE 'DROP VIEW public.icb_tiles_2023 CASCADE';
+                ELSIF relkind_char = 'm' THEN
+                    EXECUTE 'DROP MATERIALIZED VIEW public.icb_tiles_2023 CASCADE';
+                END IF;
+            END $$;
+            """,
+            """
+            DO $$
+            DECLARE
+                relkind_char char;
+            BEGIN
+                SELECT c.relkind INTO relkind_char
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relname = 'lhb_tiles_2022';
+
+                IF relkind_char = 'r' THEN
+                    EXECUTE 'DROP TABLE public.lhb_tiles_2022 CASCADE';
+                ELSIF relkind_char = 'v' THEN
+                    EXECUTE 'DROP VIEW public.lhb_tiles_2022 CASCADE';
+                ELSIF relkind_char = 'm' THEN
+                    EXECUTE 'DROP MATERIALIZED VIEW public.lhb_tiles_2022 CASCADE';
+                END IF;
+            END $$;
+            """,
+            "DROP TABLE IF EXISTS public.nhser_tiles_2021_z0_4 CASCADE;",
+            "DROP TABLE IF EXISTS public.nhser_tiles_2021_z5_7 CASCADE;",
+            "DROP TABLE IF EXISTS public.nhser_tiles_2021_z8_10 CASCADE;",
+            "DROP TABLE IF EXISTS public.nhser_tiles_2021_z11_14 CASCADE;",
+            "DROP TABLE IF EXISTS public.icb_tiles_2023_z0_4 CASCADE;",
+            "DROP TABLE IF EXISTS public.icb_tiles_2023_z5_7 CASCADE;",
+            "DROP TABLE IF EXISTS public.icb_tiles_2023_z8_10 CASCADE;",
+            "DROP TABLE IF EXISTS public.icb_tiles_2023_z11_14 CASCADE;",
+            "DROP TABLE IF EXISTS public.lhb_tiles_2022_z0_4 CASCADE;",
+            "DROP TABLE IF EXISTS public.lhb_tiles_2022_z5_7 CASCADE;",
+            "DROP TABLE IF EXISTS public.lhb_tiles_2022_z8_10 CASCADE;",
+            "DROP TABLE IF EXISTS public.lhb_tiles_2022_z11_14 CASCADE;",
             # Section 3: Geoprocessing (WGS84 -> Web Mercator 3857)
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_MakeValid(geom_3857) WHERE NOT ST_IsValid(geom_3857);",
             "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
@@ -398,13 +500,13 @@ class Command(BaseCommand):
             "UPDATE deprivation_scores_localhealthboard SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             # Section 4: Simplification
             # Compute all simplification tiers in a single pass per table to reduce write overhead.
-            # z0-4: 1,500 m, z5-7: 200 m, z8-10: 30 m (all in EPSG:3857 metres).
-            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 30)), 3)) WHERE geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 30)), 3)) WHERE geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 30)), 3)) WHERE geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_nhsenglishregion SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 30)), 3)) WHERE geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_integratedcareboard SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 30)), 3)) WHERE geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_localhealthboard SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 30)), 3)) WHERE geom_3857 IS NOT NULL;",
+            # z0-4: 1,500 m, z5-7: 200 m, z8-10: 60 m (all in EPSG:3857 metres).
+            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_nhsenglishregion SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_integratedcareboard SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+            "UPDATE deprivation_scores_localhealthboard SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
             # Section 5: Spatial indexing & clustering
             # Raw geometry indexes (for z11+ and raw queries)
             "CREATE INDEX IF NOT EXISTS idx_lsoa_3857 ON deprivation_scores_lsoa USING GIST (geom_3857);",
@@ -466,15 +568,117 @@ class Command(BaseCommand):
             "CREATE TABLE public.la_tiles AS SELECT year::int AS year, local_authority_district_code::text AS lad_code, ST_MakeValid(ST_Multi(geom_3857))::geometry(MultiPolygon, 3857) AS geom FROM deprivation_scores_localauthority WHERE geom_3857 IS NOT NULL;",
             "CREATE INDEX idx_la_tiles_geom ON public.la_tiles USING GIST (geom);",
             "ANALYZE public.la_tiles;",
-            "CREATE TABLE public.nhser_tiles_2021 AS SELECT year::int AS year, nhser_code::text AS code, nhser_name::text AS area_name, ST_MakeValid(ST_Multi(geom_3857))::geometry(MultiPolygon, 3857) AS geom, 'england'::text AS nation FROM deprivation_scores_nhsenglishregion WHERE year = 2021 AND geom_3857 IS NOT NULL;",
-            "CREATE INDEX idx_nhser_tiles_2021_geom ON public.nhser_tiles_2021 USING GIST (geom);",
-            "ANALYZE public.nhser_tiles_2021;",
-            "CREATE TABLE public.icb_tiles_2023 AS SELECT year::int AS year, icb_code::text AS code, icb_name::text AS area_name, ST_MakeValid(ST_Multi(geom_3857))::geometry(MultiPolygon, 3857) AS geom, 'england'::text AS nation FROM deprivation_scores_integratedcareboard WHERE year = 2023 AND geom_3857 IS NOT NULL;",
-            "CREATE INDEX idx_icb_tiles_2023_geom ON public.icb_tiles_2023 USING GIST (geom);",
-            "ANALYZE public.icb_tiles_2023;",
-            "CREATE TABLE public.lhb_tiles_2022 AS SELECT year::int AS year, lhb_code::text AS code, lhb_name::text AS area_name, ST_MakeValid(ST_Multi(geom_3857))::geometry(MultiPolygon, 3857) AS geom, 'wales'::text AS nation FROM deprivation_scores_localhealthboard WHERE year = 2022 AND geom_3857 IS NOT NULL;",
-            "CREATE INDEX idx_lhb_tiles_2022_geom ON public.lhb_tiles_2022 USING GIST (geom);",
-            "ANALYZE public.lhb_tiles_2022;",
+            get_health_boundary_view_sql(
+                "nhser_tiles_2021_z0_4",
+                "deprivation_scores_nhsenglishregion",
+                "nhser_code",
+                "nhser_name",
+                2021,
+                "england",
+                "geom_3857_simp_z0_4",
+            ),
+            get_health_boundary_view_sql(
+                "nhser_tiles_2021_z5_7",
+                "deprivation_scores_nhsenglishregion",
+                "nhser_code",
+                "nhser_name",
+                2021,
+                "england",
+                "geom_3857_simp_z5_7",
+            ),
+            get_health_boundary_view_sql(
+                "nhser_tiles_2021_z8_10",
+                "deprivation_scores_nhsenglishregion",
+                "nhser_code",
+                "nhser_name",
+                2021,
+                "england",
+                "geom_3857",
+            ),
+            get_health_boundary_view_sql(
+                "nhser_tiles_2021_z11_14",
+                "deprivation_scores_nhsenglishregion",
+                "nhser_code",
+                "nhser_name",
+                2021,
+                "england",
+                "geom_3857",
+            ),
+            get_health_boundary_view_sql(
+                "icb_tiles_2023_z0_4",
+                "deprivation_scores_integratedcareboard",
+                "icb_code",
+                "icb_name",
+                2023,
+                "england",
+                "geom_3857_simp_z0_4",
+            ),
+            get_health_boundary_view_sql(
+                "icb_tiles_2023_z5_7",
+                "deprivation_scores_integratedcareboard",
+                "icb_code",
+                "icb_name",
+                2023,
+                "england",
+                "geom_3857_simp_z5_7",
+            ),
+            get_health_boundary_view_sql(
+                "icb_tiles_2023_z8_10",
+                "deprivation_scores_integratedcareboard",
+                "icb_code",
+                "icb_name",
+                2023,
+                "england",
+                "geom_3857",
+            ),
+            get_health_boundary_view_sql(
+                "icb_tiles_2023_z11_14",
+                "deprivation_scores_integratedcareboard",
+                "icb_code",
+                "icb_name",
+                2023,
+                "england",
+                "geom_3857",
+            ),
+            get_health_boundary_view_sql(
+                "lhb_tiles_2022_z0_4",
+                "deprivation_scores_localhealthboard",
+                "lhb_code",
+                "lhb_name",
+                2022,
+                "wales",
+                "geom_3857_simp_z0_4",
+            ),
+            get_health_boundary_view_sql(
+                "lhb_tiles_2022_z5_7",
+                "deprivation_scores_localhealthboard",
+                "lhb_code",
+                "lhb_name",
+                2022,
+                "wales",
+                "geom_3857_simp_z5_7",
+            ),
+            get_health_boundary_view_sql(
+                "lhb_tiles_2022_z8_10",
+                "deprivation_scores_localhealthboard",
+                "lhb_code",
+                "lhb_name",
+                2022,
+                "wales",
+                "geom_3857",
+            ),
+            get_health_boundary_view_sql(
+                "lhb_tiles_2022_z11_14",
+                "deprivation_scores_localhealthboard",
+                "lhb_code",
+                "lhb_name",
+                2022,
+                "wales",
+                "geom_3857",
+            ),
+            "CREATE VIEW public.nhser_tiles_2021 AS SELECT * FROM public.nhser_tiles_2021_z11_14;",
+            "CREATE VIEW public.icb_tiles_2023 AS SELECT * FROM public.icb_tiles_2023_z11_14;",
+            "CREATE VIEW public.lhb_tiles_2022 AS SELECT * FROM public.lhb_tiles_2022_z11_14;",
             # Section 8: Final housekeeping
             "GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;",
             "ANALYZE deprivation_scores_lsoa;",
@@ -491,9 +695,18 @@ class Command(BaseCommand):
             "VACUUM ANALYZE public.lsoa_tiles_2011_z11_14;",
             "VACUUM ANALYZE public.lsoa_tiles_2021_z11_14;",
             "VACUUM ANALYZE public.la_tiles;",
-            "VACUUM ANALYZE public.nhser_tiles_2021;",
-            "VACUUM ANALYZE public.icb_tiles_2023;",
-            "VACUUM ANALYZE public.lhb_tiles_2022;",
+            "VACUUM ANALYZE public.nhser_tiles_2021_z0_4;",
+            "VACUUM ANALYZE public.nhser_tiles_2021_z5_7;",
+            "VACUUM ANALYZE public.nhser_tiles_2021_z8_10;",
+            "VACUUM ANALYZE public.nhser_tiles_2021_z11_14;",
+            "VACUUM ANALYZE public.icb_tiles_2023_z0_4;",
+            "VACUUM ANALYZE public.icb_tiles_2023_z5_7;",
+            "VACUUM ANALYZE public.icb_tiles_2023_z8_10;",
+            "VACUUM ANALYZE public.icb_tiles_2023_z11_14;",
+            "VACUUM ANALYZE public.lhb_tiles_2022_z0_4;",
+            "VACUUM ANALYZE public.lhb_tiles_2022_z5_7;",
+            "VACUUM ANALYZE public.lhb_tiles_2022_z8_10;",
+            "VACUUM ANALYZE public.lhb_tiles_2022_z11_14;",
         ]
 
         print("[POSTPROCESS] Starting SQL post-processing...")
