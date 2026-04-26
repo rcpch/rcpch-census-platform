@@ -1303,7 +1303,7 @@ class Command(BaseCommand):
             except Exception as e:
                 self.stdout.write(f"    ⚠️ Could not warm zoom {z}: {e}")
 
-    def test_geometries(self):
+    def test_geometries(self, strict=True):
         """
         Test to ensure that the spatial data and views are correctly set up.
         """
@@ -1386,7 +1386,9 @@ class Command(BaseCommand):
                 )
 
             # 4. Boundary tile tier verification
-            self.stdout.write("Checking boundary tier tables (z0_4, z5_7, z8_10, z11_14)...")
+            self.stdout.write(
+                "Checking boundary tier tables (z0_4, z5_7, z8_10, z11_14)..."
+            )
             tiered_boundaries = {
                 "Local Authorities": "la_tiles",
                 "NHS Regions": "nhser_tiles_2021",
@@ -1416,14 +1418,17 @@ class Command(BaseCommand):
                     else:
                         status = "✅"
 
-                    self.stdout.write(
-                        f"  {status} {label} {tier}: {row_count} rows"
-                    )
+                    self.stdout.write(f"  {status} {label} {tier}: {row_count} rows")
 
             if boundary_failures:
                 failures = "\n  - " + "\n  - ".join(boundary_failures)
-                raise CommandError(
-                    "Boundary tier validation failed:" + failures
+                if strict:
+                    raise CommandError("Boundary tier validation failed:" + failures)
+                self.stdout.write(
+                    self.style.WARNING(
+                        "  ⚠️ Boundary tier validation findings (report-only mode):"
+                        + failures
+                    )
                 )
 
             # 5. Coordinate System Verification
@@ -1652,7 +1657,7 @@ class Command(BaseCommand):
             #     self.warm_cache()
 
             # test that the tables have the correct number of geometries
-            self.test_geometries()
+            self.test_geometries(strict=True)
             return
         if options.get("mode") == "process_geometries":
             layers = options.get("layers")
@@ -1664,11 +1669,12 @@ class Command(BaseCommand):
                 + "\n"
             )
             self._run_post_processing_sql(layers=layers)
-            self.test_geometries()
+            partial_layers = bool(layers) and "all" not in layers
+            self.test_geometries(strict=not partial_layers)
             return
 
         if options["mode"] == "test_geometries":
-            self.test_geometries()
+            self.test_geometries(strict=True)
             return
 
         if options["mode"] == "add_organisational_areas":

@@ -152,6 +152,11 @@ Use:
 
   **Note**: Section 1 (schema `ADD COLUMN IF NOT EXISTS`) always runs regardless of `--layers` since it is idempotent and fast. `--layers` only gates the expensive UPDATE/CREATE operations.
 
+  Validation behavior after geometry processing:
+
+  - Full geometry rebuilds (`import_bfc_boundaries`, or `process_geometries` with no `--layers` / `--layers all`) run `test_geometries` in strict mode and fail on missing/empty required boundary tier tables.
+  - Scoped rebuilds (`process_geometries --layers <subset>`) run `test_geometries` in report-only mode for boundary-tier completeness, so operators can process a subset without failing due to unrelated layers not being rebuilt yet.
+
 Full/base reseed likely required:
 
 - New source CSV content for core IMD/reference tables
