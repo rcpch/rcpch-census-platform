@@ -125,7 +125,7 @@ class Command(BaseCommand):
             "is_complete": is_complete,
         }
 
-    def _run_post_processing_sql(self):
+    def _run_post_processing_sql(self, layers=None):
         self.stdout.write(
             self.style.WARNING(
                 "\n🚀 Running high-performance PostGIS optimizations and building UK-wide views..."
@@ -359,10 +359,56 @@ class Command(BaseCommand):
             ANALYZE public.{view_name};
             """
 
-        # --- SQL Statement List ---
+        def get_la_tile_sql(table_name, geom_column):
+            """Create a zoom-banded local authority tile table."""
+            return f"""
+            DROP TABLE IF EXISTS public.{table_name} CASCADE;
+
+            CREATE TABLE public.{table_name} AS
+            SELECT
+                year::int AS year,
+                local_authority_district_code::text AS lad_code,
+                ST_MakeValid(ST_Multi({geom_column}))::geometry(MultiPolygon, 3857) AS geom
+            FROM deprivation_scores_localauthority
+            WHERE {geom_column} IS NOT NULL;
+
+            CREATE INDEX idx_{table_name}_geom ON public.{table_name} USING GIST (geom);
+            ANALYZE public.{table_name};
+            """
+
+        # --- Layer resolution ---
+        _ALL_LAYERS = frozenset(
+            {
+                "lsoas",
+                "local-authorities",
+                "nhs-regions",
+                "integrated-care-boards",
+                "local-health-boards",
+            }
+        )
+        if layers is None or "all" in layers:
+            _active = _ALL_LAYERS
+        else:
+            _active = set(layers)
+            if "health-geographies" in _active:
+                _active.discard("health-geographies")
+                _active |= {
+                    "nhs-regions",
+                    "integrated-care-boards",
+                    "local-health-boards",
+                }
+
+        def want(*names):
+            return any(n in _active for n in names)
+
+        self.stdout.write(
+            self.style.SUCCESS(f"  Active layer groups: {', '.join(sorted(_active))}")
+        )
+
+        # --- SQL Statement List (conditionally built by layer group) ---
 
         sql_statements = [
-            # Section 1: Schema setup
+            # Section 1: Schema setup (always run — ADD COLUMN IF NOT EXISTS is idempotent and fast)
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_lsoa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
@@ -376,6 +422,9 @@ class Command(BaseCommand):
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_soa ADD COLUMN IF NOT EXISTS geom_3857_simp_z8_10 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_localauthority ADD COLUMN IF NOT EXISTS geom_3857_simp_z8_10 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_nhsenglishregion ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_nhsenglishregion ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_nhsenglishregion ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
@@ -388,20 +437,31 @@ class Command(BaseCommand):
             "ALTER TABLE deprivation_scores_localhealthboard ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_localhealthboard ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_localhealthboard ADD COLUMN IF NOT EXISTS geom_3857_simp_z8_10 geometry(MultiPolygon,3857);",
-            # Section 2: Cleanup
-            "DROP TABLE IF EXISTS public.uk_master_2011_z0_4 CASCADE;",
-            "DROP TABLE IF EXISTS public.uk_master_2011_z5_7 CASCADE;",
-            "DROP TABLE IF EXISTS public.uk_master_2011_z8_10 CASCADE;",
-            "DROP TABLE IF EXISTS public.uk_master_2011_z11_14 CASCADE;",
-            "DROP TABLE IF EXISTS public.uk_master_2021_z0_4 CASCADE;",
-            "DROP TABLE IF EXISTS public.uk_master_2021_z5_7 CASCADE;",
-            "DROP TABLE IF EXISTS public.uk_master_2021_z8_10 CASCADE;",
-            "DROP TABLE IF EXISTS public.uk_master_2021_z11_14 CASCADE;",
-            "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z0_4 CASCADE;",
-            "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z11_14 CASCADE;",
-            "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z11_14 CASCADE;",
-            "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z0_4 CASCADE;",
-            """
+        ]
+
+        # Section 2: Cleanup (conditional per layer group)
+        if want("lsoas"):
+            sql_statements += [
+                "DROP TABLE IF EXISTS public.uk_master_2011_z0_4 CASCADE;",
+                "DROP TABLE IF EXISTS public.uk_master_2011_z5_7 CASCADE;",
+                "DROP TABLE IF EXISTS public.uk_master_2011_z8_10 CASCADE;",
+                "DROP TABLE IF EXISTS public.uk_master_2011_z11_14 CASCADE;",
+                "DROP TABLE IF EXISTS public.uk_master_2021_z0_4 CASCADE;",
+                "DROP TABLE IF EXISTS public.uk_master_2021_z5_7 CASCADE;",
+                "DROP TABLE IF EXISTS public.uk_master_2021_z8_10 CASCADE;",
+                "DROP TABLE IF EXISTS public.uk_master_2021_z11_14 CASCADE;",
+                "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z0_4 CASCADE;",
+                "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z5_7 CASCADE;",
+                "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z8_10 CASCADE;",
+                "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z11_14 CASCADE;",
+                "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z0_4 CASCADE;",
+                "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z5_7 CASCADE;",
+                "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z8_10 CASCADE;",
+                "DROP TABLE IF EXISTS public.lsoa_tiles_2021_z11_14 CASCADE;",
+            ]
+        if want("local-authorities"):
+            sql_statements += [
+                """
             DO $$
             DECLARE
                 relkind_char char;
@@ -420,7 +480,14 @@ class Command(BaseCommand):
                 END IF;
             END $$;
             """,
-            """
+                "DROP TABLE IF EXISTS public.la_tiles_z0_4 CASCADE;",
+                "DROP TABLE IF EXISTS public.la_tiles_z5_7 CASCADE;",
+                "DROP TABLE IF EXISTS public.la_tiles_z8_10 CASCADE;",
+                "DROP TABLE IF EXISTS public.la_tiles_z11_14 CASCADE;",
+            ]
+        if want("nhs-regions"):
+            sql_statements += [
+                """
             DO $$
             DECLARE
                 relkind_char char;
@@ -439,7 +506,14 @@ class Command(BaseCommand):
                 END IF;
             END $$;
             """,
-            """
+                "DROP TABLE IF EXISTS public.nhser_tiles_2021_z0_4 CASCADE;",
+                "DROP TABLE IF EXISTS public.nhser_tiles_2021_z5_7 CASCADE;",
+                "DROP TABLE IF EXISTS public.nhser_tiles_2021_z8_10 CASCADE;",
+                "DROP TABLE IF EXISTS public.nhser_tiles_2021_z11_14 CASCADE;",
+            ]
+        if want("integrated-care-boards"):
+            sql_statements += [
+                """
             DO $$
             DECLARE
                 relkind_char char;
@@ -458,7 +532,14 @@ class Command(BaseCommand):
                 END IF;
             END $$;
             """,
-            """
+                "DROP TABLE IF EXISTS public.icb_tiles_2023_z0_4 CASCADE;",
+                "DROP TABLE IF EXISTS public.icb_tiles_2023_z5_7 CASCADE;",
+                "DROP TABLE IF EXISTS public.icb_tiles_2023_z8_10 CASCADE;",
+                "DROP TABLE IF EXISTS public.icb_tiles_2023_z11_14 CASCADE;",
+            ]
+        if want("local-health-boards"):
+            sql_statements += [
+                """
             DO $$
             DECLARE
                 relkind_char char;
@@ -477,237 +558,332 @@ class Command(BaseCommand):
                 END IF;
             END $$;
             """,
-            "DROP TABLE IF EXISTS public.nhser_tiles_2021_z0_4 CASCADE;",
-            "DROP TABLE IF EXISTS public.nhser_tiles_2021_z5_7 CASCADE;",
-            "DROP TABLE IF EXISTS public.nhser_tiles_2021_z8_10 CASCADE;",
-            "DROP TABLE IF EXISTS public.nhser_tiles_2021_z11_14 CASCADE;",
-            "DROP TABLE IF EXISTS public.icb_tiles_2023_z0_4 CASCADE;",
-            "DROP TABLE IF EXISTS public.icb_tiles_2023_z5_7 CASCADE;",
-            "DROP TABLE IF EXISTS public.icb_tiles_2023_z8_10 CASCADE;",
-            "DROP TABLE IF EXISTS public.icb_tiles_2023_z11_14 CASCADE;",
-            "DROP TABLE IF EXISTS public.lhb_tiles_2022_z0_4 CASCADE;",
-            "DROP TABLE IF EXISTS public.lhb_tiles_2022_z5_7 CASCADE;",
-            "DROP TABLE IF EXISTS public.lhb_tiles_2022_z8_10 CASCADE;",
-            "DROP TABLE IF EXISTS public.lhb_tiles_2022_z11_14 CASCADE;",
-            # Section 3: Geoprocessing (WGS84 -> Web Mercator 3857)
-            "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_MakeValid(geom_3857) WHERE NOT ST_IsValid(geom_3857);",
-            "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            "UPDATE deprivation_scores_soa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            "UPDATE deprivation_scores_localauthority SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            "UPDATE deprivation_scores_nhsenglishregion SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            "UPDATE deprivation_scores_integratedcareboard SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            "UPDATE deprivation_scores_localhealthboard SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
-            # Section 4: Simplification
-            # Compute all simplification tiers in a single pass per table to reduce write overhead.
-            # z0-4: 1,500 m, z5-7: 200 m, z8-10: 60 m (all in EPSG:3857 metres).
-            "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_nhsenglishregion SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_integratedcareboard SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
-            "UPDATE deprivation_scores_localhealthboard SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
-            # Section 5: Spatial indexing & clustering
-            # Raw geometry indexes (for z11+ and raw queries)
-            "CREATE INDEX IF NOT EXISTS idx_lsoa_3857 ON deprivation_scores_lsoa USING GIST (geom_3857);",
-            "CREATE INDEX IF NOT EXISTS idx_datazone_3857 ON deprivation_scores_datazone USING GIST (geom_3857);",
-            "CREATE INDEX IF NOT EXISTS idx_soa_3857 ON deprivation_scores_soa USING GIST (geom_3857);",
-            # Simplified geometry indexes (critical for tile performance)
-            "CREATE INDEX IF NOT EXISTS idx_lsoa_simp_z0_4 ON deprivation_scores_lsoa USING GIST (geom_3857_simp_z0_4);",
-            "CREATE INDEX IF NOT EXISTS idx_lsoa_simp_z5_7 ON deprivation_scores_lsoa USING GIST (geom_3857_simp_z5_7);",
-            "CREATE INDEX IF NOT EXISTS idx_lsoa_simp_z8_10 ON deprivation_scores_lsoa USING GIST (geom_3857_simp_z8_10);",
-            "CREATE INDEX IF NOT EXISTS idx_datazone_simp_z0_4 ON deprivation_scores_datazone USING GIST (geom_3857_simp_z0_4);",
-            "CREATE INDEX IF NOT EXISTS idx_datazone_simp_z5_7 ON deprivation_scores_datazone USING GIST (geom_3857_simp_z5_7);",
-            "CREATE INDEX IF NOT EXISTS idx_datazone_simp_z8_10 ON deprivation_scores_datazone USING GIST (geom_3857_simp_z8_10);",
-            "CREATE INDEX IF NOT EXISTS idx_soa_simp_z0_4 ON deprivation_scores_soa USING GIST (geom_3857_simp_z0_4);",
-            "CREATE INDEX IF NOT EXISTS idx_soa_simp_z5_7 ON deprivation_scores_soa USING GIST (geom_3857_simp_z5_7);",
-            "CREATE INDEX IF NOT EXISTS idx_soa_simp_z8_10 ON deprivation_scores_soa USING GIST (geom_3857_simp_z8_10);",
-            "CREATE INDEX IF NOT EXISTS idx_nhsenglishregion_simp_z0_4 ON deprivation_scores_nhsenglishregion USING GIST (geom_3857_simp_z0_4);",
-            "CREATE INDEX IF NOT EXISTS idx_nhsenglishregion_simp_z5_7 ON deprivation_scores_nhsenglishregion USING GIST (geom_3857_simp_z5_7);",
-            "CREATE INDEX IF NOT EXISTS idx_nhsenglishregion_simp_z8_10 ON deprivation_scores_nhsenglishregion USING GIST (geom_3857_simp_z8_10);",
-            "CREATE INDEX IF NOT EXISTS idx_integratedcareboard_simp_z0_4 ON deprivation_scores_integratedcareboard USING GIST (geom_3857_simp_z0_4);",
-            "CREATE INDEX IF NOT EXISTS idx_integratedcareboard_simp_z5_7 ON deprivation_scores_integratedcareboard USING GIST (geom_3857_simp_z5_7);",
-            "CREATE INDEX IF NOT EXISTS idx_integratedcareboard_simp_z8_10 ON deprivation_scores_integratedcareboard USING GIST (geom_3857_simp_z8_10);",
-            "CREATE INDEX IF NOT EXISTS idx_localhealthboard_simp_z0_4 ON deprivation_scores_localhealthboard USING GIST (geom_3857_simp_z0_4);",
-            "CREATE INDEX IF NOT EXISTS idx_localhealthboard_simp_z5_7 ON deprivation_scores_localhealthboard USING GIST (geom_3857_simp_z5_7);",
-            "CREATE INDEX IF NOT EXISTS idx_localhealthboard_simp_z8_10 ON deprivation_scores_localhealthboard USING GIST (geom_3857_simp_z8_10);",
-            "CREATE INDEX IF NOT EXISTS idx_localauthority_3857 ON deprivation_scores_localauthority USING GIST (geom_3857);",
-            "CREATE INDEX IF NOT EXISTS idx_nhsenglishregion_3857 ON deprivation_scores_nhsenglishregion USING GIST (geom_3857);",
-            "CREATE INDEX IF NOT EXISTS idx_integratedcareboard_3857 ON deprivation_scores_integratedcareboard USING GIST (geom_3857);",
-            "CREATE INDEX IF NOT EXISTS idx_localhealthboard_3857 ON deprivation_scores_localhealthboard USING GIST (geom_3857);",
-            "CREATE INDEX IF NOT EXISTS idx_lsoa_year_id ON deprivation_scores_lsoa (year, id);",
-            "CREATE INDEX IF NOT EXISTS idx_english_imd_year_lsoa ON deprivation_scores_englishindexmultipledeprivation (year, lsoa_id);",
-            "CREATE INDEX IF NOT EXISTS idx_welsh_imd_year_lsoa ON deprivation_scores_welshindexmultipledeprivation (year, lsoa_id);",
-            "CLUSTER deprivation_scores_lsoa USING idx_lsoa_simp_z5_7;",
-            "CLUSTER deprivation_scores_datazone USING idx_datazone_simp_z5_7;",
-            "CLUSTER deprivation_scores_soa USING idx_soa_simp_z5_7;",
-            "CLUSTER deprivation_scores_localauthority USING idx_localauthority_3857;",
-            "CLUSTER deprivation_scores_nhsenglishregion USING idx_nhsenglishregion_simp_z5_7;",
-            "CLUSTER deprivation_scores_integratedcareboard USING idx_integratedcareboard_simp_z5_7;",
-            "CLUSTER deprivation_scores_localhealthboard USING idx_localhealthboard_simp_z5_7;",
-            # Section 6: LSOA Views
-            get_lsoa_view_sql("lsoa_tiles_2011_z0_4", "geom_3857_simp_z0_4", 2011),
-            get_lsoa_view_sql("lsoa_tiles_2011_z5_7", "geom_3857_simp_z5_7", 2011),
-            get_lsoa_view_sql("lsoa_tiles_2011_z8_10", "geom_3857_simp_z8_10", 2011),
-            get_lsoa_view_sql("lsoa_tiles_2021_z0_4", "geom_3857_simp_z0_4", 2021),
-            get_lsoa_view_sql("lsoa_tiles_2021_z5_7", "geom_3857_simp_z5_7", 2021),
-            get_lsoa_view_sql("lsoa_tiles_2021_z8_10", "geom_3857_simp_z8_10", 2021),
-            # z11-14: raw geometry — no simplification, prevents gap artifacts at high zoom
-            get_lsoa_view_sql("lsoa_tiles_2011_z11_14", "geom_3857", 2011),
-            get_lsoa_view_sql("lsoa_tiles_2021_z11_14", "geom_3857", 2021),
-            # Section 7: UK Master Views
-            get_uk_master_view_sql("uk_master_2011_z0_4", "simp_z0_4", 2011, 2019),
-            get_uk_master_view_sql("uk_master_2011_z5_7", "simp_z5_7", 2011, 2019),
-            get_uk_master_view_sql("uk_master_2011_z8_10", "simp_z8_10", 2011, 2019),
-            get_uk_master_view_sql("uk_master_2021_z0_4", "simp_z0_4", 2021, 2025),
-            get_uk_master_view_sql("uk_master_2021_z5_7", "simp_z5_7", 2021, 2025),
-            get_uk_master_view_sql("uk_master_2021_z8_10", "simp_z8_10", 2021, 2025),
-            # z11-14: raw geometry — no simplification, prevents gap artifacts at high zoom
-            get_uk_master_view_sql("uk_master_2011_z11_14", "3857", 2011, 2019),
-            get_uk_master_view_sql("uk_master_2021_z11_14", "3857", 2021, 2025),
-            "CREATE TABLE public.la_tiles AS SELECT year::int AS year, local_authority_district_code::text AS lad_code, ST_MakeValid(ST_Multi(geom_3857))::geometry(MultiPolygon, 3857) AS geom FROM deprivation_scores_localauthority WHERE geom_3857 IS NOT NULL;",
-            "CREATE INDEX idx_la_tiles_geom ON public.la_tiles USING GIST (geom);",
-            "ANALYZE public.la_tiles;",
-            get_health_boundary_view_sql(
-                "nhser_tiles_2021_z0_4",
-                "deprivation_scores_nhsenglishregion",
-                "nhser_code",
-                "nhser_name",
-                2021,
-                "england",
-                "geom_3857_simp_z0_4",
-            ),
-            get_health_boundary_view_sql(
-                "nhser_tiles_2021_z5_7",
-                "deprivation_scores_nhsenglishregion",
-                "nhser_code",
-                "nhser_name",
-                2021,
-                "england",
-                "geom_3857_simp_z5_7",
-            ),
-            get_health_boundary_view_sql(
-                "nhser_tiles_2021_z8_10",
-                "deprivation_scores_nhsenglishregion",
-                "nhser_code",
-                "nhser_name",
-                2021,
-                "england",
-                "geom_3857",
-            ),
-            get_health_boundary_view_sql(
-                "nhser_tiles_2021_z11_14",
-                "deprivation_scores_nhsenglishregion",
-                "nhser_code",
-                "nhser_name",
-                2021,
-                "england",
-                "geom_3857",
-            ),
-            get_health_boundary_view_sql(
-                "icb_tiles_2023_z0_4",
-                "deprivation_scores_integratedcareboard",
-                "icb_code",
-                "icb_name",
-                2023,
-                "england",
-                "geom_3857_simp_z0_4",
-            ),
-            get_health_boundary_view_sql(
-                "icb_tiles_2023_z5_7",
-                "deprivation_scores_integratedcareboard",
-                "icb_code",
-                "icb_name",
-                2023,
-                "england",
-                "geom_3857_simp_z5_7",
-            ),
-            get_health_boundary_view_sql(
-                "icb_tiles_2023_z8_10",
-                "deprivation_scores_integratedcareboard",
-                "icb_code",
-                "icb_name",
-                2023,
-                "england",
-                "geom_3857",
-            ),
-            get_health_boundary_view_sql(
-                "icb_tiles_2023_z11_14",
-                "deprivation_scores_integratedcareboard",
-                "icb_code",
-                "icb_name",
-                2023,
-                "england",
-                "geom_3857",
-            ),
-            get_health_boundary_view_sql(
-                "lhb_tiles_2022_z0_4",
-                "deprivation_scores_localhealthboard",
-                "lhb_code",
-                "lhb_name",
-                2022,
-                "wales",
-                "geom_3857_simp_z0_4",
-            ),
-            get_health_boundary_view_sql(
-                "lhb_tiles_2022_z5_7",
-                "deprivation_scores_localhealthboard",
-                "lhb_code",
-                "lhb_name",
-                2022,
-                "wales",
-                "geom_3857_simp_z5_7",
-            ),
-            get_health_boundary_view_sql(
-                "lhb_tiles_2022_z8_10",
-                "deprivation_scores_localhealthboard",
-                "lhb_code",
-                "lhb_name",
-                2022,
-                "wales",
-                "geom_3857",
-            ),
-            get_health_boundary_view_sql(
-                "lhb_tiles_2022_z11_14",
-                "deprivation_scores_localhealthboard",
-                "lhb_code",
-                "lhb_name",
-                2022,
-                "wales",
-                "geom_3857",
-            ),
-            "CREATE VIEW public.nhser_tiles_2021 AS SELECT * FROM public.nhser_tiles_2021_z11_14;",
-            "CREATE VIEW public.icb_tiles_2023 AS SELECT * FROM public.icb_tiles_2023_z11_14;",
-            "CREATE VIEW public.lhb_tiles_2022 AS SELECT * FROM public.lhb_tiles_2022_z11_14;",
-            # Section 8: Final housekeeping
-            "GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;",
-            "ANALYZE deprivation_scores_lsoa;",
-            "ANALYZE deprivation_scores_datazone;",
-            "ANALYZE deprivation_scores_soa;",
-            "VACUUM ANALYZE public.uk_master_2011_z0_4;",
-            "VACUUM ANALYZE public.uk_master_2011_z5_7;",
-            "VACUUM ANALYZE public.uk_master_2011_z8_10;",
-            "VACUUM ANALYZE public.uk_master_2021_z0_4;",
-            "VACUUM ANALYZE public.uk_master_2021_z5_7;",
-            "VACUUM ANALYZE public.uk_master_2021_z8_10;",
-            "VACUUM ANALYZE public.uk_master_2011_z11_14;",
-            "VACUUM ANALYZE public.uk_master_2021_z11_14;",
-            "VACUUM ANALYZE public.lsoa_tiles_2011_z11_14;",
-            "VACUUM ANALYZE public.lsoa_tiles_2021_z11_14;",
-            "VACUUM ANALYZE public.la_tiles;",
-            "VACUUM ANALYZE public.nhser_tiles_2021_z0_4;",
-            "VACUUM ANALYZE public.nhser_tiles_2021_z5_7;",
-            "VACUUM ANALYZE public.nhser_tiles_2021_z8_10;",
-            "VACUUM ANALYZE public.nhser_tiles_2021_z11_14;",
-            "VACUUM ANALYZE public.icb_tiles_2023_z0_4;",
-            "VACUUM ANALYZE public.icb_tiles_2023_z5_7;",
-            "VACUUM ANALYZE public.icb_tiles_2023_z8_10;",
-            "VACUUM ANALYZE public.icb_tiles_2023_z11_14;",
-            "VACUUM ANALYZE public.lhb_tiles_2022_z0_4;",
-            "VACUUM ANALYZE public.lhb_tiles_2022_z5_7;",
-            "VACUUM ANALYZE public.lhb_tiles_2022_z8_10;",
-            "VACUUM ANALYZE public.lhb_tiles_2022_z11_14;",
-        ]
+                "DROP TABLE IF EXISTS public.lhb_tiles_2022_z0_4 CASCADE;",
+                "DROP TABLE IF EXISTS public.lhb_tiles_2022_z5_7 CASCADE;",
+                "DROP TABLE IF EXISTS public.lhb_tiles_2022_z8_10 CASCADE;",
+                "DROP TABLE IF EXISTS public.lhb_tiles_2022_z11_14 CASCADE;",
+            ]
+
+        # Section 3: Geoprocessing (WGS84 -> Web Mercator 3857)
+        if want("lsoas"):
+            sql_statements += [
+                "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_MakeValid(geom_3857) WHERE NOT ST_IsValid(geom_3857);",
+                "UPDATE deprivation_scores_lsoa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+                "UPDATE deprivation_scores_datazone SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+                "UPDATE deprivation_scores_soa SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            ]
+        if want("local-authorities"):
+            sql_statements += [
+                "UPDATE deprivation_scores_localauthority SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            ]
+        if want("nhs-regions"):
+            sql_statements += [
+                "UPDATE deprivation_scores_nhsenglishregion SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            ]
+        if want("integrated-care-boards"):
+            sql_statements += [
+                "UPDATE deprivation_scores_integratedcareboard SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            ]
+        if want("local-health-boards"):
+            sql_statements += [
+                "UPDATE deprivation_scores_localhealthboard SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            ]
+
+        # Section 4: Simplification
+        # Compute all simplification tiers in a single pass per table to reduce write overhead.
+        # z0-4: 1,500 m, z5-7: 200 m, z8-10: 60 m (all in EPSG:3857 metres).
+        if want("lsoas"):
+            sql_statements += [
+                "UPDATE deprivation_scores_lsoa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+                "UPDATE deprivation_scores_datazone SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+                "UPDATE deprivation_scores_soa SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+            ]
+        if want("local-authorities"):
+            sql_statements += [
+                "UPDATE deprivation_scores_localauthority SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+            ]
+        if want("nhs-regions"):
+            sql_statements += [
+                "UPDATE deprivation_scores_nhsenglishregion SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+            ]
+        if want("integrated-care-boards"):
+            sql_statements += [
+                "UPDATE deprivation_scores_integratedcareboard SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+            ]
+        if want("local-health-boards"):
+            sql_statements += [
+                "UPDATE deprivation_scores_localhealthboard SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+            ]
+
+        # Section 5: Spatial indexing & clustering
+        if want("lsoas"):
+            sql_statements += [
+                # Raw geometry indexes (for z11+ and raw queries)
+                "CREATE INDEX IF NOT EXISTS idx_lsoa_3857 ON deprivation_scores_lsoa USING GIST (geom_3857);",
+                "CREATE INDEX IF NOT EXISTS idx_datazone_3857 ON deprivation_scores_datazone USING GIST (geom_3857);",
+                "CREATE INDEX IF NOT EXISTS idx_soa_3857 ON deprivation_scores_soa USING GIST (geom_3857);",
+                # Simplified geometry indexes (critical for tile performance)
+                "CREATE INDEX IF NOT EXISTS idx_lsoa_simp_z0_4 ON deprivation_scores_lsoa USING GIST (geom_3857_simp_z0_4);",
+                "CREATE INDEX IF NOT EXISTS idx_lsoa_simp_z5_7 ON deprivation_scores_lsoa USING GIST (geom_3857_simp_z5_7);",
+                "CREATE INDEX IF NOT EXISTS idx_lsoa_simp_z8_10 ON deprivation_scores_lsoa USING GIST (geom_3857_simp_z8_10);",
+                "CREATE INDEX IF NOT EXISTS idx_datazone_simp_z0_4 ON deprivation_scores_datazone USING GIST (geom_3857_simp_z0_4);",
+                "CREATE INDEX IF NOT EXISTS idx_datazone_simp_z5_7 ON deprivation_scores_datazone USING GIST (geom_3857_simp_z5_7);",
+                "CREATE INDEX IF NOT EXISTS idx_datazone_simp_z8_10 ON deprivation_scores_datazone USING GIST (geom_3857_simp_z8_10);",
+                "CREATE INDEX IF NOT EXISTS idx_soa_simp_z0_4 ON deprivation_scores_soa USING GIST (geom_3857_simp_z0_4);",
+                "CREATE INDEX IF NOT EXISTS idx_soa_simp_z5_7 ON deprivation_scores_soa USING GIST (geom_3857_simp_z5_7);",
+                "CREATE INDEX IF NOT EXISTS idx_soa_simp_z8_10 ON deprivation_scores_soa USING GIST (geom_3857_simp_z8_10);",
+                "CREATE INDEX IF NOT EXISTS idx_lsoa_year_id ON deprivation_scores_lsoa (year, id);",
+                "CREATE INDEX IF NOT EXISTS idx_english_imd_year_lsoa ON deprivation_scores_englishindexmultipledeprivation (year, lsoa_id);",
+                "CREATE INDEX IF NOT EXISTS idx_welsh_imd_year_lsoa ON deprivation_scores_welshindexmultipledeprivation (year, lsoa_id);",
+                "CLUSTER deprivation_scores_lsoa USING idx_lsoa_simp_z5_7;",
+                "CLUSTER deprivation_scores_datazone USING idx_datazone_simp_z5_7;",
+                "CLUSTER deprivation_scores_soa USING idx_soa_simp_z5_7;",
+            ]
+        if want("local-authorities"):
+            sql_statements += [
+                "CREATE INDEX IF NOT EXISTS idx_localauthority_3857 ON deprivation_scores_localauthority USING GIST (geom_3857);",
+                "CREATE INDEX IF NOT EXISTS idx_localauthority_simp_z0_4 ON deprivation_scores_localauthority USING GIST (geom_3857_simp_z0_4);",
+                "CREATE INDEX IF NOT EXISTS idx_localauthority_simp_z5_7 ON deprivation_scores_localauthority USING GIST (geom_3857_simp_z5_7);",
+                "CREATE INDEX IF NOT EXISTS idx_localauthority_simp_z8_10 ON deprivation_scores_localauthority USING GIST (geom_3857_simp_z8_10);",
+                "CLUSTER deprivation_scores_localauthority USING idx_localauthority_3857;",
+            ]
+        if want("nhs-regions"):
+            sql_statements += [
+                "CREATE INDEX IF NOT EXISTS idx_nhsenglishregion_3857 ON deprivation_scores_nhsenglishregion USING GIST (geom_3857);",
+                "CREATE INDEX IF NOT EXISTS idx_nhsenglishregion_simp_z0_4 ON deprivation_scores_nhsenglishregion USING GIST (geom_3857_simp_z0_4);",
+                "CREATE INDEX IF NOT EXISTS idx_nhsenglishregion_simp_z5_7 ON deprivation_scores_nhsenglishregion USING GIST (geom_3857_simp_z5_7);",
+                "CREATE INDEX IF NOT EXISTS idx_nhsenglishregion_simp_z8_10 ON deprivation_scores_nhsenglishregion USING GIST (geom_3857_simp_z8_10);",
+                "CLUSTER deprivation_scores_nhsenglishregion USING idx_nhsenglishregion_simp_z5_7;",
+            ]
+        if want("integrated-care-boards"):
+            sql_statements += [
+                "CREATE INDEX IF NOT EXISTS idx_integratedcareboard_3857 ON deprivation_scores_integratedcareboard USING GIST (geom_3857);",
+                "CREATE INDEX IF NOT EXISTS idx_integratedcareboard_simp_z0_4 ON deprivation_scores_integratedcareboard USING GIST (geom_3857_simp_z0_4);",
+                "CREATE INDEX IF NOT EXISTS idx_integratedcareboard_simp_z5_7 ON deprivation_scores_integratedcareboard USING GIST (geom_3857_simp_z5_7);",
+                "CREATE INDEX IF NOT EXISTS idx_integratedcareboard_simp_z8_10 ON deprivation_scores_integratedcareboard USING GIST (geom_3857_simp_z8_10);",
+                "CLUSTER deprivation_scores_integratedcareboard USING idx_integratedcareboard_simp_z5_7;",
+            ]
+        if want("local-health-boards"):
+            sql_statements += [
+                "CREATE INDEX IF NOT EXISTS idx_localhealthboard_3857 ON deprivation_scores_localhealthboard USING GIST (geom_3857);",
+                "CREATE INDEX IF NOT EXISTS idx_localhealthboard_simp_z0_4 ON deprivation_scores_localhealthboard USING GIST (geom_3857_simp_z0_4);",
+                "CREATE INDEX IF NOT EXISTS idx_localhealthboard_simp_z5_7 ON deprivation_scores_localhealthboard USING GIST (geom_3857_simp_z5_7);",
+                "CREATE INDEX IF NOT EXISTS idx_localhealthboard_simp_z8_10 ON deprivation_scores_localhealthboard USING GIST (geom_3857_simp_z8_10);",
+                "CLUSTER deprivation_scores_localhealthboard USING idx_localhealthboard_simp_z5_7;",
+            ]
+
+        # Section 6: LSOA tile tables
+        if want("lsoas"):
+            sql_statements += [
+                get_lsoa_view_sql("lsoa_tiles_2011_z0_4", "geom_3857_simp_z0_4", 2011),
+                get_lsoa_view_sql("lsoa_tiles_2011_z5_7", "geom_3857_simp_z5_7", 2011),
+                get_lsoa_view_sql(
+                    "lsoa_tiles_2011_z8_10", "geom_3857_simp_z8_10", 2011
+                ),
+                get_lsoa_view_sql("lsoa_tiles_2021_z0_4", "geom_3857_simp_z0_4", 2021),
+                get_lsoa_view_sql("lsoa_tiles_2021_z5_7", "geom_3857_simp_z5_7", 2021),
+                get_lsoa_view_sql(
+                    "lsoa_tiles_2021_z8_10", "geom_3857_simp_z8_10", 2021
+                ),
+                # z11-14: raw geometry — no simplification, prevents gap artifacts at high zoom
+                get_lsoa_view_sql("lsoa_tiles_2011_z11_14", "geom_3857", 2011),
+                get_lsoa_view_sql("lsoa_tiles_2021_z11_14", "geom_3857", 2021),
+            ]
+
+        # Section 7: UK Master + Overlay tile tables
+        if want("lsoas"):
+            sql_statements += [
+                get_uk_master_view_sql("uk_master_2011_z0_4", "simp_z0_4", 2011, 2019),
+                get_uk_master_view_sql("uk_master_2011_z5_7", "simp_z5_7", 2011, 2019),
+                get_uk_master_view_sql(
+                    "uk_master_2011_z8_10", "simp_z8_10", 2011, 2019
+                ),
+                get_uk_master_view_sql("uk_master_2021_z0_4", "simp_z0_4", 2021, 2025),
+                get_uk_master_view_sql("uk_master_2021_z5_7", "simp_z5_7", 2021, 2025),
+                get_uk_master_view_sql(
+                    "uk_master_2021_z8_10", "simp_z8_10", 2021, 2025
+                ),
+                # z11-14: raw geometry — no simplification, prevents gap artifacts at high zoom
+                get_uk_master_view_sql("uk_master_2011_z11_14", "3857", 2011, 2019),
+                get_uk_master_view_sql("uk_master_2021_z11_14", "3857", 2021, 2025),
+            ]
+        if want("local-authorities"):
+            sql_statements += [
+                get_la_tile_sql("la_tiles_z0_4", "geom_3857_simp_z0_4"),
+                get_la_tile_sql("la_tiles_z5_7", "geom_3857_simp_z5_7"),
+                get_la_tile_sql("la_tiles_z8_10", "geom_3857_simp_z8_10"),
+                # z11-14: reuse 60 m simplification — raw LA geometry can exceed pg_tileserv's
+                # vertex limit on complex coastal authorities even after tile clipping.
+                get_la_tile_sql("la_tiles_z11_14", "geom_3857_simp_z8_10"),
+                "CREATE VIEW public.la_tiles AS SELECT * FROM public.la_tiles_z11_14;",
+            ]
+        if want("nhs-regions"):
+            sql_statements += [
+                get_health_boundary_view_sql(
+                    "nhser_tiles_2021_z0_4",
+                    "deprivation_scores_nhsenglishregion",
+                    "nhser_code",
+                    "nhser_name",
+                    2021,
+                    "england",
+                    "geom_3857_simp_z0_4",
+                ),
+                get_health_boundary_view_sql(
+                    "nhser_tiles_2021_z5_7",
+                    "deprivation_scores_nhsenglishregion",
+                    "nhser_code",
+                    "nhser_name",
+                    2021,
+                    "england",
+                    "geom_3857_simp_z5_7",
+                ),
+                get_health_boundary_view_sql(
+                    "nhser_tiles_2021_z8_10",
+                    "deprivation_scores_nhsenglishregion",
+                    "nhser_code",
+                    "nhser_name",
+                    2021,
+                    "england",
+                    "geom_3857",
+                ),
+                get_health_boundary_view_sql(
+                    "nhser_tiles_2021_z11_14",
+                    "deprivation_scores_nhsenglishregion",
+                    "nhser_code",
+                    "nhser_name",
+                    2021,
+                    "england",
+                    "geom_3857",
+                ),
+                "CREATE VIEW public.nhser_tiles_2021 AS SELECT * FROM public.nhser_tiles_2021_z11_14;",
+            ]
+        if want("integrated-care-boards"):
+            sql_statements += [
+                get_health_boundary_view_sql(
+                    "icb_tiles_2023_z0_4",
+                    "deprivation_scores_integratedcareboard",
+                    "icb_code",
+                    "icb_name",
+                    2023,
+                    "england",
+                    "geom_3857_simp_z0_4",
+                ),
+                get_health_boundary_view_sql(
+                    "icb_tiles_2023_z5_7",
+                    "deprivation_scores_integratedcareboard",
+                    "icb_code",
+                    "icb_name",
+                    2023,
+                    "england",
+                    "geom_3857_simp_z5_7",
+                ),
+                get_health_boundary_view_sql(
+                    "icb_tiles_2023_z8_10",
+                    "deprivation_scores_integratedcareboard",
+                    "icb_code",
+                    "icb_name",
+                    2023,
+                    "england",
+                    "geom_3857",
+                ),
+                get_health_boundary_view_sql(
+                    "icb_tiles_2023_z11_14",
+                    "deprivation_scores_integratedcareboard",
+                    "icb_code",
+                    "icb_name",
+                    2023,
+                    "england",
+                    "geom_3857",
+                ),
+                "CREATE VIEW public.icb_tiles_2023 AS SELECT * FROM public.icb_tiles_2023_z11_14;",
+            ]
+        if want("local-health-boards"):
+            sql_statements += [
+                get_health_boundary_view_sql(
+                    "lhb_tiles_2022_z0_4",
+                    "deprivation_scores_localhealthboard",
+                    "lhb_code",
+                    "lhb_name",
+                    2022,
+                    "wales",
+                    "geom_3857_simp_z0_4",
+                ),
+                get_health_boundary_view_sql(
+                    "lhb_tiles_2022_z5_7",
+                    "deprivation_scores_localhealthboard",
+                    "lhb_code",
+                    "lhb_name",
+                    2022,
+                    "wales",
+                    "geom_3857_simp_z5_7",
+                ),
+                get_health_boundary_view_sql(
+                    "lhb_tiles_2022_z8_10",
+                    "deprivation_scores_localhealthboard",
+                    "lhb_code",
+                    "lhb_name",
+                    2022,
+                    "wales",
+                    "geom_3857",
+                ),
+                get_health_boundary_view_sql(
+                    "lhb_tiles_2022_z11_14",
+                    "deprivation_scores_localhealthboard",
+                    "lhb_code",
+                    "lhb_name",
+                    2022,
+                    "wales",
+                    "geom_3857",
+                ),
+                "CREATE VIEW public.lhb_tiles_2022 AS SELECT * FROM public.lhb_tiles_2022_z11_14;",
+            ]
+
+        # Section 8: Final housekeeping (GRANT always; ANALYZE/VACUUM per layer)
+        sql_statements += ["GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;"]
+        if want("lsoas"):
+            sql_statements += [
+                "ANALYZE deprivation_scores_lsoa;",
+                "ANALYZE deprivation_scores_datazone;",
+                "ANALYZE deprivation_scores_soa;",
+                "VACUUM ANALYZE public.uk_master_2011_z0_4;",
+                "VACUUM ANALYZE public.uk_master_2011_z5_7;",
+                "VACUUM ANALYZE public.uk_master_2011_z8_10;",
+                "VACUUM ANALYZE public.uk_master_2021_z0_4;",
+                "VACUUM ANALYZE public.uk_master_2021_z5_7;",
+                "VACUUM ANALYZE public.uk_master_2021_z8_10;",
+                "VACUUM ANALYZE public.uk_master_2011_z11_14;",
+                "VACUUM ANALYZE public.uk_master_2021_z11_14;",
+                "VACUUM ANALYZE public.lsoa_tiles_2011_z11_14;",
+                "VACUUM ANALYZE public.lsoa_tiles_2021_z11_14;",
+            ]
+        if want("local-authorities"):
+            sql_statements += [
+                "VACUUM ANALYZE public.la_tiles_z0_4;",
+                "VACUUM ANALYZE public.la_tiles_z5_7;",
+                "VACUUM ANALYZE public.la_tiles_z8_10;",
+                "VACUUM ANALYZE public.la_tiles_z11_14;",
+            ]
+        if want("nhs-regions"):
+            sql_statements += [
+                "VACUUM ANALYZE public.nhser_tiles_2021_z0_4;",
+                "VACUUM ANALYZE public.nhser_tiles_2021_z5_7;",
+                "VACUUM ANALYZE public.nhser_tiles_2021_z8_10;",
+                "VACUUM ANALYZE public.nhser_tiles_2021_z11_14;",
+            ]
+        if want("integrated-care-boards"):
+            sql_statements += [
+                "VACUUM ANALYZE public.icb_tiles_2023_z0_4;",
+                "VACUUM ANALYZE public.icb_tiles_2023_z5_7;",
+                "VACUUM ANALYZE public.icb_tiles_2023_z8_10;",
+                "VACUUM ANALYZE public.icb_tiles_2023_z11_14;",
+            ]
+        if want("local-health-boards"):
+            sql_statements += [
+                "VACUUM ANALYZE public.lhb_tiles_2022_z0_4;",
+                "VACUUM ANALYZE public.lhb_tiles_2022_z5_7;",
+                "VACUUM ANALYZE public.lhb_tiles_2022_z8_10;",
+                "VACUUM ANALYZE public.lhb_tiles_2022_z11_14;",
+            ]
 
         print("[POSTPROCESS] Starting SQL post-processing...")
         with connection.cursor() as cursor:
@@ -1244,6 +1420,25 @@ class Command(BaseCommand):
             action="store_true",
             help="Force re-import even if expected records with geom already exist",
         )
+        parser.add_argument(
+            "--layers",
+            nargs="+",
+            choices=[
+                "all",
+                "lsoas",
+                "local-authorities",
+                "nhs-regions",
+                "integrated-care-boards",
+                "local-health-boards",
+                "health-geographies",
+            ],
+            default=None,
+            help=(
+                "Limit process_geometries to specific overlay groups. "
+                "'health-geographies' expands to nhs-regions + integrated-care-boards + local-health-boards. "
+                "Omit to process all layers (equivalent to 'all')."
+            ),
+        )
 
     def handle(self, *args, **options):
         force = options.get("force", False)
@@ -1419,6 +1614,7 @@ class Command(BaseCommand):
             self.test_geometries()
             return
         if options.get("mode") == "process_geometries":
+            layers = options.get("layers")
             self.stdout.write(
                 "\n"
                 + self.style.SUCCESS(
@@ -1426,7 +1622,7 @@ class Command(BaseCommand):
                 )
                 + "\n"
             )
-            self._run_post_processing_sql()
+            self._run_post_processing_sql(layers=layers)
             self.test_geometries()
             return
 
