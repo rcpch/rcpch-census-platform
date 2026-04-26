@@ -9,7 +9,7 @@ from decimal import Decimal
 import geopandas as gpd
 import pandas as pd
 from sqlalchemy import create_engine
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 from django.conf import settings
 from ...models import (
@@ -1385,7 +1385,48 @@ class Command(BaseCommand):
                     f"  {status} {label}: 2011({count_11}) | 2021({count_21}) polygons."
                 )
 
-            # 3. Coordinate System Verification
+            # 4. Boundary tile tier verification
+            self.stdout.write("Checking boundary tier tables (z0_4, z5_7, z8_10, z11_14)...")
+            tiered_boundaries = {
+                "Local Authorities": "la_tiles",
+                "NHS Regions": "nhser_tiles_2021",
+                "Integrated Care Boards": "icb_tiles_2023",
+                "Local Health Boards": "lhb_tiles_2022",
+            }
+            tiers = ["z0_4", "z5_7", "z8_10", "z11_14"]
+            boundary_failures = []
+
+            for label, prefix in tiered_boundaries.items():
+                for tier in tiers:
+                    table_name = f"{prefix}_{tier}"
+                    if not table_or_view_exists(cursor, table_name):
+                        boundary_failures.append(
+                            f"Missing required boundary table: public.{table_name}"
+                        )
+                        continue
+
+                    cursor.execute(f"SELECT COUNT(*) FROM public.{table_name};")
+                    row = cursor.fetchone()
+                    row_count = row[0] if row else 0
+                    if row_count <= 0:
+                        boundary_failures.append(
+                            f"Boundary table is empty: public.{table_name}"
+                        )
+                        status = "❌"
+                    else:
+                        status = "✅"
+
+                    self.stdout.write(
+                        f"  {status} {label} {tier}: {row_count} rows"
+                    )
+
+            if boundary_failures:
+                failures = "\n  - " + "\n  - ".join(boundary_failures)
+                raise CommandError(
+                    "Boundary tier validation failed:" + failures
+                )
+
+            # 5. Coordinate System Verification
             if table_or_view_exists(cursor, "uk_master_2021_z8_10"):
                 cursor.execute(
                     "SELECT ST_X(ST_Centroid(geom)) FROM public.uk_master_2021_z8_10 LIMIT 1;"
