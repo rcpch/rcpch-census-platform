@@ -744,7 +744,7 @@ class Command(BaseCommand):
                     "nhser_name",
                     2021,
                     "england",
-                    "geom_3857",
+                    "geom_3857_simp_z8_10",
                 ),
                 get_health_boundary_view_sql(
                     "nhser_tiles_2021_z11_14",
@@ -784,7 +784,7 @@ class Command(BaseCommand):
                     "icb_name",
                     2023,
                     "england",
-                    "geom_3857",
+                    "geom_3857_simp_z8_10",
                 ),
                 get_health_boundary_view_sql(
                     "icb_tiles_2023_z11_14",
@@ -824,7 +824,7 @@ class Command(BaseCommand):
                     "lhb_name",
                     2022,
                     "wales",
-                    "geom_3857",
+                    "geom_3857_simp_z8_10",
                 ),
                 get_health_boundary_view_sql(
                     "lhb_tiles_2022_z11_14",

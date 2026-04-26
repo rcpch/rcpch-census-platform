@@ -99,6 +99,15 @@ To achieve fast rendering on the frontend:
     * `<era>` is either `2011` (IMD 2019 England / 2019 Wales) or `2021` (IMD 2025 England / 2019 Wales).
 3. **CDN**: Tiles are cached at the edge via a CDN to ensure sub-second map interactivity.
 
+### Frontend script cache-busting
+
+To reduce stale frontend behavior after map-layer changes, `site/index.html` uses versioned local script URLs:
+
+* `config.js?v=__ASSET_VERSION__`
+* `map-logic.js?v=__ASSET_VERSION__`
+
+During deployment, `.github/workflows/deploy_containerapps.yml` injects `__ASSET_VERSION__` from the current git commit hash (first 12 chars via `build_info.json`). This gives each release unique JS asset URLs, so browser/CDN caches naturally refresh on deploy.
+
 ## Current Dataset Mapping (Map Behaviour)
 
 This section summarizes what the map currently renders by view. Use this as the quick reference for boundary year, IMD year, and local authority metadata in tile properties.

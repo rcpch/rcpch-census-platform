@@ -43,6 +43,27 @@ jobs:
       - name: Burn in build info
         run: s/get-build-info > build_info.json
 
+      - name: Inject static asset version
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          build_info_path = Path('build_info.json')
+          index_path = Path('site/index.html')
+
+          build_info = json.loads(build_info_path.read_text(encoding='utf-8'))
+          sha = str(build_info.get('latest_git_commit', '')).strip()
+          asset_version = (sha[:12] if sha else 'dev')
+
+          html = index_path.read_text(encoding='utf-8')
+          html = html.replace('__ASSET_VERSION__', asset_version)
+          index_path.write_text(html, encoding='utf-8')
+
+          print(f'Injected asset version: {asset_version}')
+          PY
+
       - name: Build and push web image
         shell: bash
         run: |

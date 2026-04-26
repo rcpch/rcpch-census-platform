@@ -241,6 +241,15 @@ Misc:
 - `s/get-build-info`
   - Outputs current git hash and branch JSON.
 
+### Frontend Cache-Busting (Automated on Deploy)
+
+- `site/index.html` includes deploy-time placeholders in map script tags:
+  - `config.js?v=__ASSET_VERSION__`
+  - `map-logic.js?v=__ASSET_VERSION__`
+- The deploy workflow (`.github/workflows/deploy_containerapps.yml`) replaces `__ASSET_VERSION__` with the first 12 chars of `latest_git_commit` from `build_info.json`.
+- This ensures each deployed revision serves a unique JS URL and avoids stale browser/CDN asset caches after map/frontend updates.
+- In local development (without deploy replacement), the placeholder string remains literal and is still a valid query string.
+
 ## Publishing and deployment docs
 
 For full operator guidance, use these docs in `site/docs/`:
