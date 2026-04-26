@@ -310,21 +310,22 @@ function initMap() {
     style: {
       choropleth: {
         baseColorByNation: {
-          england: "#67000d",
+          england: "#b91c1c",
           scotland: "#08306b",
           wales: "#00441b",
           northern_ireland: "#7f2704",
         },
+        fillOpacity: 0.62,
       },
       boundaries: {
         localAuthorityColor: "#374151",
-        localAuthorityWidth: 1,
-        nhserColor: "#1e40af",
-        nhserWidth: 1.5,
-        icbColor: "#9333ea",
-        icbWidth: 1.25,
+        localAuthorityWidth: 1.5,
+        nhserColor: "#0f766e",
+        nhserWidth: 2.4,
+        icbColor: "#b45309",
+        icbWidth: 2.2,
         lhbColor: "#166534",
-        lhbWidth: 1.4,
+        lhbWidth: 2.2,
       },
       tooltip: {
         backgroundColor: "#0d0d58",
