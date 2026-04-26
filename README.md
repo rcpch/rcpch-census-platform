@@ -6,6 +6,24 @@ This project is a python 3.11 / Django Rest Framework project providing UK censu
      <img src='https://raw.githubusercontent.com/rcpch/rcpch-census-platform/refs/heads/live/static/images/rcpch-logo-mobile.4d5b446caf9a.svg' alt='RCPCH Logo'>
 </p>
 
+<!--
+Documentation routing note for humans and LLMs:
+- README is intentionally overview-first and avoids operational/detail duplication.
+- Human/operator runbooks live in site/docs/.
+- Agent/LLM-specific operational constraints live in AGENTS.md.
+-->
+
+## Documentation Routing (Humans and LLMs)
+
+Use this file as a high-level entry point.
+
+- For boundary datasets, tile table contracts, and geometry processing details, use [site/docs/boundaries.md](site/docs/boundaries.md).
+- For managed database restore and seeding operations, use [site/docs/managed-database-seeding.md](site/docs/managed-database-seeding.md).
+- For deployment flow and architecture, use [site/docs/deploy.md](site/docs/deploy.md).
+- For coding-agent and LLM operational constraints, use [AGENTS.md](AGENTS.md).
+
+If README content conflicts with site/docs, treat site/docs as the source of truth.
+
 
 ## Why is it needed?
 
@@ -107,7 +125,7 @@ These domains are then weighted and contribute to the final index of multiple de
 
 Written in python 3.11 and django-rest-framework. We recommend using `pyenv` or similar python version manager and virtual environment manager.
 
-### Option One
+### Option One (Quick Local Setup)
 
 1. clone the repo
 2. ```cd rcpch_census_platform```
@@ -115,14 +133,16 @@ Written in python 3.11 and django-rest-framework. We recommend using `pyenv` or 
 4. ```python manage.py createsuperuser --username username --email username@email.com```
 5. ```python manage.py makemigrations```
 6. ```python manage.py migrate```
-7. ```python manage.py seed --mode='__all__'```
-8. ```python manage.py seed --mode='import_bfc_boundaries'```
+7. `python manage.py seed --mode='__all__'`
+8. `python manage.py seed --mode='import_bfc_boundaries'`
 
-This latter step will take more than 30 minutes as it populates the database with all the census and deprivation data, and also the geographical boundary shapes and map tiles. If successful, it should yield the following message:
-> ![alt rcpch-census-db](static/images/census_db_screenshot.png?raw=true)
+Notes:
+
+- `import_bfc_boundaries` can take significant time on a fresh build.
+- For seeding modes, boundary import behavior, and validation semantics, use [site/docs/boundaries.md](site/docs/boundaries.md).
 
 The final step is to run the server:
-```python manage.py runserver```
+`python manage.py runserver`
 
 ## Tests — postcode mocking
 
@@ -161,9 +181,11 @@ Steps:
     - `./s/dev`
     - (equivalent: `docker compose -f docker-compose-postgis.yml up --build`)
 3. The `web` container will wait for the database, run `collectstatic`, run `migrate`, and then start Django.
-4. Seed the database (this can take a long time):
+4. Seed the database:
     - `docker compose -f docker-compose-postgis.yml exec web python manage.py seed --mode='__all__'`
-    - Optional: `docker compose -f docker-compose-postgis.yml exec web python manage.py seed --mode='import_bfc_boundaries'`
+    - Then: `docker compose -f docker-compose-postgis.yml exec web python manage.py seed --mode='import_bfc_boundaries'`
+
+For full seeding guidance (including partial geometry rebuild behavior and validation modes), use [site/docs/boundaries.md](site/docs/boundaries.md).
 
 Useful URLs:
 
@@ -186,32 +208,14 @@ To point it at a deployed tiles endpoint, pass a query parameter:
 
 - `?tilesBase=https://<your-host>/tiles`
 
-### Other Command Line functions
+### Seeding and Validation Commands
 
-The seeding process should skip for each model that has the correct number of rows.
+Useful commands:
 
-These are:
+- `python manage.py seed --mode test_table_totals`
+- `python manage.py seed --mode test_geometries`
 
-| Model | Number of Rows | Notes | 
-|----|----|----|
-| LSOA (2011) | 34,753 | 2011 LSOA rows (32,844 in England, 1,909 in Wales). |
-| LSOA (2021) | 35,672 | 2021 LSOA rows. |
-| DataZone | 6,976 | Scotland Data Zones. |
-| LocalAuthority (2011) | 32 | Scotland local authorities (2011). |
-| LocalAuthority (2019) | 339 | England + Wales local authorities (2019): 317 + 22. |
-| LocalAuthority (2024, with geom) | 318 | 2024 local authorities with geometries present. |
-| PopulationDensity | 32,844 | England population densities. |
-| GreenSpace | 371 | England/Wales/Scotland green space rows. |
-| SOA | 890 | Northern Ireland SOAs. |
-| WelshIndexMultipleDeprivation | 1,909 | Wales WIMD (2019) rows. |
-| NorthernIrelandIndexMultipleDeprivation | 890 | Northern Ireland NIMDM (2017) rows. |
-| ScottishIndexMultipleDeprivation | 6,976 | Scotland SIMD (2020) rows. |
-
-`python manage.py seed --mode test_table_totals`
-
-To validate the generated UK master views have geometries for all nations (and sanity-check the coordinate system), run:
-
-`python manage.py seed --mode test_geometries`
+For expected counts, boundary tier validation behavior, and operational interpretation of these checks, use [site/docs/boundaries.md](site/docs/boundaries.md).
 
 <!-- TODO: #14 #13 remove all references to auth, logins, or tokens in the census engine readme -->
 
