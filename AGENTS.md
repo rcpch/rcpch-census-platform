@@ -37,7 +37,7 @@ The platform has two distinct data phases:
   - Generates simplified geometries for low/medium zoom
   - Builds spatial indexes and clusters
   - Materializes tile-serving tables for all zoom tiers
-- `process_geometries` runs post-processing only (no boundary re-download), useful for SQL/view/table-shape changes.
+- `process_geometries` runs post-processing only (no boundary re-download), useful for SQL/view/table-shape changes. Accepts an optional `--layers` flag to process only specific overlay groups (see below).
 
 ## Tile-serving model
 
@@ -128,6 +128,34 @@ No full reseed required:
 Use:
 
 - `python manage.py seed --mode process_geometries`
+
+  To rebuild only specific overlay tables (much faster — minutes not hours):
+
+  ```bash
+  # Local authority tiles only
+  python manage.py seed --mode process_geometries --layers local-authorities
+
+  # All health boundaries (NHSER + ICB + LHB)
+  python manage.py seed --mode process_geometries --layers health-geographies
+
+  # Individual health boundary types
+  python manage.py seed --mode process_geometries --layers nhs-regions
+  python manage.py seed --mode process_geometries --layers integrated-care-boards
+  python manage.py seed --mode process_geometries --layers local-health-boards
+
+  # LSOAs + UK master tiles only
+  python manage.py seed --mode process_geometries --layers lsoas
+
+  # Multiple groups at once
+  python manage.py seed --mode process_geometries --layers local-authorities nhs-regions
+  ```
+
+  **Note**: Section 1 (schema `ADD COLUMN IF NOT EXISTS`) always runs regardless of `--layers` since it is idempotent and fast. `--layers` only gates the expensive UPDATE/CREATE operations.
+
+  Validation behavior after geometry processing:
+
+  - Full geometry rebuilds (`import_bfc_boundaries`, or `process_geometries` with no `--layers` / `--layers all`) run `test_geometries` in strict mode and fail on missing/empty required boundary tier tables.
+  - Scoped rebuilds (`process_geometries --layers <subset>`) run `test_geometries` in report-only mode for boundary-tier completeness, so operators can process a subset without failing due to unrelated layers not being rebuilt yet.
 
 Full/base reseed likely required:
 

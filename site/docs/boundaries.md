@@ -213,6 +213,11 @@ After the base IMD data has been seeded, run the geometry enrichment:
 python manage.py seed --mode import_bfc_boundaries
 ```
 
+Validation semantics:
+
+* `import_bfc_boundaries` runs post-processing and then `test_geometries` in strict mode.
+* Strict mode fails the command if required boundary tier tables are missing or empty.
+
 To update or overwrite existing geometries, use the `--force` flag.
 
 If you only changed exposed tile properties (for example adding `area_name`), you can rebuild just the post-processed tile tables without re-downloading boundaries:
@@ -220,6 +225,18 @@ If you only changed exposed tile properties (for example adding `area_name`), yo
 ```bash
 python manage.py seed --mode process_geometries
 ```
+
+For scoped rebuilds, use `--layers`:
+
+```bash
+python manage.py seed --mode process_geometries --layers local-authorities
+python manage.py seed --mode process_geometries --layers health-geographies
+```
+
+Validation semantics for `process_geometries`:
+
+* Full rebuild (`process_geometries` with no `--layers`, or `--layers all`) runs `test_geometries` in strict mode.
+* Scoped rebuild (`process_geometries --layers <subset>`) runs `test_geometries` in report-only mode for boundary-tier completeness, so missing/empty unrelated tiers are logged but do not abort the command.
 
 ## References
 

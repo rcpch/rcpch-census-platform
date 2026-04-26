@@ -55,6 +55,7 @@ Azure Container App
 ```
 
 The managed database persists independently of application deployments and only needs seeding when:
+
 - Initially setting up a new environment
 - Updating to a new data release version
 - Restoring from a known-good state
@@ -107,6 +108,7 @@ az containerapp exec \
 ```
 
 **Parameter Explanation**:
+
 - `--name`: Your Azure Container App name
 - `--resource-group`: Your Azure resource group
 - `--container`: Container to execute in (usually `web`)
@@ -164,6 +166,7 @@ ERROR: extension "postgis_tiger_geocoder" does not exist
 ```
 
 These extensions are:
+
 - Not available in Azure PostgreSQL's allowlist
 - Not required for UK census data (they're for US address geocoding)
 - Safely excluded from the restore process
