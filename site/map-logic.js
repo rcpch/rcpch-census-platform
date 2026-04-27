@@ -93,14 +93,14 @@ function updateDatasetInfo(selectedNation, era) {
     northern_ireland: "N. Ireland",
   };
 
-  const eraActive = selectedNation === "england";
+  const eraActive = selectedNation === "england" || selectedNation === "all";
   eraGroup.style.opacity = eraActive ? "1" : "0.45";
   eraSelect.disabled = !eraActive;
   noteEl.textContent = eraActive
-    ? ""
-    : selectedNation === "all"
-      ? "All UK view uses 2011-era boundaries for all nations"
-      : "Era selector applies to England only";
+    ? selectedNation === "all"
+      ? "All UK: era switch changes England between 2025/2021 and 2019/2011 datasets"
+      : ""
+    : "Era selector applies to England and All UK";
 
   const nations =
     selectedNation === "all"
@@ -108,8 +108,7 @@ function updateDatasetInfo(selectedNation, era) {
       : [selectedNation];
 
   const lines = nations.map((n) => {
-    const eraKey =
-      selectedNation === "all" ? "2011" : n === "england" ? era : "2011";
+    const eraKey = n === "england" ? era : "2011";
     const d = DATASET_INFO[n][eraKey];
     const noteStr = d.note
       ? ` <span style="color:#9a6700;font-style:italic;">(${d.note})</span>`
@@ -137,7 +136,9 @@ function updateLocalAuthorityControlState() {
     ? currentNation === "england" && currentEra === "2021"
       ? "Using 2024 Local Authority boundaries"
       : currentNation === "all"
-        ? "All UK: England/Wales 2019 + Scotland 2011 boundaries"
+        ? currentEra === "2021"
+          ? "All UK: England 2024 + Wales 2019 + Scotland 2011 boundaries"
+          : "All UK: England/Wales 2019 + Scotland 2011 boundaries"
         : "Showing matching Local Authority boundaries for this view"
     : "Not available for Northern Ireland in this layer";
 }
