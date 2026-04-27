@@ -136,10 +136,18 @@ The `uk_master_2021_*` tables contain data from different boundary vintages depe
 
 Consuming applications can therefore:
 
-- Pass `era=2021` to show the latest available data for each nation (England on 2021 LSOAs + 2025 IMD; Wales on 2011 LSOAs + 2019 WIMD).
-- Pass `era=2011` to show a consistent historical-cohort view where England also uses 2011 LSOAs + 2019 IMD, matching Wales and other nations.
+* Pass `era=2021` to show the latest available data for each nation (England on 2021 LSOAs + 2025 IMD; Wales on 2011 LSOAs + 2019 WIMD).
+* Pass `era=2011` to show a consistent historical-cohort view where England also uses 2011 LSOAs + 2019 IMD, matching Wales and other nations.
 
 The era toggle is meaningful for All UK views, not only England-only views.
+
+### Frontend behavior (site map)
+
+Current `site/` map control behavior is:
+
+* Default load uses `initialNation: 'all'` and `initialEra: '2021'`.
+* The era selector is enabled for `all` and `england`, and disabled for `wales`, `scotland`, and `northern_ireland`.
+* In `all` view, changing era switches tile family between `uk_master_2021_*` and `uk_master_2011_*`; this changes England's IMD/boundary pairing while the other nations remain on their latest available published datasets.
 
 ### Important alignment caveat
 

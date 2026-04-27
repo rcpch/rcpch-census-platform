@@ -85,6 +85,12 @@ Key point: the `uk_master_2021_*` tables are **mixed vintage** — England uses 
 
 This means the era toggle has a meaningful effect on the All UK view (switching between 2019 and 2025 IMD data for England), not just on England-only views. Consuming applications (e.g. NPDA) can use `era=2021` for current-cohort maps and `era=2011` for historical-cohort maps, with Wales and other nations appearing identically in both because no newer data exists for them.
 
+Frontend control behavior (`site/index.html` + `site/map-logic.js`) is currently:
+
+- Default view: `nation=all`, `era=2021`.
+- Era selector is enabled for `all` and `england`, and disabled for `wales`, `scotland`, and `northern_ireland`.
+- In `all` view, switching era swaps between `uk_master_2021_*` and `uk_master_2011_*`; this only changes England's boundary/IMD pairing while the other nations remain on their latest available published datasets.
+
 Local authority boundary import summary:
 
 - England/Wales LA geometry is imported from the 2019 and 2024 ONS LAD BFC services.
@@ -184,6 +190,7 @@ Added April 2026. Three new health administrative boundaries imported via BFC (B
 | Local Health Boards | 2022 | Wales | LHB22CD | `lhb_code` | 7 |
 
 All map to 2021 LSOA boundaries. Imported as part of `import_bfc_boundaries` mode. Models include:
+
 - `NHSEnglishRegion`, `IntegratedCareBoard`, `LocalHealthBoard` in `deprivation_scores/models.py`
 - Unique constraint on `(code, year)` to support multi-year versioning
 - Full geometry processing (3857 transform, simplification, spatial indexes)
