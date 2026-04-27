@@ -96,7 +96,7 @@ To achieve fast rendering on the frontend:
     * `z0-z4`: Uses `public.uk_master_<era>_z0_4` (high simplification).
     * `z5-z7`: Uses `public.uk_master_<era>_z5_7` (medium simplification).
     * `z8+`: Uses `public.uk_master_<era>_z8_10` (full detail BFC).
-    * `<era>` is either `2011` (IMD 2019 England / 2019 Wales) or `2021` (IMD 2025 England / 2019 Wales).
+    * `<era>` is either `2011` or `2021`. Both eras are valid for All UK and England-only views. The `uk_master_2021_*` tables are mixed vintage: England uses 2021 LSOAs + 2025 IMD while Wales, Scotland and N. Ireland remain on their 2011-era boundaries and latest available IMD (see table below).
 3. **CDN**: Tiles are cached at the edge via a CDN to ensure sub-second map interactivity.
 
 ### Frontend script cache-busting
@@ -114,17 +114,32 @@ This section summarizes what the map currently renders by view. Use this as the 
 
 | View | Nation | Boundary Type/Year (`year`) | IMD Dataset/Year (`imd_year`) | LA/LAD metadata year (`la_year`) | Match note |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| All UK (`uk_master_2021_*`) | England | LSOA 2021 | IMD 2025 | 2024 | Lookup-linked (2021 LSOAs reference 2024 LADs in source lookup file) |
+| All UK (`uk_master_2021_*`) | Wales | LSOA 2011 | WIMD 2019 | 2019 | No 2021 LSOA boundaries or post-2019 WIMD published for Wales |
+| All UK (`uk_master_2021_*`) | Scotland | DataZone 2011 | SIMD 2020 | 2011 | No post-2011 DataZone boundaries or post-2020 SIMD published for Scotland |
+| All UK (`uk_master_2021_*`) | Northern Ireland | SOA 2001 | NIMDM 2017 | `NULL` | Not applicable in current layer (`la_*` fields are `NULL`) |
 | All UK (`uk_master_2011_*`) | England | LSOA 2011 | IMD 2019 | 2019 | Lookup-linked (2011 LSOAs reference 2019 LADs in source lookup file) |
 | All UK (`uk_master_2011_*`) | Wales | LSOA 2011 | WIMD 2019 | 2019 | Lookup-linked (2011 LSOAs reference 2019 LADs in source lookup file) |
 | All UK (`uk_master_2011_*`) | Scotland | DataZone 2011 | SIMD 2020 | 2011 | Lookup-linked (2011 DataZones reference 2011 LAs) |
 | All UK (`uk_master_2011_*`) | Northern Ireland | SOA 2001 | NIMDM 2017 | `NULL` | Not applicable in current layer (`la_*` fields are `NULL`) |
-| England-only (era = 2011) | England | LSOA 2011 | IMD 2019 | 2019 | Lookup-linked (2011 LSOAs reference 2019 LADs in source lookup file) |
 | England-only (era = 2021) | England | LSOA 2021 | IMD 2025 | 2024 | Lookup-linked (2021 LSOAs reference 2024 LADs in source lookup file) |
+| England-only (era = 2011) | England | LSOA 2011 | IMD 2019 | 2019 | Lookup-linked (2011 LSOAs reference 2019 LADs in source lookup file) |
 
 For the standalone `public.la_tiles` overlay source, the year mapping is currently:
 
 * England/Wales: `2019` and `2024`
 * Scotland: `2011`
+
+### Mixed-vintage note for `uk_master_2021_*`
+
+The `uk_master_2021_*` tables contain data from different boundary vintages depending on nation. England uses 2021 LSOAs and 2025 IMD data; Wales, Scotland and N. Ireland remain on their 2011-era boundaries and their most recent available IMD datasets. This reflects the actual availability of published data — Wales has not adopted 2021 LSOA boundaries and has not published a WIMD since 2019; Scotland and N. Ireland are similarly frozen on older vintages. There is no purely "all-2021" UK-wide dataset.
+
+Consuming applications can therefore:
+
+- Pass `era=2021` to show the latest available data for each nation (England on 2021 LSOAs + 2025 IMD; Wales on 2011 LSOAs + 2019 WIMD).
+- Pass `era=2011` to show a consistent historical-cohort view where England also uses 2011 LSOAs + 2019 IMD, matching Wales and other nations.
+
+The era toggle is meaningful for All UK views, not only England-only views.
 
 ### Important alignment caveat
 

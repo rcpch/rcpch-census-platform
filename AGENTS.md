@@ -74,11 +74,16 @@ To avoid doc drift, treat `site/docs/boundaries.md` as the canonical source for:
 
 Current map behaviour summary (quick reference only):
 
-| View | England | Wales | Scotland | N. Ireland |
+| View / Era | England | Wales | Scotland | N. Ireland |
 | --- | --- | --- | --- | --- |
-| All UK | 2011 LSOA + 2019 IMD | 2011 LSOA + 2019 WIMD | 2011 DataZone + 2020 SIMD | 2001 SOA + 2017 NIMDM |
-| England-only (era toggle = 2021) | 2021 LSOA + 2025 IMD | n/a | n/a | n/a |
-| England-only (era toggle = 2011) | 2011 LSOA + 2019 IMD | n/a | n/a | n/a |
+| All UK (era = 2021) | 2021 LSOA + 2025 IMD | 2011 LSOA + 2019 WIMD | 2011 DataZone + 2020 SIMD | 2001 SOA + 2017 NIMDM |
+| All UK (era = 2011) | 2011 LSOA + 2019 IMD | 2011 LSOA + 2019 WIMD | 2011 DataZone + 2020 SIMD | 2001 SOA + 2017 NIMDM |
+| England-only (era = 2021) | 2021 LSOA + 2025 IMD | n/a | n/a | n/a |
+| England-only (era = 2011) | 2011 LSOA + 2019 IMD | n/a | n/a | n/a |
+
+Key point: the `uk_master_2021_*` tables are **mixed vintage** — England uses 2021 LSOAs and 2025 IMD, while Wales, Scotland and N. Ireland remain on their respective 2011-era boundaries and latest available IMD data. Wales has not adopted 2021 LSOA boundaries and has not published an IMD since WIMD 2019; Scotland and N. Ireland are similarly frozen on older vintages. There is no purely "all-2021" UK-wide dataset.
+
+This means the era toggle has a meaningful effect on the All UK view (switching between 2019 and 2025 IMD data for England), not just on England-only views. Consuming applications (e.g. NPDA) can use `era=2021` for current-cohort maps and `era=2011` for historical-cohort maps, with Wales and other nations appearing identically in both because no newer data exists for them.
 
 Local authority boundary import summary:
 
