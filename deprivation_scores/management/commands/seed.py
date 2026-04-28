@@ -182,6 +182,7 @@ class Command(BaseCommand):
             )
 
             # Fixed boundary years for Scotland and NI
+            wales_boundary_year = 2011
             scotland_boundary_year = 2011
             ni_boundary_year = 2001
 
@@ -274,7 +275,7 @@ class Command(BaseCommand):
             ) lhb ON TRUE
             WHERE l.lsoa_code LIKE 'W%' 
                 AND l.{actual_geom_col} IS NOT NULL 
-                AND l.year = {boundary_year}
+                AND l.year = {wales_boundary_year}
 
             UNION ALL
 
