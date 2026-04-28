@@ -11,6 +11,8 @@ echo "=========================================="
 : "${GITHUB_REPO:=rcpch/rcpch-census-platform}"
 
 # ---- Config ----
+: "${CHANGELOG_FILE:=}"
+: "${GENERATE_RELEASE_NOTES:=false}"
 MAX_SIZE_MB=1900
 BASENAME="rcpch-census-${RELEASE_VERSION}.dump"
 WORK_DIR="$(mktemp -d)"
@@ -18,8 +20,18 @@ WORK_DIR="$(mktemp -d)"
 echo "Dump file: $DUMP_FILE"
 echo "Release:   $RELEASE_VERSION"
 
+if [ -n "$CHANGELOG_FILE" ] && [ ! -f "$CHANGELOG_FILE" ]; then
+  echo "Changelog file not found: $CHANGELOG_FILE" >&2
+  exit 1
+fi
+
 cp "$DUMP_FILE" "$WORK_DIR/$BASENAME"
 cd "$WORK_DIR"
+
+RELEASE_NOTES="Automated database dump"
+if [ -n "$CHANGELOG_FILE" ]; then
+  RELEASE_NOTES="$(cat "$CHANGELOG_FILE")"
+fi
 
 # ---- Split if necessary ----
 SIZE_MB=$(du -m "$BASENAME" | cut -f1)
@@ -35,10 +47,21 @@ fi
 
 # ---- Create or update release ----
 if ! gh release view "$RELEASE_VERSION" -R "$GITHUB_REPO" >/dev/null 2>&1; then
+  CREATE_ARGS=(
+    -R "$GITHUB_REPO"
+    --title "Database dump ${RELEASE_VERSION}"
+  )
+
+  if [ "$GENERATE_RELEASE_NOTES" = "true" ]; then
+    CREATE_ARGS+=(--generate-notes)
+  fi
+
+  if [ -n "$RELEASE_NOTES" ]; then
+    CREATE_ARGS+=(--notes "$RELEASE_NOTES")
+  fi
+
   gh release create "$RELEASE_VERSION" \
-    -R "$GITHUB_REPO" \
-    --title "Database dump ${RELEASE_VERSION}" \
-    --notes "Automated database dump"
+    "${CREATE_ARGS[@]}"
 fi
 
 # ---- Upload assets ----
