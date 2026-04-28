@@ -28,6 +28,8 @@ if (!TILES_BASE_URL) {
   );
 }
 
+const TILE_API_KEY_PARAM = "subscription-key";
+
 const apiAuthNotice = document.getElementById("api-auth-notice");
 
 function isLocalRuntime() {
@@ -51,10 +53,12 @@ function hideApiAuthNotice() {
   apiAuthNotice.textContent = "";
 }
 
-let tilesUrl = TILES_BASE_URL;
-if (typeof window.CENSUS_API_KEY === "string" && window.CENSUS_API_KEY) {
-  const separator = tilesUrl.includes("?") ? "&" : "?";
-  tilesUrl = `${tilesUrl}${separator}subscription-key=${encodeURIComponent(window.CENSUS_API_KEY)}`;
+const TILE_API_KEY =
+  typeof window.CENSUS_API_KEY === "string" && window.CENSUS_API_KEY
+    ? window.CENSUS_API_KEY
+    : "";
+
+if (TILE_API_KEY) {
   hideApiAuthNotice();
 } else if (!isLocalRuntime()) {
   console.error(
@@ -64,7 +68,6 @@ if (typeof window.CENSUS_API_KEY === "string" && window.CENSUS_API_KEY) {
     "Map requests are running without an API key. If APIM subscription validation is enabled, the map may not load.",
   );
 }
-const TILES_BASE_URL_WITH_AUTH = tilesUrl;
 
 const DATASET_INFO = {
   england: {
@@ -339,7 +342,9 @@ function initMap() {
 
   mapInstance = window.RcpchImdMap.createImdMap({
     container: "map",
-    tilesBaseUrl: TILES_BASE_URL_WITH_AUTH,
+    tilesBaseUrl: TILES_BASE_URL,
+    tilesApiKey: TILE_API_KEY || undefined,
+    tilesApiKeyParam: TILE_API_KEY_PARAM,
     initialNation: currentNation,
     initialEra: currentEra,
     areaTooltipMode: "template",
