@@ -27,13 +27,13 @@ if (!TILES_BASE_URL) {
     "No tiles base URL configured. Set ?tilesBase=https://<host>/tiles, the rcpch-tiles-base-url meta tag, or inject window.PUBLIC_TILES_URL.",
   );
 
-// Append API key to TILES_BASE_URL if configured (for APIM authentication)
-let tilesUrl = TILES_BASE_URL;
-if (typeof window.CENSUS_API_KEY === "string" && window.CENSUS_API_KEY) {
-  const separator = tilesUrl.includes("?") ? "&" : "?";
-  tilesUrl = `${tilesUrl}${separator}subscription-key=${encodeURIComponent(window.CENSUS_API_KEY)}`;
-}
-const TILES_BASE_URL_WITH_AUTH = tilesUrl;
+  // Append API key to TILES_BASE_URL if configured (for APIM authentication)
+  let tilesUrl = TILES_BASE_URL;
+  if (typeof window.CENSUS_API_KEY === "string" && window.CENSUS_API_KEY) {
+    const separator = tilesUrl.includes("?") ? "&" : "?";
+    tilesUrl = `${tilesUrl}${separator}subscription-key=${encodeURIComponent(window.CENSUS_API_KEY)}`;
+  }
+  const TILES_BASE_URL_WITH_AUTH = tilesUrl;
 }
 
 const DATASET_INFO = {
