@@ -150,9 +150,12 @@
       <p class="mt-4 text-gray-600">Loading...</p>
     </div>
 
+    <div id="api-auth-notice" class="hidden mb-6 rounded-lg border px-4 py-3 text-sm" style="background:#fff7ed;color:#9a3412;border-color:#fdba74;"></div>
+
     <div id="results" class="mt-8 hidden"></div>
   </div>
 
+  <script src="config.js?v=__ASSET_VERSION__"></script>
   <script>
     const yearsByCountry = {
       england: [2025, 2019],
@@ -168,6 +171,22 @@
     const form = document.getElementById('imd-form');
     const resultsDiv = document.getElementById('results');
     const loadingDiv = document.getElementById('loading');
+    const apiAuthNotice = document.getElementById('api-auth-notice');
+
+    function showApiAuthNotice(message) {
+      apiAuthNotice.textContent = message;
+      apiAuthNotice.classList.remove('hidden');
+    }
+
+    function hideApiAuthNotice() {
+      apiAuthNotice.classList.add('hidden');
+      apiAuthNotice.textContent = '';
+    }
+
+    if (typeof window.CENSUS_API_KEY !== 'string' || !window.CENSUS_API_KEY) {
+      console.error('[imd-lookup] Missing CENSUS_API_KEY. APIM-protected requests may be rejected.');
+      showApiAuthNotice('Requests are running without an API key. If APIM subscription validation is enabled, lookups may fail.');
+    }
 
     // Update year dropdown when country changes
     countrySelect.addEventListener('change', (e) => {
@@ -207,6 +226,14 @@
       });
     });
 
+    function withApiKey(urlString) {
+      const url = new URL(urlString);
+      if (typeof window.CENSUS_API_KEY === 'string' && window.CENSUS_API_KEY) {
+        url.searchParams.set('subscription-key', window.CENSUS_API_KEY);
+      }
+      return url.toString();
+    }
+
     async function fetchIMDData(endpoint) {
       const country = countrySelect.value;
       const year = yearSelect.value;
@@ -225,9 +252,18 @@
           url += `indices_of_multiple_deprivation?postcode=${encodeURIComponent(postcode)}&country=${country}&year=${year}`;
         }
 
+        url = withApiKey(url);
+
         console.log('Fetching:', url);
 
         const response = await fetch(url);
+
+        if (response.status === 401 || response.status === 403) {
+          console.error(`[imd-lookup] API key rejected with status ${response.status}.`);
+          showApiAuthNotice('The IMD API key is missing or invalid. Please check the deployed GitHub Pages secret or APIM subscription settings.');
+        } else {
+          hideApiAuthNotice();
+        }
         
         if (!response.ok) {
           const errorText = await response.text();
