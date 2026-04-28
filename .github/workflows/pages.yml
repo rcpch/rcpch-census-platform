@@ -32,6 +32,10 @@ jobs:
         run: |
           echo "window.PUBLIC_TILES_URL = '${{ secrets.PUBLIC_TILES_URL }}';" > site/config.js
 
+      - name: Inject CENSUS_API_KEY config
+        run: |
+          echo "window.CENSUS_API_KEY = '${{ secrets.RCPCH_CENSUS_PLATFORM_GITHUB_PAGES_API_KEY }}';" >> site/config.js
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
