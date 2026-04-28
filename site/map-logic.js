@@ -28,6 +28,44 @@ if (!TILES_BASE_URL) {
   );
 }
 
+const apiAuthNotice = document.getElementById("api-auth-notice");
+
+function isLocalRuntime() {
+  return (
+    window.location.protocol === "file:" ||
+    window.location.hostname === "" ||
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+  );
+}
+
+function showApiAuthNotice(message) {
+  if (!apiAuthNotice) return;
+  apiAuthNotice.textContent = message;
+  apiAuthNotice.classList.remove("hidden");
+}
+
+function hideApiAuthNotice() {
+  if (!apiAuthNotice) return;
+  apiAuthNotice.classList.add("hidden");
+  apiAuthNotice.textContent = "";
+}
+
+let tilesUrl = TILES_BASE_URL;
+if (typeof window.CENSUS_API_KEY === "string" && window.CENSUS_API_KEY) {
+  const separator = tilesUrl.includes("?") ? "&" : "?";
+  tilesUrl = `${tilesUrl}${separator}subscription-key=${encodeURIComponent(window.CENSUS_API_KEY)}`;
+  hideApiAuthNotice();
+} else if (!isLocalRuntime()) {
+  console.error(
+    "[rcpch-imd-map] Missing CENSUS_API_KEY. APIM-protected map requests may be rejected.",
+  );
+  showApiAuthNotice(
+    "Map requests are running without an API key. If APIM subscription validation is enabled, the map may not load.",
+  );
+}
+const TILES_BASE_URL_WITH_AUTH = tilesUrl;
+
 const DATASET_INFO = {
   england: {
     2021: { imd: "2025 IMD", boundaries: "2021 LSOAs" },
@@ -301,7 +339,7 @@ function initMap() {
 
   mapInstance = window.RcpchImdMap.createImdMap({
     container: "map",
-    tilesBaseUrl: TILES_BASE_URL,
+    tilesBaseUrl: TILES_BASE_URL_WITH_AUTH,
     initialNation: currentNation,
     initialEra: currentEra,
     areaTooltipMode: "template",
@@ -351,6 +389,23 @@ function initMap() {
     },
     onWarning(warning) {
       console.warn("[rcpch-imd-map]", warning.code, warning.message);
+      const warningText =
+        `${warning.code || ""} ${warning.message || ""}`.toLowerCase();
+      if (
+        warningText.includes("401") ||
+        warningText.includes("403") ||
+        warningText.includes("subscription") ||
+        warningText.includes("unauthor") ||
+        warningText.includes("forbidden") ||
+        warningText.includes("access denied")
+      ) {
+        console.error(
+          "[rcpch-imd-map] API key rejected or missing for map requests.",
+        );
+        showApiAuthNotice(
+          "Map data could not be loaded because the API key is missing or invalid.",
+        );
+      }
     },
   });
 

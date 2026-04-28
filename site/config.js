@@ -5,3 +5,7 @@
 
 // Example override:
 // window.PUBLIC_TILES_URL = "https://api.rcpch.ac.uk/deprivation/v2/tiles";
+
+// API Key for APIM (injected at build time in GitHub Pages deployment)
+// Leave undefined to run locally without authentication
+// window.CENSUS_API_KEY = "your-api-key-here";
