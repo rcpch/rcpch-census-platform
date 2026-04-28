@@ -173,6 +173,15 @@
     const loadingDiv = document.getElementById('loading');
     const apiAuthNotice = document.getElementById('api-auth-notice');
 
+    function isLocalRuntime() {
+      return (
+        window.location.protocol === 'file:' ||
+        window.location.hostname === '' ||
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1'
+      );
+    }
+
     function showApiAuthNotice(message) {
       apiAuthNotice.textContent = message;
       apiAuthNotice.classList.remove('hidden');
@@ -183,7 +192,7 @@
       apiAuthNotice.textContent = '';
     }
 
-    if (typeof window.CENSUS_API_KEY !== 'string' || !window.CENSUS_API_KEY) {
+    if ((typeof window.CENSUS_API_KEY !== 'string' || !window.CENSUS_API_KEY) && !isLocalRuntime()) {
       console.error('[imd-lookup] Missing CENSUS_API_KEY. APIM-protected requests may be rejected.');
       showApiAuthNotice('Requests are running without an API key. If APIM subscription validation is enabled, lookups may fail.');
     }
@@ -254,7 +263,7 @@
 
         url = withApiKey(url);
 
-        console.log('Fetching:', url);
+        console.log('[imd-lookup] Fetching IMD data for endpoint:', endpoint);
 
         const response = await fetch(url);
 
