@@ -1,199 +1,358 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" data-theme="light">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>UK Deprivation Map | Era Comparison</title>
-    <link rel="icon" type="image/png" href="rcpch_logo.png">
-    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <link rel="icon" type="image/png" href="rcpch_logo.png" />
+    <link
+      href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css"
+      rel="stylesheet"
+      type="text/css"
+    />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#11a7f2',
-                        dark: '#0d0d58',
-                        accent: '#E00087'
-                    }
-                }
-            }
-        }
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#11a7f2",
+              dark: "#0d0d58",
+              accent: "#E00087",
+            },
+          },
+        },
+      };
     </script>
     <style>
-        :root {
-            --p: 197 93% 51%;
-            --pf: 197 93% 41%;
-            --pc: 0 0% 100%;
-            --a: 328 100% 46%;
-            --af: 328 100% 36%;
-            --ac: 0 0% 100%;
-        }
+      :root {
+        --p: 197 93% 51%;
+        --pf: 197 93% 41%;
+        --pc: 0 0% 100%;
+        --a: 328 100% 46%;
+        --af: 328 100% 36%;
+        --ac: 0 0% 100%;
+      }
 
-        body { 
-            margin: 0; 
-            padding: 0; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; 
-        }
-        
-        #map { 
-            position: absolute; 
-            top: 64px; /* Height of navbar */
-            bottom: 0; 
-            width: 100%; 
-        }
-        
-        .control-panel {
-            position: absolute; 
-            top: 84px; /* navbar height + 20px margin */
-            left: 20px; 
-            z-index: 10;
-            background: white; 
-            padding: 20px; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15); 
-            width: 280px;
-        }
+      body {
+        margin: 0;
+        padding: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
+          sans-serif;
+      }
 
-        .control-group { 
-            margin-bottom: 15px; 
-        }
+      #map {
+        position: absolute;
+        top: 64px; /* Height of navbar */
+        bottom: 0;
+        width: 100%;
+      }
 
-        .control-label { 
-            display: block; 
-            font-weight: 600; 
-            margin-bottom: 8px; 
-            font-size: 0.875rem; 
-            color: #0d0d58; 
-        }
+      .control-panel {
+        position: absolute;
+        top: 84px; /* navbar height + 20px margin */
+        left: 20px;
+        z-index: 10;
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        width: 280px;
+      }
 
-        .maplibregl-popup {
-            z-index: 20;
-        }
-        
-        .maplibregl-popup-content {
-            padding: 10px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            pointer-events: none;
-        }
+      .control-group {
+        margin-bottom: 15px;
+      }
 
-        /* Custom navbar styling */
-        .navbar {
-            background-color: #0d0d58;
-            height: 64px;
-            position: fixed;
-            top: 0;
-            width: 100%;
-            z-index: 1000;
-        }
+      .control-label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+        font-size: 0.875rem;
+        color: #0d0d58;
+      }
 
-        .navbar-title {
-            color: white;
-            font-size: 1.25rem;
-            font-weight: 700;
-        }
+      .maplibregl-popup {
+        z-index: 20;
+      }
 
-        .navbar a {
-            color: white;
-        }
+      .maplibregl-popup-content {
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        pointer-events: none;
+      }
 
-        .navbar a:hover {
-            background-color: rgba(17, 167, 242, 0.2);
-        }
+      /* Custom navbar styling */
+      .navbar {
+        background-color: #0d0d58;
+        height: 64px;
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 1000;
+      }
+
+      .navbar-title {
+        color: white;
+        font-size: 1.25rem;
+        font-weight: 700;
+      }
+
+      .navbar a {
+        color: white;
+      }
+
+      .navbar a:hover {
+        background-color: rgba(17, 167, 242, 0.2);
+      }
     </style>
-</head>
-<body>
-
-<!-- Navbar -->
-<div class="navbar">
-    <div class="navbar-start">
-        <img src="rcpch_logo.png" alt="RCPCH Logo" class="h-10 ml-4 mr-3">
+  </head>
+  <body>
+    <!-- Navbar -->
+    <div class="navbar">
+      <div class="navbar-start">
+        <img src="rcpch_logo.png" alt="RCPCH Logo" class="h-10 ml-4 mr-3" />
         <div class="navbar-title">UK Deprivation Viewer</div>
-    </div>
-    <div class="navbar-end">
+      </div>
+      <div class="navbar-end">
         <ul class="menu menu-horizontal px-1">
-            <li><a href="index.html">Map</a></li>
-            <li><a href="imd-lookup.html">IMD Calculator</a></li>
-            <li><a href="docs/index.html">Documentation</a></li>
-            <li><a href="https://api.rcpch.ac.uk/deprivation/v2/swagger-ui/" target="_blank">API Spec</a></li>
+          <li><a href="index.html">Map</a></li>
+          <li><a href="imd-lookup.html">IMD Calculator</a></li>
+          <li><a href="docs/index.html">Documentation</a></li>
+          <li>
+            <a
+              href="https://api.rcpch.ac.uk/deprivation/v2/swagger-ui/"
+              target="_blank"
+              >API Spec</a
+            >
+          </li>
         </ul>
+      </div>
     </div>
-</div>
 
-<div id="api-auth-notice" class="hidden" style="position:fixed;top:76px;right:20px;z-index:1001;max-width:420px;padding:12px 14px;border-radius:10px;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;box-shadow:0 4px 15px rgba(0,0,0,0.12);"></div>
+    <div
+      id="api-auth-notice"
+      class="hidden"
+      style="
+        position: fixed;
+        top: 76px;
+        right: 20px;
+        z-index: 1001;
+        max-width: 420px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        background: #fff7ed;
+        color: #9a3412;
+        border: 1px solid #fdba74;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
+      "
+    ></div>
 
-<!-- Control Panel -->
-<div class="control-panel">
-    <h2 style="margin-top:0; font-size: 1.2rem; color: #0d0d58; margin-bottom: 20px;">Map Controls</h2>
-    
-    <div class="control-group" id="era-toggle-group">
-        <label class="control-label" for="era-toggle">Era (England IMD/LSOA)</label>
+    <!-- Control Panel -->
+    <div class="control-panel">
+      <h2
+        style="
+          margin-top: 0;
+          font-size: 1.2rem;
+          color: #0d0d58;
+          margin-bottom: 20px;
+        "
+      >
+        Map Controls
+      </h2>
+
+      <div class="control-group" id="era-toggle-group">
+        <label class="control-label" for="era-toggle"
+          >Era (England IMD/LSOA)</label
+        >
         <select id="era-toggle" class="select select-bordered w-full select-sm">
-            <option value="2021" selected>2025 IMD &middot; 2021 LSOAs</option>
-            <option value="2011">2019 IMD &middot; 2011 LSOAs</option>
+          <option value="2021" selected>2025 IMD &middot; 2021 LSOAs</option>
+          <option value="2011">2019 IMD &middot; 2011 LSOAs</option>
         </select>
-        <div id="era-note" style="font-size:0.7rem;color:#888;margin-top:4px;min-height:1em;"></div>
-    </div>
+        <div
+          id="era-note"
+          style="
+            font-size: 0.7rem;
+            color: #888;
+            margin-top: 4px;
+            min-height: 1em;
+          "
+        ></div>
+      </div>
 
-    <div id="dataset-info" style="font-size:0.72rem;color:#444;background:#f0f4f8;border-radius:6px;padding:8px 10px;margin-bottom:12px;line-height:1.7;border-left:3px solid #11a7f2;"></div>
+      <div
+        id="dataset-info"
+        style="
+          font-size: 0.72rem;
+          color: #444;
+          background: #f0f4f8;
+          border-radius: 6px;
+          padding: 8px 10px;
+          margin-bottom: 12px;
+          line-height: 1.7;
+          border-left: 3px solid #11a7f2;
+        "
+      ></div>
 
-    <div class="control-group">
+      <div class="control-group">
         <label class="control-label" for="nation-filter">Filter Nation</label>
-        <select id="nation-filter" class="select select-bordered w-full select-sm">
-            <option value="all">All UK (Unified View)</option>
-            <option value="england">England</option>
-            <option value="scotland">Scotland</option>
-            <option value="wales">Wales</option>
-            <option value="northern_ireland">Northern Ireland</option>
+        <select
+          id="nation-filter"
+          class="select select-bordered w-full select-sm"
+        >
+          <option value="all">All UK (Unified View)</option>
+          <option value="england">England</option>
+          <option value="scotland">Scotland</option>
+          <option value="wales">Wales</option>
+          <option value="northern_ireland">Northern Ireland</option>
+          <option value="channel_islands">Channel Islands</option>
         </select>
-    </div>
+      </div>
 
-    <div class="control-group" id="la-toggle-group">
+      <div class="control-group" id="la-toggle-group">
         <label class="control-label" for="la-toggle">Boundary Overlays</label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:#333;cursor:pointer;">
-            <input id="la-toggle" type="checkbox" style="accent-color:#0d0d58;">
-            Show Local Authority boundaries
+        <label
+          style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
+            color: #333;
+            cursor: pointer;
+          "
+        >
+          <input id="la-toggle" type="checkbox" style="accent-color: #0d0d58" />
+          Show Local Authority boundaries
         </label>
-        <div id="la-note" style="font-size:0.7rem;color:#888;margin-top:4px;min-height:1em;"></div>
+        <div
+          id="la-note"
+          style="
+            font-size: 0.7rem;
+            color: #888;
+            margin-top: 4px;
+            min-height: 1em;
+          "
+        ></div>
 
-        <div style="margin-top:8px; padding-top:8px; border-top:1px solid #e5e7eb;">
-            <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:#333;cursor:pointer;" id="nhser-toggle-group">
-                <input id="nhser-toggle" type="checkbox" style="accent-color:#0f766e;">
-                Show NHS England regions
-            </label>
-            <div id="nhser-note" style="font-size:0.7rem;color:#888;margin-top:4px;min-height:1em;padding-left:24px;"></div>
+        <div
+          style="
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e5e7eb;
+          "
+        >
+          <label
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              font-size: 0.82rem;
+              color: #333;
+              cursor: pointer;
+            "
+            id="nhser-toggle-group"
+          >
+            <input
+              id="nhser-toggle"
+              type="checkbox"
+              style="accent-color: #0f766e"
+            />
+            Show NHS England regions
+          </label>
+          <div
+            id="nhser-note"
+            style="
+              font-size: 0.7rem;
+              color: #888;
+              margin-top: 4px;
+              min-height: 1em;
+              padding-left: 24px;
+            "
+          ></div>
 
-            <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:#333;cursor:pointer; margin-top:6px;" id="icb-toggle-group">
-                <input id="icb-toggle" type="checkbox" style="accent-color:#b45309;">
-                Show ICBs
-            </label>
-            <div id="icb-note" style="font-size:0.7rem;color:#888;margin-top:4px;min-height:1em;padding-left:24px;"></div>
+          <label
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              font-size: 0.82rem;
+              color: #333;
+              cursor: pointer;
+              margin-top: 6px;
+            "
+            id="icb-toggle-group"
+          >
+            <input
+              id="icb-toggle"
+              type="checkbox"
+              style="accent-color: #b45309"
+            />
+            Show ICBs
+          </label>
+          <div
+            id="icb-note"
+            style="
+              font-size: 0.7rem;
+              color: #888;
+              margin-top: 4px;
+              min-height: 1em;
+              padding-left: 24px;
+            "
+          ></div>
 
-            <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:#333;cursor:pointer; margin-top:6px;" id="lhb-toggle-group">
-                <input id="lhb-toggle" type="checkbox" style="accent-color:#166534;">
-                Show Local Health Boards
-            </label>
-            <div id="lhb-note" style="font-size:0.7rem;color:#888;margin-top:4px;min-height:1em;padding-left:24px;"></div>
+          <label
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              font-size: 0.82rem;
+              color: #333;
+              cursor: pointer;
+              margin-top: 6px;
+            "
+            id="lhb-toggle-group"
+          >
+            <input
+              id="lhb-toggle"
+              type="checkbox"
+              style="accent-color: #166534"
+            />
+            Show Local Health Boards
+          </label>
+          <div
+            id="lhb-note"
+            style="
+              font-size: 0.7rem;
+              color: #888;
+              margin-top: 4px;
+              min-height: 1em;
+              padding-left: 24px;
+            "
+          ></div>
         </div>
+      </div>
     </div>
-</div>
 
-<div id="map"></div>
+    <div id="map"></div>
 
-<script src="config.js?v=__ASSET_VERSION__"></script>
-<!--
+    <script src="config.js?v=__ASSET_VERSION__"></script>
+    <!--
 Update process for @rcpch/imd-map CDN pin:
 1) npm view @rcpch/imd-map version
 2) curl -s https://cdn.jsdelivr.net/npm/@rcpch/imd-map@<version>/dist/umd/rcpch-imd-map.min.js | openssl dgst -sha384 -binary | openssl base64 -A | xargs -I {} echo "sha384-{}"
 Then update both the @<version> in src and the integrity value below.
 -->
-<script
-    src="https://cdn.jsdelivr.net/npm/@rcpch/imd-map@0.3.1/dist/umd/rcpch-imd-map.min.js"
-    integrity="sha384-UpOF5EyCHqp0AfvRXGaw/HTwfb4JxWrJaZqBDgh9ETsmqWVNjUN9LG4467DywbbM"
-    crossorigin="anonymous"></script>
-<script src="map-logic.js?v=__ASSET_VERSION__"></script>
-
-</body>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@rcpch/imd-map@0.3.1/dist/umd/rcpch-imd-map.min.js"
+      integrity="sha384-UpOF5EyCHqp0AfvRXGaw/HTwfb4JxWrJaZqBDgh9ETsmqWVNjUN9LG4467DywbbM"
+      crossorigin="anonymous"
+    ></script>
+    <script src="map-logic.js?v=__ASSET_VERSION__"></script>
+  </body>
 </html>
