@@ -31,7 +31,8 @@ The platform has two distinct data phases:
 
 1. Boundary enrichment + spatial post-processing
 
-- `import_bfc_boundaries` downloads/streams external geometry datasets and merges geometries into base tables.
+- `import_bfc_boundaries` downloads/streams external geometry datasets and merges geometries into base tables. Channel Island boundaries are always imported as part of this mode (no skip-check, always force).
+- `import_channel_islands` imports only the Channel Island / Crown Dependency boundaries (Guernsey, Isle of Man, Jersey) and immediately runs `process_geometries --layers channel-islands`. Use this for standalone seeding without touching other layers.
 - `_run_post_processing_sql()` then:
   - Creates 3857 geometry columns
   - Generates simplified geometries for low/medium zoom
@@ -63,6 +64,12 @@ Materialized table families:
   - `public.lsoa_tiles_2021_z5_7`
   - `public.lsoa_tiles_2021_z8_10`
   - `public.lsoa_tiles_2021_z11_14`
+- Channel Islands overlay tables:
+  - `public.channel_islands_tiles_z0_4`
+  - `public.channel_islands_tiles_z5_7`
+  - `public.channel_islands_tiles_z8_10`
+  - `public.channel_islands_tiles_z11_14`
+  - `public.channel_islands_tiles` (view alias → z11_14)
 
 ## Dataset/Boundary Source Of Truth
 
@@ -74,12 +81,12 @@ To avoid doc drift, treat `site/docs/boundaries.md` as the canonical source for:
 
 Current map behaviour summary (quick reference only):
 
-| View / Era | England | Wales | Scotland | N. Ireland |
-| --- | --- | --- | --- | --- |
-| All UK (era = 2021) | 2021 LSOA + 2025 IMD | 2011 LSOA + 2019 WIMD | 2011 DataZone + 2020 SIMD | 2001 SOA + 2017 NIMDM |
-| All UK (era = 2011) | 2011 LSOA + 2019 IMD | 2011 LSOA + 2019 WIMD | 2011 DataZone + 2020 SIMD | 2001 SOA + 2017 NIMDM |
-| England-only (era = 2021) | 2021 LSOA + 2025 IMD | n/a | n/a | n/a |
-| England-only (era = 2011) | 2011 LSOA + 2019 IMD | n/a | n/a | n/a |
+| View / Era                | England              | Wales                 | Scotland                  | N. Ireland            |
+| ------------------------- | -------------------- | --------------------- | ------------------------- | --------------------- |
+| All UK (era = 2021)       | 2021 LSOA + 2025 IMD | 2011 LSOA + 2019 WIMD | 2011 DataZone + 2020 SIMD | 2001 SOA + 2017 NIMDM |
+| All UK (era = 2011)       | 2011 LSOA + 2019 IMD | 2011 LSOA + 2019 WIMD | 2011 DataZone + 2020 SIMD | 2001 SOA + 2017 NIMDM |
+| England-only (era = 2021) | 2021 LSOA + 2025 IMD | n/a                   | n/a                       | n/a                   |
+| England-only (era = 2011) | 2011 LSOA + 2019 IMD | n/a                   | n/a                       | n/a                   |
 
 Key point: the `uk_master_2021_*` tables are **mixed vintage** — England uses 2021 LSOAs and 2025 IMD, while Wales, Scotland and N. Ireland remain on their respective 2011-era boundaries and latest available IMD data. Wales has not adopted 2021 LSOA boundaries and has not published an IMD since WIMD 2019; Scotland and N. Ireland are similarly frozen on older vintages. There is no purely "all-2021" UK-wide dataset.
 
@@ -154,6 +161,9 @@ Use:
   python manage.py seed --mode process_geometries --layers integrated-care-boards
   python manage.py seed --mode process_geometries --layers local-health-boards
 
+  # Channel Islands / Crown Dependencies only (post-processing only — use import_channel_islands to also re-fetch boundaries)
+  python manage.py seed --mode process_geometries --layers channel-islands
+
   # LSOAs + UK master tiles only
   python manage.py seed --mode process_geometries --layers lsoas
 
@@ -164,7 +174,6 @@ Use:
   **Note**: Section 1 (schema `ADD COLUMN IF NOT EXISTS`) always runs regardless of `--layers` since it is idempotent and fast. `--layers` only gates the expensive UPDATE/CREATE operations.
 
   Validation behavior after geometry processing:
-
   - Full geometry rebuilds (`import_bfc_boundaries`, or `process_geometries` with no `--layers` / `--layers all`) run `test_geometries` in strict mode and fail on missing/empty required boundary tier tables.
   - Scoped rebuilds (`process_geometries --layers <subset>`) run `test_geometries` in report-only mode for boundary-tier completeness, so operators can process a subset without failing due to unrelated layers not being rebuilt yet.
 
@@ -183,11 +192,11 @@ Use:
 
 Added April 2026. Three new health administrative boundaries imported via BFC (Boundaries Full Clipped) from ONS:
 
-| Boundary Type | Year | Nation | Endpoint Code | Django Column | Record Count |
-| --- | --- | --- | --- | --- | --- |
-| NHS England Regions | 2021 | England | NHSER21CD | `nhser_code` | 7 |
-| Integrated Care Boards | 2023 | England | ICB23CD | `icb_code` | ~42 |
-| Local Health Boards | 2022 | Wales | LHB22CD | `lhb_code` | 7 |
+| Boundary Type          | Year | Nation  | Endpoint Code | Django Column | Record Count |
+| ---------------------- | ---- | ------- | ------------- | ------------- | ------------ |
+| NHS England Regions    | 2021 | England | NHSER21CD     | `nhser_code`  | 7            |
+| Integrated Care Boards | 2023 | England | ICB23CD       | `icb_code`    | ~42          |
+| Local Health Boards    | 2022 | Wales   | LHB22CD       | `lhb_code`    | 7            |
 
 All map to 2021 LSOA boundaries. Imported as part of `import_bfc_boundaries` mode. Models include:
 
@@ -195,15 +204,42 @@ All map to 2021 LSOA boundaries. Imported as part of `import_bfc_boundaries` mod
 - Unique constraint on `(code, year)` to support multi-year versioning
 - Full geometry processing (3857 transform, simplification, spatial indexes)
 
+## Channel Islands / Crown Dependencies Import
+
+Added May 2026. Three Crown Dependency island boundaries — no internal geographies, no IMD data.
+
+| Territory    | ISO Code | Year | Source                      | Django Column | Record Count |
+| ------------ | -------- | ---- | --------------------------- | ------------- | ------------ |
+| Guernsey     | GGY      | 2024 | geoBoundaries ADM0          | `code`        | 1            |
+| Isle of Man  | IMN      | 2024 | geoBoundaries ADM0          | `code`        | 1            |
+| Jersey       | JEY      | 2024 | GADM v4.1 ADM0              | `code`        | 1            |
+
+All three share `year=2024` on the `ChannelIsland` model (`deprivation_scores_channelisland`). Because they share the same table and year, imports always use `force=True` to bypass the skip-guard.
+
+Included in both `uk_master_*` tables (as `nation = 'channel_islands'`, `imd_decile = 0`) and their own zoom-banded overlay (`channel_islands_tiles_z*`).
+
+Seed commands:
+
+```bash
+# Standalone — fetch boundaries + rebuild channel-islands tiles only (fast)
+python manage.py seed --mode import_channel_islands
+
+# As part of a full BFC import (channel islands always included)
+python manage.py seed --mode import_bfc_boundaries
+
+# Rebuild tile tables only (boundaries already in DB)
+python manage.py seed --mode process_geometries --layers channel-islands
+```
+
 ## Local Authority Boundary Imports
 
 Current Local Authority boundary sources are split by nation/year:
 
-| Boundary Type | Year | Nation Coverage | Endpoint Code | Django Column | Notes |
-| --- | --- | --- | --- | --- | --- |
-| Local Authority Districts | 2011 | Great Britain | `lad11cd` | `local_authority_district_code` | Used to spatialize the pre-seeded Scottish LA rows (`year = 2011`) |
-| Local Authority Districts | 2019 | England and Wales in current import flow | `lad19cd` | `local_authority_district_code` | Used for 2011-era England/Wales LA references |
-| Local Authority Districts | 2024 | England and Wales | `LAD24CD` | `local_authority_district_code` | Used for 2021-era England LA references |
+| Boundary Type             | Year | Nation Coverage                          | Endpoint Code | Django Column                   | Notes                                                              |
+| ------------------------- | ---- | ---------------------------------------- | ------------- | ------------------------------- | ------------------------------------------------------------------ |
+| Local Authority Districts | 2011 | Great Britain                            | `lad11cd`     | `local_authority_district_code` | Used to spatialize the pre-seeded Scottish LA rows (`year = 2011`) |
+| Local Authority Districts | 2019 | England and Wales in current import flow | `lad19cd`     | `local_authority_district_code` | Used for 2011-era England/Wales LA references                      |
+| Local Authority Districts | 2024 | England and Wales                        | `LAD24CD`     | `local_authority_district_code` | Used for 2021-era England LA references                            |
 
 ## Convenience scripts in s/
 

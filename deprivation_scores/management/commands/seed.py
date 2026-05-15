@@ -23,6 +23,7 @@ from ...models import (
     ScottishIndexMultipleDeprivation,
     NorthernIrelandIndexMultipleDeprivation,
     PopulationDensity,
+    ChannelIsland,
 )
 
 
@@ -329,7 +330,31 @@ class Command(BaseCommand):
             LEFT JOIN deprivation_scores_northernirelandindexmultipledeprivation ni 
                 ON ni.soa_id = so.id AND ni.year = {ni_imd_year}
             WHERE so.{actual_geom_col} IS NOT NULL 
-                AND so.year = {ni_boundary_year};
+                AND so.year = {ni_boundary_year}
+
+            UNION ALL
+
+            -- CHANNEL ISLANDS / CROWN DEPENDENCIES (Guernsey, Isle of Man, Jersey — year 2024, no IMD)
+            SELECT
+                ci.year::int AS year,
+                NULL::int AS imd_year,
+                ci.code::text AS code,
+                ci.name::text AS area_name,
+                NULL::text AS la_code,
+                NULL::text AS la_name,
+                NULL::int AS la_year,
+                NULL::text AS nhser_code,
+                NULL::text AS nhser_name,
+                NULL::text AS icb_code,
+                NULL::text AS icb_name,
+                NULL::text AS lhb_code,
+                NULL::text AS lhb_name,
+                ST_MakeValid(ST_Multi(ci.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom,
+                'channel_islands'::text AS nation,
+                0::int AS imd_decile
+            FROM deprivation_scores_channelisland ci
+            WHERE ci.{actual_geom_col} IS NOT NULL
+                AND ci.year = 2024;
 
             -- 3. Create Spatial Index (Removes 500 errors by speeding up BBOX queries)
             CREATE INDEX idx_{view_name}_geom ON public.{view_name} USING GIST (geom);
@@ -385,6 +410,7 @@ class Command(BaseCommand):
                 "nhs-regions",
                 "integrated-care-boards",
                 "local-health-boards",
+                "channel-islands",
             }
         )
         if layers is None or "all" in layers:
@@ -438,6 +464,10 @@ class Command(BaseCommand):
             "ALTER TABLE deprivation_scores_localhealthboard ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_localhealthboard ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_localhealthboard ADD COLUMN IF NOT EXISTS geom_3857_simp_z8_10 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_channelisland ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_channelisland ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_channelisland ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_channelisland ADD COLUMN IF NOT EXISTS geom_3857_simp_z8_10 geometry(MultiPolygon,3857);",
         ]
 
         # Section 2: Cleanup (conditional per layer group)
@@ -564,6 +594,32 @@ class Command(BaseCommand):
                 "DROP TABLE IF EXISTS public.lhb_tiles_2022_z8_10 CASCADE;",
                 "DROP TABLE IF EXISTS public.lhb_tiles_2022_z11_14 CASCADE;",
             ]
+        if want("channel-islands"):
+            sql_statements += [
+                """
+            DO $$
+            DECLARE
+                relkind_char char;
+            BEGIN
+                SELECT c.relkind INTO relkind_char
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relname = 'channel_islands_tiles';
+
+                IF relkind_char = 'r' THEN
+                    EXECUTE 'DROP TABLE public.channel_islands_tiles CASCADE';
+                ELSIF relkind_char = 'v' THEN
+                    EXECUTE 'DROP VIEW public.channel_islands_tiles CASCADE';
+                ELSIF relkind_char = 'm' THEN
+                    EXECUTE 'DROP MATERIALIZED VIEW public.channel_islands_tiles CASCADE';
+                END IF;
+            END $$;
+            """,
+                "DROP TABLE IF EXISTS public.channel_islands_tiles_z0_4 CASCADE;",
+                "DROP TABLE IF EXISTS public.channel_islands_tiles_z5_7 CASCADE;",
+                "DROP TABLE IF EXISTS public.channel_islands_tiles_z8_10 CASCADE;",
+                "DROP TABLE IF EXISTS public.channel_islands_tiles_z11_14 CASCADE;",
+            ]
 
         # Section 3: Geoprocessing (WGS84 -> Web Mercator 3857)
         if want("lsoas"):
@@ -588,6 +644,10 @@ class Command(BaseCommand):
         if want("local-health-boards"):
             sql_statements += [
                 "UPDATE deprivation_scores_localhealthboard SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            ]
+        if want("channel-islands"):
+            sql_statements += [
+                "UPDATE deprivation_scores_channelisland SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             ]
 
         # Section 4: Simplification
@@ -614,6 +674,10 @@ class Command(BaseCommand):
         if want("local-health-boards"):
             sql_statements += [
                 "UPDATE deprivation_scores_localhealthboard SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+            ]
+        if want("channel-islands"):
+            sql_statements += [
+                "UPDATE deprivation_scores_channelisland SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
             ]
 
         # Section 5: Spatial indexing & clustering
@@ -671,6 +735,14 @@ class Command(BaseCommand):
                 "CREATE INDEX IF NOT EXISTS idx_localhealthboard_simp_z5_7 ON deprivation_scores_localhealthboard USING GIST (geom_3857_simp_z5_7);",
                 "CREATE INDEX IF NOT EXISTS idx_localhealthboard_simp_z8_10 ON deprivation_scores_localhealthboard USING GIST (geom_3857_simp_z8_10);",
                 "CLUSTER deprivation_scores_localhealthboard USING idx_localhealthboard_simp_z5_7;",
+            ]
+        if want("channel-islands"):
+            sql_statements += [
+                "CREATE INDEX IF NOT EXISTS idx_channelisland_3857 ON deprivation_scores_channelisland USING GIST (geom_3857);",
+                "CREATE INDEX IF NOT EXISTS idx_channelisland_simp_z0_4 ON deprivation_scores_channelisland USING GIST (geom_3857_simp_z0_4);",
+                "CREATE INDEX IF NOT EXISTS idx_channelisland_simp_z5_7 ON deprivation_scores_channelisland USING GIST (geom_3857_simp_z5_7);",
+                "CREATE INDEX IF NOT EXISTS idx_channelisland_simp_z8_10 ON deprivation_scores_channelisland USING GIST (geom_3857_simp_z8_10);",
+                "CLUSTER deprivation_scores_channelisland USING idx_channelisland_simp_z5_7;",
             ]
 
         # Section 6: LSOA tile tables
@@ -838,6 +910,46 @@ class Command(BaseCommand):
                 ),
                 "CREATE VIEW public.lhb_tiles_2022 AS SELECT * FROM public.lhb_tiles_2022_z11_14;",
             ]
+        if want("channel-islands"):
+            sql_statements += [
+                get_health_boundary_view_sql(
+                    "channel_islands_tiles_z0_4",
+                    "deprivation_scores_channelisland",
+                    "code",
+                    "name",
+                    2024,
+                    "channel_islands",
+                    "geom_3857_simp_z0_4",
+                ),
+                get_health_boundary_view_sql(
+                    "channel_islands_tiles_z5_7",
+                    "deprivation_scores_channelisland",
+                    "code",
+                    "name",
+                    2024,
+                    "channel_islands",
+                    "geom_3857_simp_z5_7",
+                ),
+                get_health_boundary_view_sql(
+                    "channel_islands_tiles_z8_10",
+                    "deprivation_scores_channelisland",
+                    "code",
+                    "name",
+                    2024,
+                    "channel_islands",
+                    "geom_3857_simp_z8_10",
+                ),
+                get_health_boundary_view_sql(
+                    "channel_islands_tiles_z11_14",
+                    "deprivation_scores_channelisland",
+                    "code",
+                    "name",
+                    2024,
+                    "channel_islands",
+                    "geom_3857",
+                ),
+                "CREATE VIEW public.channel_islands_tiles AS SELECT * FROM public.channel_islands_tiles_z11_14;",
+            ]
 
         # Section 8: Final housekeeping (GRANT always; ANALYZE/VACUUM per layer)
         sql_statements += ["GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;"]
@@ -884,6 +996,14 @@ class Command(BaseCommand):
                 "VACUUM ANALYZE public.lhb_tiles_2022_z5_7;",
                 "VACUUM ANALYZE public.lhb_tiles_2022_z8_10;",
                 "VACUUM ANALYZE public.lhb_tiles_2022_z11_14;",
+            ]
+        if want("channel-islands"):
+            sql_statements += [
+                "ANALYZE deprivation_scores_channelisland;",
+                "VACUUM ANALYZE public.channel_islands_tiles_z0_4;",
+                "VACUUM ANALYZE public.channel_islands_tiles_z5_7;",
+                "VACUUM ANALYZE public.channel_islands_tiles_z8_10;",
+                "VACUUM ANALYZE public.channel_islands_tiles_z11_14;",
             ]
 
         print("[POSTPROCESS] Starting SQL post-processing...")
@@ -1373,7 +1493,7 @@ class Command(BaseCommand):
                 )
                 nations_2021 = {}
 
-            expected_nations = ["england", "wales", "scotland", "northern_ireland"]
+            expected_nations = ["england", "wales", "scotland", "northern_ireland", "channel_islands"]
 
             for nation in expected_nations:
                 count_11 = nations_2011.get(nation, 0)
@@ -1395,6 +1515,7 @@ class Command(BaseCommand):
                 "NHS Regions": "nhser_tiles_2021",
                 "Integrated Care Boards": "icb_tiles_2023",
                 "Local Health Boards": "lhb_tiles_2022",
+                "Channel Islands": "channel_islands_tiles",
             }
             tiers = ["z0_4", "z5_7", "z8_10", "z11_14"]
             boundary_failures = []
@@ -1478,6 +1599,7 @@ class Command(BaseCommand):
                 "integrated-care-boards",
                 "local-health-boards",
                 "health-geographies",
+                "channel-islands",
             ],
             default=None,
             help=(
@@ -1600,6 +1722,45 @@ class Command(BaseCommand):
             },
         ]
 
+        # Channel Island / Crown Dependency datasets — kept separate from BFC_DATASETS
+        # because they are small single-polygon files from different sources (not ArcGIS).
+        # All share year=2024 and use INSERT...ON CONFLICT so --force is required to re-import.
+        CHANNEL_ISLAND_DATASETS = [
+            {
+                "name": "Guernsey (geoBoundaries ADM0)",
+                "url": "https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/GGY/ADM0/geoBoundaries-GGY-ADM0.geojson",
+                "table": "deprivation_scores_channelisland",
+                "django_code_col": "code",
+                "django_name_col": "name",
+                "year": 2024,
+                "code_column": "shapeiso",
+                "name_column": "shapename",
+                "chunk_size": 1,
+            },
+            {
+                "name": "Isle of Man (geoBoundaries ADM0)",
+                "url": "https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/IMN/ADM0/geoBoundaries-IMN-ADM0.geojson",
+                "table": "deprivation_scores_channelisland",
+                "django_code_col": "code",
+                "django_name_col": "name",
+                "year": 2024,
+                "code_column": "shapeiso",
+                "name_column": "shapename",
+                "chunk_size": 1,
+            },
+            {
+                "name": "Jersey (GADM v4.1 ADM0)",
+                "url": "https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_JEY_0.json",
+                "table": "deprivation_scores_channelisland",
+                "django_code_col": "code",
+                "django_name_col": "name",
+                "year": 2024,
+                "code_column": "gid_0",
+                "name_column": "country",
+                "chunk_size": 1,
+            },
+        ]
+
         # Update your logic here
         if options.get("mode") == "import_bfc_boundaries":
             self.stdout.write(
@@ -1648,6 +1809,14 @@ class Command(BaseCommand):
                 )
             )
 
+            # Always import channel islands as part of a full BFC import (force=True because
+            # all three share year=2024 on the same table so the skip-guard would fire after 1).
+            self.stdout.write(
+                self.style.SUCCESS("\nImporting Channel Island / Crown Dependency boundaries...")
+            )
+            for ds in CHANNEL_ISLAND_DATASETS:
+                self._stream_bfc_import(dataset=ds, force=True)
+
             # Run optimizations after all datasets are imported
             self._run_post_processing_sql()
 
@@ -1659,6 +1828,25 @@ class Command(BaseCommand):
 
             # test that the tables have the correct number of geometries
             self.test_geometries(strict=True)
+            return
+        if options.get("mode") == "import_channel_islands":
+            self.stdout.write(
+                "\n"
+                + self.style.SUCCESS(
+                    "Importing Channel Island / Crown Dependency boundaries..."
+                )
+                + "\n"
+            )
+            # Always force=True: all 3 islands share year=2024 on the same table,
+            # so the skip-guard would fire after the first insert otherwise.
+            for ds in CHANNEL_ISLAND_DATASETS:
+                self._stream_bfc_import(dataset=ds, force=True)
+
+            self.stdout.write(
+                self.style.SUCCESS("Running post-processing for channel-islands layer...")
+            )
+            self._run_post_processing_sql(layers=["channel-islands"])
+            self.test_geometries(strict=False)
             return
         if options.get("mode") == "process_geometries":
             layers = options.get("layers")
@@ -3473,6 +3661,14 @@ def test_table_totals():
             ],
             "expected": 7,
             "message": "LocalHealthBoard should have 7 rows with geometries for year 2022.",
+        },
+        {
+            "label": "ChannelIsland",
+            "count": get_table_year_counts("deprivation_scores_channelisland", 2024)[
+                "spatialized_rows"
+            ],
+            "expected": 3,
+            "message": "ChannelIsland should have 3 rows with geometries for year 2024 (Guernsey, Isle of Man, Jersey).",
         },
     ]
     for val in normal_vals:
