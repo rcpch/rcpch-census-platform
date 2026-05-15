@@ -8,6 +8,75 @@ This file is a quick operational guide for coding agents and LLM tools working i
 - Core purpose: seed UK deprivation and boundary datasets, then serve fast vector tiles for map rendering.
 - Key seeding command: `python manage.py seed --mode <mode>`.
 
+## Development environment — Docker-first workflow
+
+> **Agents must always run Django commands inside the web container, not on the host.** The host machine has no PostGIS-aware Python environment and cannot reach the `db` service directly.
+
+### How the stack works
+
+`s/dev` starts the full development stack via Docker Compose (`docker-compose-postgis.yml`):
+
+```bash
+s/dev          # builds and starts web + db (PostGIS 15-3.4) + pg_tileserv
+```
+
+Three services are started:
+
+| Service | Port | Purpose |
+| --- | --- | --- |
+| `web` | 8000 | Django app (auto-migrates on start, mounts repo at `/app`) |
+| `db` | 5432 | PostGIS 15-3.4 — the only database used in development |
+| `pg_tileserv` | 7800 | Serves vector tiles directly from PostGIS |
+
+The `web` container mounts the repository root at `/app` (read-write), so any file you edit on the host is immediately visible inside the container — **no rebuild required for code changes**.
+
+### Running Django management commands
+
+Always prefix management commands with `docker compose exec web`:
+
+```bash
+# Run migrations
+docker compose exec web python manage.py migrate
+
+# Seed data
+docker compose exec web python manage.py seed --mode __all__
+docker compose exec web python manage.py seed --mode import_bfc_boundaries
+docker compose exec web python manage.py seed --mode import_channel_islands
+docker compose exec web python manage.py seed --mode process_geometries --layers channel-islands
+
+# Open a Django shell
+docker compose exec web python manage.py shell
+
+# Run tests (or use s/test which wraps this)
+docker compose exec web pytest
+```
+
+### Container name
+
+The web container is named `rcpch-census-platform-web-1` (Docker Compose default). Both `docker compose exec web` and `docker compose -f docker-compose-postgis.yml exec web` work from the repo root.
+
+### Worktrees and multiple branches
+
+If you are working in a git worktree (`.worktrees/<branch-name>`), `s/dev` must be run from inside that worktree directory — it uses the worktree's `docker-compose-postgis.yml`. The `web` container will then mount the worktree at `/app`, so the correct branch's code is live. Running `s/dev` from the main repo while working in a worktree will mount the wrong directory.
+
+### Convenience scripts
+
+All scripts live in `s/` and are executable without arguments unless noted:
+
+| Script | What it does |
+| --- | --- |
+| `s/dev` | Start the full PostGIS development stack (`docker compose up --build`) |
+| `s/runserver` | Start Django dev server on the host (only use if not using Docker) |
+| `s/migrate` | Run `makemigrations` + `migrate` |
+| `s/pg-tiles` | Start pg_tileserv only |
+| `s/test` | Run pytest; uses the running `web` container when available |
+| `s/wait-for-db.sh` | Wait for DB readiness (used inside Docker entrypoint) |
+| `s/build-dump` | Build a seeded pg_dump locally for release |
+| `s/release-dump` | Publish dump to GitHub Releases |
+| `s/restore-db` | Restore a release dump into managed PostgreSQL |
+| `s/deploy-db` | Operator notes for Azure Container Apps restore |
+| `s/get-build-info` | Output current git hash + branch as JSON |
+
 ## Data pipeline summary
 
 The platform has two distinct data phases:
@@ -240,23 +309,6 @@ Current Local Authority boundary sources are split by nation/year:
 | Local Authority Districts | 2011 | Great Britain                            | `lad11cd`     | `local_authority_district_code` | Used to spatialize the pre-seeded Scottish LA rows (`year = 2011`) |
 | Local Authority Districts | 2019 | England and Wales in current import flow | `lad19cd`     | `local_authority_district_code` | Used for 2011-era England/Wales LA references                      |
 | Local Authority Districts | 2024 | England and Wales                        | `LAD24CD`     | `local_authority_district_code` | Used for 2021-era England LA references                            |
-
-## Convenience scripts in s/
-
-Primary helper scripts:
-
-- `s/dev`
-  - Starts the PostGIS development compose stack.
-- `s/runserver`
-  - Runs Django dev server.
-- `s/migrate`
-  - Runs `makemigrations` then `migrate`.
-- `s/pg-tiles`
-  - Starts pg_tileserv service via compose.
-- `s/test`
-  - Runs pytest with pass-through flags; uses running web container when available, otherwise starts a one-off test container.
-- `s/wait-for-db.sh`
-  - Waits for DB readiness; optionally waits for seeded/populated tables when `WAIT_FOR_POPULATION=true`.
 
 ## Git hooks (one-time setup)
 
