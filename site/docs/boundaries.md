@@ -296,6 +296,7 @@ For scoped rebuilds, use `--layers`:
 python manage.py seed --mode process_geometries --layers local-authorities
 python manage.py seed --mode process_geometries --layers health-geographies
 python manage.py seed --mode process_geometries --layers channel-islands
+python manage.py seed --mode process_geometries --layers uk-master
 ```
 
 To import Channel Island / Crown Dependency boundaries independently (without re-running the full BFC import):
@@ -304,7 +305,7 @@ To import Channel Island / Crown Dependency boundaries independently (without re
 python manage.py seed --mode import_channel_islands
 ```
 
-This fetches Guernsey, Isle of Man and Jersey boundaries and immediately rebuilds the `channel_islands_tiles_z*` tables and `uk_master_*` tables for the channel-islands layer.
+This fetches Guernsey, Isle of Man and Jersey boundaries and immediately rebuilds both the `channel_islands_tiles_z*` tables and the `uk_master_*` tables (via `--layers channel-islands uk-master`).
 
 Validation semantics for `process_geometries`:
 

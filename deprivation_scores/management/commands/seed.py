@@ -406,6 +406,7 @@ class Command(BaseCommand):
         _ALL_LAYERS = frozenset(
             {
                 "lsoas",
+                "uk-master",
                 "local-authorities",
                 "nhs-regions",
                 "integrated-care-boards",
@@ -471,7 +472,7 @@ class Command(BaseCommand):
         ]
 
         # Section 2: Cleanup (conditional per layer group)
-        if want("lsoas"):
+        if want("uk-master"):
             sql_statements += [
                 "DROP TABLE IF EXISTS public.uk_master_2011_z0_4 CASCADE;",
                 "DROP TABLE IF EXISTS public.uk_master_2011_z5_7 CASCADE;",
@@ -481,6 +482,9 @@ class Command(BaseCommand):
                 "DROP TABLE IF EXISTS public.uk_master_2021_z5_7 CASCADE;",
                 "DROP TABLE IF EXISTS public.uk_master_2021_z8_10 CASCADE;",
                 "DROP TABLE IF EXISTS public.uk_master_2021_z11_14 CASCADE;",
+            ]
+        if want("lsoas"):
+            sql_statements += [
                 "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z0_4 CASCADE;",
                 "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z5_7 CASCADE;",
                 "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z8_10 CASCADE;",
@@ -763,8 +767,8 @@ class Command(BaseCommand):
                 get_lsoa_view_sql("lsoa_tiles_2021_z11_14", "geom_3857", 2021),
             ]
 
-        # Section 7: UK Master + Overlay tile tables
-        if want("lsoas"):
+        # Section 7: UK Master tile tables
+        if want("uk-master"):
             sql_statements += [
                 get_uk_master_view_sql("uk_master_2011_z0_4", "simp_z0_4", 2011, 2019),
                 get_uk_master_view_sql("uk_master_2011_z5_7", "simp_z5_7", 2011, 2019),
@@ -780,6 +784,8 @@ class Command(BaseCommand):
                 get_uk_master_view_sql("uk_master_2011_z11_14", "3857", 2011, 2019),
                 get_uk_master_view_sql("uk_master_2021_z11_14", "3857", 2021, 2025),
             ]
+
+        # Section 8: Overlay tile tables
         if want("local-authorities"):
             sql_statements += [
                 get_la_tile_sql("la_tiles_z0_4", "geom_3857_simp_z0_4"),
@@ -1456,13 +1462,11 @@ class Command(BaseCommand):
             # 1. Check the 2011 Master View
             self.stdout.write("Checking 2011 Era (2019 IMD)...")
             if table_or_view_exists(cursor, "uk_master_2011_z8_10"):
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT nation, COUNT(*) 
                     FROM public.uk_master_2011_z8_10 
                     GROUP BY nation;
-                """
-                )
+                """)
                 results_2011 = cursor.fetchall()
                 nations_2011 = {row[0]: row[1] for row in results_2011}
             else:
@@ -1476,13 +1480,11 @@ class Command(BaseCommand):
             # 2. Check the 2021 Master View
             self.stdout.write("Checking 2021 Era (2025 IMD)...")
             if table_or_view_exists(cursor, "uk_master_2021_z8_10"):
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT nation, COUNT(*) 
                     FROM public.uk_master_2021_z8_10 
                     GROUP BY nation;
-                """
-                )
+                """)
                 results_2021 = cursor.fetchall()
                 nations_2021 = {row[0]: row[1] for row in results_2021}
             else:
@@ -1493,7 +1495,13 @@ class Command(BaseCommand):
                 )
                 nations_2021 = {}
 
-            expected_nations = ["england", "wales", "scotland", "northern_ireland", "channel_islands"]
+            expected_nations = [
+                "england",
+                "wales",
+                "scotland",
+                "northern_ireland",
+                "channel_islands",
+            ]
 
             for nation in expected_nations:
                 count_11 = nations_2011.get(nation, 0)
@@ -1594,6 +1602,7 @@ class Command(BaseCommand):
             choices=[
                 "all",
                 "lsoas",
+                "uk-master",
                 "local-authorities",
                 "nhs-regions",
                 "integrated-care-boards",
@@ -1605,6 +1614,7 @@ class Command(BaseCommand):
             help=(
                 "Limit process_geometries to specific overlay groups. "
                 "'health-geographies' expands to nhs-regions + integrated-care-boards + local-health-boards. "
+                "'uk-master' rebuilds uk_master_2011_* and uk_master_2021_* tables. "
                 "Omit to process all layers (equivalent to 'all')."
             ),
         )
@@ -1812,7 +1822,9 @@ class Command(BaseCommand):
             # Always import channel islands as part of a full BFC import (force=True because
             # all three share year=2024 on the same table so the skip-guard would fire after 1).
             self.stdout.write(
-                self.style.SUCCESS("\nImporting Channel Island / Crown Dependency boundaries...")
+                self.style.SUCCESS(
+                    "\nImporting Channel Island / Crown Dependency boundaries..."
+                )
             )
             for ds in CHANNEL_ISLAND_DATASETS:
                 self._stream_bfc_import(dataset=ds, force=True)
@@ -1843,9 +1855,11 @@ class Command(BaseCommand):
                 self._stream_bfc_import(dataset=ds, force=True)
 
             self.stdout.write(
-                self.style.SUCCESS("Running post-processing for channel-islands layer...")
+                self.style.SUCCESS(
+                    "Running post-processing for channel-islands layer..."
+                )
             )
-            self._run_post_processing_sql(layers=["channel-islands"])
+            self._run_post_processing_sql(layers=["channel-islands", "uk-master"])
             self.test_geometries(strict=False)
             return
         if options.get("mode") == "process_geometries":
@@ -2234,7 +2248,11 @@ def update_english_imd_data_with_subdomains():
         >= 32844
     ):
         sys.stdout.write(
-            "\n" + R + "⏭️ English 2019 subdomains already exist! Skipping..." + W + "\n"
+            "\n"
+            + R
+            + "⏭️ English 2019 subdomains already exist! Skipping..."
+            + W
+            + "\n"
         )
         return
 
@@ -2542,7 +2560,11 @@ def update_english_2025_imd_data_with_subdomains():
         >= 33755
     ):
         sys.stdout.write(
-            "\n" + R + "⏭️ English 2025 subdomains already exist! Skipping..." + W + "\n"
+            "\n"
+            + R
+            + "⏭️ English 2025 subdomains already exist! Skipping..."
+            + W
+            + "\n"
         )
         return
 
@@ -3328,7 +3350,11 @@ def update_population_densities():
         and PopulationDensity.objects.all().count() >= 32058
     ):
         sys.stdout.write(
-            "\n" + R + "⏭️ Population density data already added. Skipping..." + W + "\n"
+            "\n"
+            + R
+            + "⏭️ Population density data already added. Skipping..."
+            + W
+            + "\n"
         )  # should be 32058
         return
 

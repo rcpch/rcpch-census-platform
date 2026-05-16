@@ -101,7 +101,7 @@ The platform has two distinct data phases:
 1. Boundary enrichment + spatial post-processing
 
 - `import_bfc_boundaries` downloads/streams external geometry datasets and merges geometries into base tables. Channel Island boundaries are always imported as part of this mode (no skip-check, always force).
-- `import_channel_islands` imports only the Channel Island / Crown Dependency boundaries (Guernsey, Isle of Man, Jersey) and immediately runs `process_geometries --layers channel-islands`. Use this for standalone seeding without touching other layers.
+- `import_channel_islands` imports only the Channel Island / Crown Dependency boundaries (Guernsey, Isle of Man, Jersey) and immediately runs `process_geometries --layers channel-islands uk-master` so UK era tables include the islands after standalone imports.
 - `_run_post_processing_sql()` then:
   - Creates 3857 geometry columns
   - Generates simplified geometries for low/medium zoom
@@ -233,7 +233,10 @@ Use:
   # Channel Islands / Crown Dependencies only (post-processing only — use import_channel_islands to also re-fetch boundaries)
   python manage.py seed --mode process_geometries --layers channel-islands
 
-  # LSOAs + UK master tiles only
+  # UK master tiles only
+  python manage.py seed --mode process_geometries --layers uk-master
+
+  # LSOA tiles only
   python manage.py seed --mode process_geometries --layers lsoas
 
   # Multiple groups at once
@@ -290,7 +293,7 @@ Included in both `uk_master_*` tables (as `nation = 'channel_islands'`, `imd_dec
 Seed commands:
 
 ```bash
-# Standalone — fetch boundaries + rebuild channel-islands tiles only (fast)
+# Standalone — fetch boundaries + rebuild channel-islands + uk-master tiles (fast)
 python manage.py seed --mode import_channel_islands
 
 # As part of a full BFC import (channel islands always included)
