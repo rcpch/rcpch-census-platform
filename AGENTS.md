@@ -8,6 +8,74 @@ This file is a quick operational guide for coding agents and LLM tools working i
 - Core purpose: seed UK deprivation and boundary datasets, then serve fast vector tiles for map rendering.
 - Key seeding command: `python manage.py seed --mode <mode>`.
 
+## Development environment — Docker-first workflow
+
+> **Agents must always run Django commands inside the web container, not on the host.** The host machine has no PostGIS-aware Python environment and cannot reach the `db` service directly.
+
+### How the stack works
+
+`s/dev` starts the full development stack via Docker Compose (`docker-compose-postgis.yml`):
+
+```bash
+s/dev          # builds and starts web + db (PostGIS 15-3.4) + pg_tileserv
+```
+
+Three services are started:
+
+| Service | Port | Purpose |
+| --- | --- | --- |
+| `web` | 8000 | Django app (auto-migrates on start, mounts repo at `/app`) |
+| `db` | 5432 | PostGIS 15-3.4 — the only database used in development |
+| `pg_tileserv` | 7800 | Serves vector tiles directly from PostGIS |
+
+The `web` container mounts the repository root at `/app` (read-write), so any file you edit on the host is immediately visible inside the container — **no rebuild required for code changes**.
+
+### Running Django management commands
+
+Always prefix management commands with `docker compose exec web`:
+
+```bash
+# Run migrations
+docker compose exec web python manage.py migrate
+
+# Seed data
+docker compose exec web python manage.py seed --mode __all__
+docker compose exec web python manage.py seed --mode import_bfc_boundaries
+docker compose exec web python manage.py seed --mode process_geometries --layers channel-islands
+
+# Open a Django shell
+docker compose exec web python manage.py shell
+
+# Run tests (or use s/test which wraps this)
+docker compose exec web pytest
+```
+
+### Container name
+
+The web container is named `rcpch-census-platform-web-1` (Docker Compose default). Both `docker compose exec web` and `docker compose -f docker-compose-postgis.yml exec web` work from the repo root.
+
+### Worktrees and multiple branches
+
+If you are working in a git worktree (`.worktrees/<branch-name>`), `s/dev` must be run from inside that worktree directory — it uses the worktree's `docker-compose-postgis.yml`. The `web` container will then mount the worktree at `/app`, so the correct branch's code is live. Running `s/dev` from the main repo while working in a worktree will mount the wrong directory.
+
+### Convenience scripts
+
+All scripts live in `s/` and are executable without arguments unless noted:
+
+| Script | What it does |
+| --- | --- |
+| `s/dev` | Start the full PostGIS development stack (`docker compose up --build`) |
+| `s/runserver` | Start Django dev server on the host (only use if not using Docker) |
+| `s/migrate` | Run `makemigrations` + `migrate` |
+| `s/pg-tiles` | Start pg_tileserv only |
+| `s/test` | Run pytest; uses the running `web` container when available |
+| `s/wait-for-db.sh` | Wait for DB readiness (used inside Docker entrypoint) |
+| `s/build-dump` | Build a seeded pg_dump locally for release |
+| `s/release-dump` | Publish dump to GitHub Releases |
+| `s/restore-db` | Restore a release dump into managed PostgreSQL |
+| `s/deploy-db` | Operator notes for Azure Container Apps restore |
+| `s/get-build-info` | Output current git hash + branch as JSON |
+
 ## Data pipeline summary
 
 The platform has two distinct data phases:
@@ -31,7 +99,7 @@ The platform has two distinct data phases:
 
 1. Boundary enrichment + spatial post-processing
 
-- `import_bfc_boundaries` downloads/streams external geometry datasets and merges geometries into base tables.
+- `import_bfc_boundaries` downloads/streams external geometry datasets and merges geometries into base tables. Channel Island boundaries are imported as part of this mode (no skip-check, always force).
 - `_run_post_processing_sql()` then:
   - Creates 3857 geometry columns
   - Generates simplified geometries for low/medium zoom
@@ -63,6 +131,12 @@ Materialized table families:
   - `public.lsoa_tiles_2021_z5_7`
   - `public.lsoa_tiles_2021_z8_10`
   - `public.lsoa_tiles_2021_z11_14`
+- Channel Islands overlay tables:
+  - `public.channel_islands_tiles_z0_4`
+  - `public.channel_islands_tiles_z5_7`
+  - `public.channel_islands_tiles_z8_10`
+  - `public.channel_islands_tiles_z11_14`
+  - `public.channel_islands_tiles` (view alias → z11_14)
 
 ## Dataset/Boundary Source Of Truth
 
@@ -74,12 +148,12 @@ To avoid doc drift, treat `site/docs/boundaries.md` as the canonical source for:
 
 Current map behaviour summary (quick reference only):
 
-| View / Era | England | Wales | Scotland | N. Ireland |
-| --- | --- | --- | --- | --- |
-| All UK (era = 2021) | 2021 LSOA + 2025 IMD | 2011 LSOA + 2019 WIMD | 2011 DataZone + 2020 SIMD | 2001 SOA + 2017 NIMDM |
-| All UK (era = 2011) | 2011 LSOA + 2019 IMD | 2011 LSOA + 2019 WIMD | 2011 DataZone + 2020 SIMD | 2001 SOA + 2017 NIMDM |
-| England-only (era = 2021) | 2021 LSOA + 2025 IMD | n/a | n/a | n/a |
-| England-only (era = 2011) | 2011 LSOA + 2019 IMD | n/a | n/a | n/a |
+| View / Era                | England              | Wales                 | Scotland                  | N. Ireland            |
+| ------------------------- | -------------------- | --------------------- | ------------------------- | --------------------- |
+| All UK (era = 2021)       | 2021 LSOA + 2025 IMD | 2011 LSOA + 2019 WIMD | 2011 DataZone + 2020 SIMD | 2001 SOA + 2017 NIMDM |
+| All UK (era = 2011)       | 2011 LSOA + 2019 IMD | 2011 LSOA + 2019 WIMD | 2011 DataZone + 2020 SIMD | 2001 SOA + 2017 NIMDM |
+| England-only (era = 2021) | 2021 LSOA + 2025 IMD | n/a                   | n/a                       | n/a                   |
+| England-only (era = 2011) | 2011 LSOA + 2019 IMD | n/a                   | n/a                       | n/a                   |
 
 Key point: the `uk_master_2021_*` tables are **mixed vintage** — England uses 2021 LSOAs and 2025 IMD, while Wales, Scotland and N. Ireland remain on their respective 2011-era boundaries and latest available IMD data. Wales has not adopted 2021 LSOA boundaries and has not published an IMD since WIMD 2019; Scotland and N. Ireland are similarly frozen on older vintages. There is no purely "all-2021" UK-wide dataset.
 
@@ -154,7 +228,16 @@ Use:
   python manage.py seed --mode process_geometries --layers integrated-care-boards
   python manage.py seed --mode process_geometries --layers local-health-boards
 
-  # LSOAs + UK master tiles only
+  # Channel Islands / Crown Dependencies are included in import_bfc_boundaries
+  python manage.py seed --mode import_bfc_boundaries
+
+  # Channel Islands / Crown Dependencies only (post-processing only)
+  python manage.py seed --mode process_geometries --layers channel-islands
+
+  # UK master tiles only
+  python manage.py seed --mode process_geometries --layers uk-master
+
+  # LSOA tiles only
   python manage.py seed --mode process_geometries --layers lsoas
 
   # Multiple groups at once
@@ -164,7 +247,6 @@ Use:
   **Note**: Section 1 (schema `ADD COLUMN IF NOT EXISTS`) always runs regardless of `--layers` since it is idempotent and fast. `--layers` only gates the expensive UPDATE/CREATE operations.
 
   Validation behavior after geometry processing:
-
   - Full geometry rebuilds (`import_bfc_boundaries`, or `process_geometries` with no `--layers` / `--layers all`) run `test_geometries` in strict mode and fail on missing/empty required boundary tier tables.
   - Scoped rebuilds (`process_geometries --layers <subset>`) run `test_geometries` in report-only mode for boundary-tier completeness, so operators can process a subset without failing due to unrelated layers not being rebuilt yet.
 
@@ -183,11 +265,11 @@ Use:
 
 Added April 2026. Three new health administrative boundaries imported via BFC (Boundaries Full Clipped) from ONS:
 
-| Boundary Type | Year | Nation | Endpoint Code | Django Column | Record Count |
-| --- | --- | --- | --- | --- | --- |
-| NHS England Regions | 2021 | England | NHSER21CD | `nhser_code` | 7 |
-| Integrated Care Boards | 2023 | England | ICB23CD | `icb_code` | ~42 |
-| Local Health Boards | 2022 | Wales | LHB22CD | `lhb_code` | 7 |
+| Boundary Type          | Year | Nation  | Endpoint Code | Django Column | Record Count |
+| ---------------------- | ---- | ------- | ------------- | ------------- | ------------ |
+| NHS England Regions    | 2021 | England | NHSER21CD     | `nhser_code`  | 7            |
+| Integrated Care Boards | 2023 | England | ICB23CD       | `icb_code`    | ~42          |
+| Local Health Boards    | 2022 | Wales   | LHB22CD       | `lhb_code`    | 7            |
 
 All map to 2021 LSOA boundaries. Imported as part of `import_bfc_boundaries` mode. Models include:
 
@@ -195,32 +277,39 @@ All map to 2021 LSOA boundaries. Imported as part of `import_bfc_boundaries` mod
 - Unique constraint on `(code, year)` to support multi-year versioning
 - Full geometry processing (3857 transform, simplification, spatial indexes)
 
+## Channel Islands / Crown Dependencies Import
+
+Added May 2026. Three Crown Dependency island boundaries — no internal geographies, no IMD data.
+
+| Territory    | ISO Code | Year | Source                      | Django Column | Record Count |
+| ------------ | -------- | ---- | --------------------------- | ------------- | ------------ |
+| Guernsey     | GGY      | 2024 | geoBoundaries ADM0          | `code`        | 1            |
+| Isle of Man  | IMN      | 2024 | geoBoundaries ADM0          | `code`        | 1            |
+| Jersey       | JEY      | 2024 | GADM v4.1 ADM0              | `code`        | 1            |
+
+All three share `year=2024` on the `ChannelIsland` model (`deprivation_scores_channelisland`). Because they share the same table and year, imports always use `force=True` to bypass the skip-guard.
+
+Included in both `uk_master_*` tables (as `nation = 'channel_islands'`, `imd_decile = 0`) and their own zoom-banded overlay (`channel_islands_tiles_z*`).
+
+Seed commands:
+
+```bash
+# As part of a full BFC import (channel islands always included)
+python manage.py seed --mode import_bfc_boundaries
+
+# Rebuild tile tables only (boundaries already in DB)
+python manage.py seed --mode process_geometries --layers channel-islands
+```
+
 ## Local Authority Boundary Imports
 
 Current Local Authority boundary sources are split by nation/year:
 
-| Boundary Type | Year | Nation Coverage | Endpoint Code | Django Column | Notes |
-| --- | --- | --- | --- | --- | --- |
-| Local Authority Districts | 2011 | Great Britain | `lad11cd` | `local_authority_district_code` | Used to spatialize the pre-seeded Scottish LA rows (`year = 2011`) |
-| Local Authority Districts | 2019 | England and Wales in current import flow | `lad19cd` | `local_authority_district_code` | Used for 2011-era England/Wales LA references |
-| Local Authority Districts | 2024 | England and Wales | `LAD24CD` | `local_authority_district_code` | Used for 2021-era England LA references |
-
-## Convenience scripts in s/
-
-Primary helper scripts:
-
-- `s/dev`
-  - Starts the PostGIS development compose stack.
-- `s/runserver`
-  - Runs Django dev server.
-- `s/migrate`
-  - Runs `makemigrations` then `migrate`.
-- `s/pg-tiles`
-  - Starts pg_tileserv service via compose.
-- `s/test`
-  - Runs pytest with pass-through flags; uses running web container when available, otherwise starts a one-off test container.
-- `s/wait-for-db.sh`
-  - Waits for DB readiness; optionally waits for seeded/populated tables when `WAIT_FOR_POPULATION=true`.
+| Boundary Type             | Year | Nation Coverage                          | Endpoint Code | Django Column                   | Notes                                                              |
+| ------------------------- | ---- | ---------------------------------------- | ------------- | ------------------------------- | ------------------------------------------------------------------ |
+| Local Authority Districts | 2011 | Great Britain                            | `lad11cd`     | `local_authority_district_code` | Used to spatialize the pre-seeded Scottish LA rows (`year = 2011`) |
+| Local Authority Districts | 2019 | England and Wales in current import flow | `lad19cd`     | `local_authority_district_code` | Used for 2011-era England/Wales LA references                      |
+| Local Authority Districts | 2024 | England and Wales                        | `LAD24CD`     | `local_authority_district_code` | Used for 2021-era England LA references                            |
 
 ## Git hooks (one-time setup)
 

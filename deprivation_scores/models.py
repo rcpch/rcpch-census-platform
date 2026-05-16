@@ -763,3 +763,30 @@ class LocalHealthBoard(models.Model):
 
     def __str__(self):
         return f"{self.lhb_name} ({self.year})"
+
+
+class ChannelIsland(models.Model):
+    """Crown Dependencies: Guernsey (GGY), Isle of Man (IMN), Jersey (JEY).
+
+    Single national outline boundaries only — no internal geographies or IMD data.
+    Sourced from geoBoundaries (Guernsey, Isle of Man) and GADM v4.1 (Jersey).
+    """
+
+    code = models.CharField(
+        "ISO 3166-1 alpha-3 code (e.g. GGY, IMN, JEY)", max_length=10
+    )
+    name = models.CharField("Territory name", max_length=100)
+    year = models.IntegerField("Boundary year", default=2024)
+
+    geom = gis_models.MultiPolygonField(srid=4326, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Channel Island / Crown Dependency"
+        verbose_name_plural = "Channel Islands / Crown Dependencies"
+        unique_together = ("code", "year")
+        indexes = [
+            models.Index(fields=["year"]),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.year})"

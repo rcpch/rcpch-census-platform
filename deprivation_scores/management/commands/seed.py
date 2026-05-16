@@ -329,7 +329,31 @@ class Command(BaseCommand):
             LEFT JOIN deprivation_scores_northernirelandindexmultipledeprivation ni 
                 ON ni.soa_id = so.id AND ni.year = {ni_imd_year}
             WHERE so.{actual_geom_col} IS NOT NULL 
-                AND so.year = {ni_boundary_year};
+                AND so.year = {ni_boundary_year}
+
+            UNION ALL
+
+            -- CHANNEL ISLANDS / CROWN DEPENDENCIES (Guernsey, Isle of Man, Jersey — year 2024, no IMD)
+            SELECT
+                ci.year::int AS year,
+                NULL::int AS imd_year,
+                ci.code::text AS code,
+                ci.name::text AS area_name,
+                NULL::text AS la_code,
+                NULL::text AS la_name,
+                NULL::int AS la_year,
+                NULL::text AS nhser_code,
+                NULL::text AS nhser_name,
+                NULL::text AS icb_code,
+                NULL::text AS icb_name,
+                NULL::text AS lhb_code,
+                NULL::text AS lhb_name,
+                ST_MakeValid(ST_Multi(ci.{actual_geom_col}))::geometry(MultiPolygon, 3857) AS geom,
+                'channel_islands'::text AS nation,
+                0::int AS imd_decile
+            FROM deprivation_scores_channelisland ci
+            WHERE ci.{actual_geom_col} IS NOT NULL
+                AND ci.year = 2024;
 
             -- 3. Create Spatial Index (Removes 500 errors by speeding up BBOX queries)
             CREATE INDEX idx_{view_name}_geom ON public.{view_name} USING GIST (geom);
@@ -381,10 +405,12 @@ class Command(BaseCommand):
         _ALL_LAYERS = frozenset(
             {
                 "lsoas",
+                "uk-master",
                 "local-authorities",
                 "nhs-regions",
                 "integrated-care-boards",
                 "local-health-boards",
+                "channel-islands",
             }
         )
         if layers is None or "all" in layers:
@@ -438,10 +464,14 @@ class Command(BaseCommand):
             "ALTER TABLE deprivation_scores_localhealthboard ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_localhealthboard ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
             "ALTER TABLE deprivation_scores_localhealthboard ADD COLUMN IF NOT EXISTS geom_3857_simp_z8_10 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_channelisland ADD COLUMN IF NOT EXISTS geom_3857 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_channelisland ADD COLUMN IF NOT EXISTS geom_3857_simp_z0_4 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_channelisland ADD COLUMN IF NOT EXISTS geom_3857_simp_z5_7 geometry(MultiPolygon,3857);",
+            "ALTER TABLE deprivation_scores_channelisland ADD COLUMN IF NOT EXISTS geom_3857_simp_z8_10 geometry(MultiPolygon,3857);",
         ]
 
         # Section 2: Cleanup (conditional per layer group)
-        if want("lsoas"):
+        if want("uk-master"):
             sql_statements += [
                 "DROP TABLE IF EXISTS public.uk_master_2011_z0_4 CASCADE;",
                 "DROP TABLE IF EXISTS public.uk_master_2011_z5_7 CASCADE;",
@@ -451,6 +481,9 @@ class Command(BaseCommand):
                 "DROP TABLE IF EXISTS public.uk_master_2021_z5_7 CASCADE;",
                 "DROP TABLE IF EXISTS public.uk_master_2021_z8_10 CASCADE;",
                 "DROP TABLE IF EXISTS public.uk_master_2021_z11_14 CASCADE;",
+            ]
+        if want("lsoas"):
+            sql_statements += [
                 "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z0_4 CASCADE;",
                 "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z5_7 CASCADE;",
                 "DROP TABLE IF EXISTS public.lsoa_tiles_2011_z8_10 CASCADE;",
@@ -564,6 +597,32 @@ class Command(BaseCommand):
                 "DROP TABLE IF EXISTS public.lhb_tiles_2022_z8_10 CASCADE;",
                 "DROP TABLE IF EXISTS public.lhb_tiles_2022_z11_14 CASCADE;",
             ]
+        if want("channel-islands"):
+            sql_statements += [
+                """
+            DO $$
+            DECLARE
+                relkind_char char;
+            BEGIN
+                SELECT c.relkind INTO relkind_char
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relname = 'channel_islands_tiles';
+
+                IF relkind_char = 'r' THEN
+                    EXECUTE 'DROP TABLE public.channel_islands_tiles CASCADE';
+                ELSIF relkind_char = 'v' THEN
+                    EXECUTE 'DROP VIEW public.channel_islands_tiles CASCADE';
+                ELSIF relkind_char = 'm' THEN
+                    EXECUTE 'DROP MATERIALIZED VIEW public.channel_islands_tiles CASCADE';
+                END IF;
+            END $$;
+            """,
+                "DROP TABLE IF EXISTS public.channel_islands_tiles_z0_4 CASCADE;",
+                "DROP TABLE IF EXISTS public.channel_islands_tiles_z5_7 CASCADE;",
+                "DROP TABLE IF EXISTS public.channel_islands_tiles_z8_10 CASCADE;",
+                "DROP TABLE IF EXISTS public.channel_islands_tiles_z11_14 CASCADE;",
+            ]
 
         # Section 3: Geoprocessing (WGS84 -> Web Mercator 3857)
         if want("lsoas"):
@@ -588,6 +647,10 @@ class Command(BaseCommand):
         if want("local-health-boards"):
             sql_statements += [
                 "UPDATE deprivation_scores_localhealthboard SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
+            ]
+        if want("channel-islands"):
+            sql_statements += [
+                "UPDATE deprivation_scores_channelisland SET geom_3857 = ST_Transform(geom, 3857) WHERE geom_3857 IS NULL AND geom IS NOT NULL;",
             ]
 
         # Section 4: Simplification
@@ -614,6 +677,10 @@ class Command(BaseCommand):
         if want("local-health-boards"):
             sql_statements += [
                 "UPDATE deprivation_scores_localhealthboard SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
+            ]
+        if want("channel-islands"):
+            sql_statements += [
+                "UPDATE deprivation_scores_channelisland SET geom_3857_simp_z0_4 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 1500)), 3)), geom_3857_simp_z5_7 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 200)), 3)), geom_3857_simp_z8_10 = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(geom_3857, 60)), 3)) WHERE geom_3857 IS NOT NULL;",
             ]
 
         # Section 5: Spatial indexing & clustering
@@ -672,6 +739,14 @@ class Command(BaseCommand):
                 "CREATE INDEX IF NOT EXISTS idx_localhealthboard_simp_z8_10 ON deprivation_scores_localhealthboard USING GIST (geom_3857_simp_z8_10);",
                 "CLUSTER deprivation_scores_localhealthboard USING idx_localhealthboard_simp_z5_7;",
             ]
+        if want("channel-islands"):
+            sql_statements += [
+                "CREATE INDEX IF NOT EXISTS idx_channelisland_3857 ON deprivation_scores_channelisland USING GIST (geom_3857);",
+                "CREATE INDEX IF NOT EXISTS idx_channelisland_simp_z0_4 ON deprivation_scores_channelisland USING GIST (geom_3857_simp_z0_4);",
+                "CREATE INDEX IF NOT EXISTS idx_channelisland_simp_z5_7 ON deprivation_scores_channelisland USING GIST (geom_3857_simp_z5_7);",
+                "CREATE INDEX IF NOT EXISTS idx_channelisland_simp_z8_10 ON deprivation_scores_channelisland USING GIST (geom_3857_simp_z8_10);",
+                "CLUSTER deprivation_scores_channelisland USING idx_channelisland_simp_z5_7;",
+            ]
 
         # Section 6: LSOA tile tables
         if want("lsoas"):
@@ -691,8 +766,8 @@ class Command(BaseCommand):
                 get_lsoa_view_sql("lsoa_tiles_2021_z11_14", "geom_3857", 2021),
             ]
 
-        # Section 7: UK Master + Overlay tile tables
-        if want("lsoas"):
+        # Section 7: UK Master tile tables
+        if want("uk-master"):
             sql_statements += [
                 get_uk_master_view_sql("uk_master_2011_z0_4", "simp_z0_4", 2011, 2019),
                 get_uk_master_view_sql("uk_master_2011_z5_7", "simp_z5_7", 2011, 2019),
@@ -708,6 +783,8 @@ class Command(BaseCommand):
                 get_uk_master_view_sql("uk_master_2011_z11_14", "3857", 2011, 2019),
                 get_uk_master_view_sql("uk_master_2021_z11_14", "3857", 2021, 2025),
             ]
+
+        # Section 8: Overlay tile tables
         if want("local-authorities"):
             sql_statements += [
                 get_la_tile_sql("la_tiles_z0_4", "geom_3857_simp_z0_4"),
@@ -838,6 +915,46 @@ class Command(BaseCommand):
                 ),
                 "CREATE VIEW public.lhb_tiles_2022 AS SELECT * FROM public.lhb_tiles_2022_z11_14;",
             ]
+        if want("channel-islands"):
+            sql_statements += [
+                get_health_boundary_view_sql(
+                    "channel_islands_tiles_z0_4",
+                    "deprivation_scores_channelisland",
+                    "code",
+                    "name",
+                    2024,
+                    "channel_islands",
+                    "geom_3857_simp_z0_4",
+                ),
+                get_health_boundary_view_sql(
+                    "channel_islands_tiles_z5_7",
+                    "deprivation_scores_channelisland",
+                    "code",
+                    "name",
+                    2024,
+                    "channel_islands",
+                    "geom_3857_simp_z5_7",
+                ),
+                get_health_boundary_view_sql(
+                    "channel_islands_tiles_z8_10",
+                    "deprivation_scores_channelisland",
+                    "code",
+                    "name",
+                    2024,
+                    "channel_islands",
+                    "geom_3857_simp_z8_10",
+                ),
+                get_health_boundary_view_sql(
+                    "channel_islands_tiles_z11_14",
+                    "deprivation_scores_channelisland",
+                    "code",
+                    "name",
+                    2024,
+                    "channel_islands",
+                    "geom_3857",
+                ),
+                "CREATE VIEW public.channel_islands_tiles AS SELECT * FROM public.channel_islands_tiles_z11_14;",
+            ]
 
         # Section 8: Final housekeeping (GRANT always; ANALYZE/VACUUM per layer)
         sql_statements += ["GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;"]
@@ -884,6 +1001,14 @@ class Command(BaseCommand):
                 "VACUUM ANALYZE public.lhb_tiles_2022_z5_7;",
                 "VACUUM ANALYZE public.lhb_tiles_2022_z8_10;",
                 "VACUUM ANALYZE public.lhb_tiles_2022_z11_14;",
+            ]
+        if want("channel-islands"):
+            sql_statements += [
+                "ANALYZE deprivation_scores_channelisland;",
+                "VACUUM ANALYZE public.channel_islands_tiles_z0_4;",
+                "VACUUM ANALYZE public.channel_islands_tiles_z5_7;",
+                "VACUUM ANALYZE public.channel_islands_tiles_z8_10;",
+                "VACUUM ANALYZE public.channel_islands_tiles_z11_14;",
             ]
 
         print("[POSTPROCESS] Starting SQL post-processing...")
@@ -1336,13 +1461,11 @@ class Command(BaseCommand):
             # 1. Check the 2011 Master View
             self.stdout.write("Checking 2011 Era (2019 IMD)...")
             if table_or_view_exists(cursor, "uk_master_2011_z8_10"):
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT nation, COUNT(*) 
                     FROM public.uk_master_2011_z8_10 
                     GROUP BY nation;
-                """
-                )
+                """)
                 results_2011 = cursor.fetchall()
                 nations_2011 = {row[0]: row[1] for row in results_2011}
             else:
@@ -1356,13 +1479,11 @@ class Command(BaseCommand):
             # 2. Check the 2021 Master View
             self.stdout.write("Checking 2021 Era (2025 IMD)...")
             if table_or_view_exists(cursor, "uk_master_2021_z8_10"):
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT nation, COUNT(*) 
                     FROM public.uk_master_2021_z8_10 
                     GROUP BY nation;
-                """
-                )
+                """)
                 results_2021 = cursor.fetchall()
                 nations_2021 = {row[0]: row[1] for row in results_2021}
             else:
@@ -1373,7 +1494,13 @@ class Command(BaseCommand):
                 )
                 nations_2021 = {}
 
-            expected_nations = ["england", "wales", "scotland", "northern_ireland"]
+            expected_nations = [
+                "england",
+                "wales",
+                "scotland",
+                "northern_ireland",
+                "channel_islands",
+            ]
 
             for nation in expected_nations:
                 count_11 = nations_2011.get(nation, 0)
@@ -1395,6 +1522,7 @@ class Command(BaseCommand):
                 "NHS Regions": "nhser_tiles_2021",
                 "Integrated Care Boards": "icb_tiles_2023",
                 "Local Health Boards": "lhb_tiles_2022",
+                "Channel Islands": "channel_islands_tiles",
             }
             tiers = ["z0_4", "z5_7", "z8_10", "z11_14"]
             boundary_failures = []
@@ -1473,16 +1601,19 @@ class Command(BaseCommand):
             choices=[
                 "all",
                 "lsoas",
+                "uk-master",
                 "local-authorities",
                 "nhs-regions",
                 "integrated-care-boards",
                 "local-health-boards",
                 "health-geographies",
+                "channel-islands",
             ],
             default=None,
             help=(
                 "Limit process_geometries to specific overlay groups. "
                 "'health-geographies' expands to nhs-regions + integrated-care-boards + local-health-boards. "
+                "'uk-master' rebuilds uk_master_2011_* and uk_master_2021_* tables. "
                 "Omit to process all layers (equivalent to 'all')."
             ),
         )
@@ -1600,6 +1731,45 @@ class Command(BaseCommand):
             },
         ]
 
+        # Channel Island / Crown Dependency datasets — kept separate from BFC_DATASETS
+        # because they are small single-polygon files from different sources (not ArcGIS).
+        # All share year=2024 and use INSERT...ON CONFLICT so --force is required to re-import.
+        CHANNEL_ISLAND_DATASETS = [
+            {
+                "name": "Guernsey (geoBoundaries ADM0)",
+                "url": "https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/GGY/ADM0/geoBoundaries-GGY-ADM0.geojson",
+                "table": "deprivation_scores_channelisland",
+                "django_code_col": "code",
+                "django_name_col": "name",
+                "year": 2024,
+                "code_column": "shapeiso",
+                "name_column": "shapename",
+                "chunk_size": 1,
+            },
+            {
+                "name": "Isle of Man (geoBoundaries ADM0)",
+                "url": "https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/IMN/ADM0/geoBoundaries-IMN-ADM0.geojson",
+                "table": "deprivation_scores_channelisland",
+                "django_code_col": "code",
+                "django_name_col": "name",
+                "year": 2024,
+                "code_column": "shapeiso",
+                "name_column": "shapename",
+                "chunk_size": 1,
+            },
+            {
+                "name": "Jersey (GADM v4.1 ADM0)",
+                "url": "https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_JEY_0.json",
+                "table": "deprivation_scores_channelisland",
+                "django_code_col": "code",
+                "django_name_col": "name",
+                "year": 2024,
+                "code_column": "gid_0",
+                "name_column": "country",
+                "chunk_size": 1,
+            },
+        ]
+
         # Update your logic here
         if options.get("mode") == "import_bfc_boundaries":
             self.stdout.write(
@@ -1647,6 +1817,16 @@ class Command(BaseCommand):
                     f"Boundary import preflight summary: run={len(datasets_to_import)}, skipped={skipped_count}, force={force}."
                 )
             )
+
+            # Always import channel islands as part of a full BFC import. They share year=2024
+            # on the same table, so the skip-guard would fire after the first insert otherwise.
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "\nImporting Channel Island / Crown Dependency boundaries..."
+                )
+            )
+            for ds in CHANNEL_ISLAND_DATASETS:
+                self._stream_bfc_import(dataset=ds, force=True)
 
             # Run optimizations after all datasets are imported
             self._run_post_processing_sql()
@@ -2046,7 +2226,11 @@ def update_english_imd_data_with_subdomains():
         >= 32844
     ):
         sys.stdout.write(
-            "\n" + R + "⏭️ English 2019 subdomains already exist! Skipping..." + W + "\n"
+            "\n"
+            + R
+            + "⏭️ English 2019 subdomains already exist! Skipping..."
+            + W
+            + "\n"
         )
         return
 
@@ -2354,7 +2538,11 @@ def update_english_2025_imd_data_with_subdomains():
         >= 33755
     ):
         sys.stdout.write(
-            "\n" + R + "⏭️ English 2025 subdomains already exist! Skipping..." + W + "\n"
+            "\n"
+            + R
+            + "⏭️ English 2025 subdomains already exist! Skipping..."
+            + W
+            + "\n"
         )
         return
 
@@ -3140,7 +3328,11 @@ def update_population_densities():
         and PopulationDensity.objects.all().count() >= 32058
     ):
         sys.stdout.write(
-            "\n" + R + "⏭️ Population density data already added. Skipping..." + W + "\n"
+            "\n"
+            + R
+            + "⏭️ Population density data already added. Skipping..."
+            + W
+            + "\n"
         )  # should be 32058
         return
 
@@ -3473,6 +3665,14 @@ def test_table_totals():
             ],
             "expected": 7,
             "message": "LocalHealthBoard should have 7 rows with geometries for year 2022.",
+        },
+        {
+            "label": "ChannelIsland",
+            "count": get_table_year_counts("deprivation_scores_channelisland", 2024)[
+                "spatialized_rows"
+            ],
+            "expected": 3,
+            "message": "ChannelIsland should have 3 rows with geometries for year 2024 (Guernsey, Isle of Man, Jersey).",
         },
     ]
     for val in normal_vals:

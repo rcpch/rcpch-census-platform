@@ -132,7 +132,17 @@ function updateDatasetInfo(selectedNation, era) {
     wales: "Wales",
     scotland: "Scotland",
     northern_ireland: "N. Ireland",
+    channel_islands: "Channel Islands",
   };
+
+  if (selectedNation === "channel_islands") {
+    eraGroup.style.opacity = "0.45";
+    eraSelect.disabled = true;
+    noteEl.textContent = "Era selector applies to England and All UK";
+    infoEl.innerHTML =
+      "<div><strong>Channel Islands:</strong> No IMD data available &middot; 2024 boundaries (Guernsey, Isle of Man, Jersey)</div>";
+    return;
+  }
 
   const eraActive = selectedNation === "england" || selectedNation === "all";
   eraGroup.style.opacity = eraActive ? "1" : "0.45";
@@ -165,7 +175,9 @@ function updateLocalAuthorityControlState() {
   const laNote = document.getElementById("la-note");
   const laGroup = document.getElementById("la-toggle-group");
 
-  const enabled = currentNation !== "northern_ireland";
+  const enabled =
+    currentNation !== "northern_ireland" &&
+    currentNation !== "channel_islands";
   laToggle.disabled = !enabled;
   laGroup.style.opacity = enabled ? "1" : "0.45";
 
@@ -181,7 +193,7 @@ function updateLocalAuthorityControlState() {
           ? "All UK: England 2024 + Wales 2019 + Scotland 2011 boundaries"
           : "All UK: England/Wales 2019 + Scotland 2011 boundaries"
         : "Showing matching Local Authority boundaries for this view"
-    : "Not available for Northern Ireland in this layer";
+    : "Not available for Northern Ireland or Channel Islands in this layer";
 }
 
 function updateHealthBoundaryControlState() {
@@ -207,6 +219,7 @@ function applyOverlayVisibility() {
 
   const localAuthorityEnabled =
     currentNation !== "northern_ireland" &&
+    currentNation !== "channel_islands" &&
     !!document.getElementById("la-toggle")?.checked;
 
   const nhserEnabled =
@@ -248,6 +261,7 @@ function shouldShowTooltipRowForNation(rowKey, nation) {
 function getBoundaryTypeLabelForNation(nation) {
   if (nation === "scotland") return "Data Zones";
   if (nation === "northern_ireland") return "SOAs";
+  if (nation === "channel_islands") return "Island";
   return "LSOAs";
 }
 
@@ -358,6 +372,7 @@ function initMap() {
           scotland: "#08306b",
           wales: "#00441b",
           northern_ireland: "#7f2704",
+          channel_islands: "#475569",
         },
         fillOpacity: 0.62,
       },
