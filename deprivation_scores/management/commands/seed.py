@@ -23,7 +23,6 @@ from ...models import (
     ScottishIndexMultipleDeprivation,
     NorthernIrelandIndexMultipleDeprivation,
     PopulationDensity,
-    ChannelIsland,
 )
 
 
@@ -1819,8 +1818,8 @@ class Command(BaseCommand):
                 )
             )
 
-            # Always import channel islands as part of a full BFC import (force=True because
-            # all three share year=2024 on the same table so the skip-guard would fire after 1).
+            # Always import channel islands as part of a full BFC import. They share year=2024
+            # on the same table, so the skip-guard would fire after the first insert otherwise.
             self.stdout.write(
                 self.style.SUCCESS(
                     "\nImporting Channel Island / Crown Dependency boundaries..."
@@ -1840,27 +1839,6 @@ class Command(BaseCommand):
 
             # test that the tables have the correct number of geometries
             self.test_geometries(strict=True)
-            return
-        if options.get("mode") == "import_channel_islands":
-            self.stdout.write(
-                "\n"
-                + self.style.SUCCESS(
-                    "Importing Channel Island / Crown Dependency boundaries..."
-                )
-                + "\n"
-            )
-            # Always force=True: all 3 islands share year=2024 on the same table,
-            # so the skip-guard would fire after the first insert otherwise.
-            for ds in CHANNEL_ISLAND_DATASETS:
-                self._stream_bfc_import(dataset=ds, force=True)
-
-            self.stdout.write(
-                self.style.SUCCESS(
-                    "Running post-processing for channel-islands layer..."
-                )
-            )
-            self._run_post_processing_sql(layers=["channel-islands", "uk-master"])
-            self.test_geometries(strict=False)
             return
         if options.get("mode") == "process_geometries":
             layers = options.get("layers")

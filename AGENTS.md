@@ -41,7 +41,6 @@ docker compose exec web python manage.py migrate
 # Seed data
 docker compose exec web python manage.py seed --mode __all__
 docker compose exec web python manage.py seed --mode import_bfc_boundaries
-docker compose exec web python manage.py seed --mode import_channel_islands
 docker compose exec web python manage.py seed --mode process_geometries --layers channel-islands
 
 # Open a Django shell
@@ -100,8 +99,7 @@ The platform has two distinct data phases:
 
 1. Boundary enrichment + spatial post-processing
 
-- `import_bfc_boundaries` downloads/streams external geometry datasets and merges geometries into base tables. Channel Island boundaries are always imported as part of this mode (no skip-check, always force).
-- `import_channel_islands` imports only the Channel Island / Crown Dependency boundaries (Guernsey, Isle of Man, Jersey) and immediately runs `process_geometries --layers channel-islands uk-master` so UK era tables include the islands after standalone imports.
+- `import_bfc_boundaries` downloads/streams external geometry datasets and merges geometries into base tables. Channel Island boundaries are imported as part of this mode (no skip-check, always force).
 - `_run_post_processing_sql()` then:
   - Creates 3857 geometry columns
   - Generates simplified geometries for low/medium zoom
@@ -230,7 +228,10 @@ Use:
   python manage.py seed --mode process_geometries --layers integrated-care-boards
   python manage.py seed --mode process_geometries --layers local-health-boards
 
-  # Channel Islands / Crown Dependencies only (post-processing only — use import_channel_islands to also re-fetch boundaries)
+  # Channel Islands / Crown Dependencies are included in import_bfc_boundaries
+  python manage.py seed --mode import_bfc_boundaries
+
+  # Channel Islands / Crown Dependencies only (post-processing only)
   python manage.py seed --mode process_geometries --layers channel-islands
 
   # UK master tiles only
@@ -293,9 +294,6 @@ Included in both `uk_master_*` tables (as `nation = 'channel_islands'`, `imd_dec
 Seed commands:
 
 ```bash
-# Standalone — fetch boundaries + rebuild channel-islands + uk-master tiles (fast)
-python manage.py seed --mode import_channel_islands
-
 # As part of a full BFC import (channel islands always included)
 python manage.py seed --mode import_bfc_boundaries
 

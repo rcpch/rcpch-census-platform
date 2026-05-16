@@ -40,12 +40,12 @@ We use **BFC (Boundaries Full Clipped)** datasets to ensure high-fidelity bounda
 
 ### Channel Islands / Crown Dependency import note
 
-The Channel Islands (Guernsey, Isle of Man, Jersey) use a separate import path from the ArcGIS-based BFC datasets because these territories are not available from ONS:
+The Channel Islands (Guernsey, Isle of Man, Jersey) use separate data sources from the ArcGIS-based BFC datasets because these territories are not available from ONS:
 
 * Guernsey and Isle of Man are sourced from [geoBoundaries](https://www.geoboundaries.org/) (ADM0 level — national outline only).
 * Jersey is sourced from [GADM v4.1](https://gadm.org/) (ADM0 level) as it is absent from geoBoundaries.
 
-All three share `year=2024` on the `ChannelIsland` model (`deprivation_scores_channelisland`). Because they share the same table and year, the skip-guard in `import_bfc_boundaries` is bypassed for these entries — imports always run with `force=True`.
+All three share `year=2024` on the `ChannelIsland` model (`deprivation_scores_channelisland`). Because they share the same table and year, the skip-guard in `import_bfc_boundaries` is bypassed for these entries — imports always run with `force=True` as part of the main `import_bfc_boundaries` flow.
 
 These boundaries contain no internal geographies and no IMD data. They appear in `uk_master_*` tile tables with `nation = 'channel_islands'` and `imd_decile = 0`.
 
@@ -299,13 +299,7 @@ python manage.py seed --mode process_geometries --layers channel-islands
 python manage.py seed --mode process_geometries --layers uk-master
 ```
 
-To import Channel Island / Crown Dependency boundaries independently (without re-running the full BFC import):
-
-```bash
-python manage.py seed --mode import_channel_islands
-```
-
-This fetches Guernsey, Isle of Man and Jersey boundaries and immediately rebuilds both the `channel_islands_tiles_z*` tables and the `uk_master_*` tables (via `--layers channel-islands uk-master`).
+The Channel Islands are imported as part of `import_bfc_boundaries` along with all other BFC datasets. There is no separate import mode for Channel Islands alone.
 
 Validation semantics for `process_geometries`:
 
