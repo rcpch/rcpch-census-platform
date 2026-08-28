@@ -194,6 +194,13 @@ SPECTACULAR_SETTINGS = {
 _csrf_origins = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "")
 CSRF_TRUSTED_ORIGINS = [origin for origin in _csrf_origins.split(",") if origin]
 
+# Trust the X-Forwarded-Proto header set by the nginx reverse proxy so that
+# request.is_secure() / build_absolute_uri() report HTTPS behind a TLS-terminating
+# ingress (e.g. Azure Container Apps). Without this, swagger-ui's schema URL is
+# generated as http:// and browsers block it as mixed content.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+
 
 # Basic logging configuration for console output and app logger
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
