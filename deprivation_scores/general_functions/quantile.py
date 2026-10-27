@@ -2,6 +2,21 @@ from typing import Literal, Optional
 import math
 
 
+QUANTILE_NAMES = {
+    2: "median",
+    3: "tertile",
+    4: "quartile",
+    5: "quintile",
+    6: "sextile",
+    7: "septile",
+    8: "octile",
+    10: "decile",
+    12: "duodecile",
+    18: "hexadecile",
+    20: "vigintile",
+}
+
+
 def quantile_for_rank(
     rank: int,
     requested_quantile: int,
@@ -17,21 +32,7 @@ def quantile_for_rank(
     year: int - the IMD year (e.g., 2019 or 2025 for England) to determine correct LSOA count
     """
 
-    QUANTILES = {
-        2: "median",
-        3: "tertile",
-        4: "quartile",
-        5: "quintile",
-        6: "sextile",
-        7: "septile",
-        8: "octile",
-        10: "decile",
-        12: "duodecile",
-        18: "hexadecile",
-        20: "vigintile",
-    }
-
-    if int(requested_quantile) not in QUANTILES.keys():
+    if int(requested_quantile) not in QUANTILE_NAMES.keys():
         raise ValueError(f"{requested_quantile} is not a valid quantile.")
 
     # English LSOA counts differ by IMD year
@@ -62,7 +63,7 @@ def quantile_for_rank(
     return {
         "rank": rank,
         "requested_quantile": int(requested_quantile),
-        "requested_quantile_name": QUANTILES.get(int(requested_quantile)),
+        "requested_quantile_name": QUANTILE_NAMES.get(int(requested_quantile)),
         "data_quantile": math.floor(rank / quantile_limit) + 1,
         "country": country,
         "year": year,

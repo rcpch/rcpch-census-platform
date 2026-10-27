@@ -20,7 +20,7 @@ from drf_spectacular.utils import (
 )
 from drf_spectacular.types import OpenApiTypes
 
-from .general_functions import quantile_for_rank
+from .general_functions import QUANTILE_NAMES, quantile_for_rank
 
 from .filter_sets import (
     EnglishIndexMultipleDeprivationFilter,
@@ -772,12 +772,29 @@ class UKIndexMultipleDeprivationView(APIView):
         return Response(response.data)
 
 
+MAX_BATCH_POSTCODES = 100
+
+
 class UKIndexMultipleDeprivationQuantileView(APIView):
+    # Serializers used to embed the full deprivation indices when requested
+    english_serializer_class = EnglishIndexMultipleDeprivationSerializer
+    welsh_serializer_class = WelshIndexMultipleDeprivationSerializer
+    scottish_serializer_class = ScottishIndexMultipleDeprivationSerializer
+    northern_ireland_serializer_class = (
+        NorthernIrelandIndexMultipleDeprivationSerializer
+    )
+
     @extend_schema(
         parameters=[
             OpenApiParameter(
                 name="postcode",
-                description="Postcode",
+                description=(
+                    "One or more UK postcodes. Supply a single postcode, a comma-separated "
+                    "list (postcode=SW1A1AA,M1 5AL) or repeated parameters "
+                    "(postcode=SW1A1AA&postcode=M1 5AL). The country of each postcode is "
+                    "detected automatically, so postcodes from different UK nations can be "
+                    f"mixed in one request. Maximum of {MAX_BATCH_POSTCODES} postcodes per request."
+                ),
                 required=True,
                 type=OpenApiTypes.STR,
             ),
@@ -790,7 +807,11 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
             ),
             OpenApiParameter(
                 name="year",
-                description="Year of Index of Multiple Deprivation dataset to use",
+                description=(
+                    "Year of Index of Multiple Deprivation dataset to use. If omitted, each "
+                    "postcode uses the default year for its nation (2019 England and Wales, "
+                    "2020 Scotland, 2017 Northern Ireland)."
+                ),
                 required=False,
                 type=OpenApiTypes.INT,
                 examples=[
@@ -811,6 +832,15 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                     ),
                 ],
             ),
+            OpenApiParameter(
+                name="include_full_indices",
+                description=(
+                    "When true, each result also includes the full deprivation indices for "
+                    "the postcode's area under the 'indices' key."
+                ),
+                required=False,
+                type=OpenApiTypes.BOOL,
+            ),
         ],
         responses={
             200: OpenApiResponse(
@@ -818,30 +848,55 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                 description="Valid Response",
                 examples=[
                     OpenApiExample(
-                        "/index_of_multiple_deprivation_quantile?postcode=SW1A1AA&quantile=10",
-                        external_value="external value",
+                        "Single postcode",
                         value={
-                            "rank": 24862,
-                            "requested_quantile": 10,
-                            "requested_quantile_name": "decile",
-                            "data_quantile": 8,
-                            "country": "england",
-                            "error": None,
+                            "result": {
+                                "rank": 24862,
+                                "requested_quantile": 10,
+                                "requested_quantile_name": "decile",
+                                "data_quantile": 8,
+                                "country": "england",
+                                "year": 2019,
+                                "error": None,
+                            }
                         },
                         response_only=True,
                     ),
                     OpenApiExample(
-                        "/index_of_multiple_deprivation_quantile?postcode=B346DX&quantile=2",
-                        external_value="external value",
+                        "Multiple postcodes",
                         value={
-                            "result": {
-                                "rank": 9304,
-                                "requested_quantile": 2,
-                                "requested_quantile_name": "median",
-                                "data_quantile": 1,
-                                "country": "england",
-                                "error": None,
-                            }
+                            "results": [
+                                {
+                                    "postcode": "SE1 7PB",
+                                    "rank": 21865,
+                                    "requested_quantile": 10,
+                                    "requested_quantile_name": "decile",
+                                    "data_quantile": 7,
+                                    "country": "england",
+                                    "year": 2019,
+                                    "error": None,
+                                },
+                                {
+                                    "postcode": "CF10 3NQ",
+                                    "rank": 833,
+                                    "requested_quantile": 10,
+                                    "requested_quantile_name": "decile",
+                                    "data_quantile": 5,
+                                    "country": "wales",
+                                    "year": 2019,
+                                    "error": None,
+                                },
+                                {
+                                    "postcode": "XX1 1XX",
+                                    "rank": None,
+                                    "requested_quantile": 10,
+                                    "requested_quantile_name": "decile",
+                                    "data_quantile": None,
+                                    "country": None,
+                                    "year": None,
+                                    "error": "Could not get LSOA from postcode.",
+                                },
+                            ]
                         },
                         response_only=True,
                     ),
@@ -851,198 +906,349 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
     )
     def get(self, request):
         """
-        This endpoint returns an Index of Multiple Deprivations against a postcode, from either England, Wales, Scotland or Northern Ireland.
+        This endpoint returns Index of Multiple Deprivation quantiles against one or more postcodes, from England, Wales, Scotland or Northern Ireland.
+
+        The country of each postcode is detected automatically, so the endpoint is country-agnostic: a single request can mix postcodes from different UK nations and each result is calculated against that nation's deprivation dataset.
+
+        A single postcode returns the original `{"result": ...}` response shape. Multiple postcodes return `{"results": [...]}` with one item per postcode in the order supplied; postcodes that cannot be resolved are returned with an `error` message instead of failing the whole request.
 
         Parameters:
 
-        `postcode`: string **[Mandatory]**
+        `postcode`: string or list of strings **[Mandatory]** - a single postcode, a comma-separated list, or repeated `postcode` parameters (maximum 100 per request)
 
         `quantile`: integer **[Mandatory]**, one of [2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20]
 
-        `year`: integer **[Optional]**, year of the Index of Multiple Deprivation dataset to use
+        `year`: integer **[Optional]**, year of the Index of Multiple Deprivation dataset to use. If omitted, each postcode uses the default year for its nation (2019 England and Wales, 2020 Scotland, 2017 Northern Ireland). If supplied, postcodes from nations that do not publish that dataset year are returned with an error.
+
+        `include_full_indices`: boolean **[Optional]** - when true, each result also includes the full deprivation indices for the postcode's area under `indices`.
         """
-        post_code = self.request.query_params.get("postcode", None)
+        postcodes = self._postcodes_from_request()
         requested_quantile = self.request.query_params.get("quantile", None)
-        year = self.request.query_params.get("year", None)
+        year_param = self.request.query_params.get("year", None)
+        include_full_indices = self._boolean_param(request, "include_full_indices")
 
         # Validate quantile parameter
         if requested_quantile is None:
-            logger.warning(
-                "Quantile parameter missing for quantile view (postcode=%s)", post_code
-            )
+            logger.warning("Quantile parameter missing for quantile view")
             raise ParseError("Quantile parameter is required.", code=400)
 
         valid_quantiles = [2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20]
         try:
-            quantile_int = int(requested_quantile)
-            if quantile_int not in valid_quantiles:
-                logger.warning(
-                    "Invalid quantile supplied: %s (postcode=%s)",
-                    requested_quantile,
-                    post_code,
-                )
-                raise ParseError(
-                    f"{requested_quantile} is not a valid quantile. Must be one of {valid_quantiles}.",
-                    code=400,
-                )
+            quantile = int(requested_quantile)
+            if quantile not in valid_quantiles:
+                raise ValueError
         except (ValueError, TypeError):
-            logger.warning(
-                "Quantile parse error for value: %s (postcode=%s)",
-                requested_quantile,
-                post_code,
-            )
+            logger.warning("Invalid quantile supplied: %s", requested_quantile)
             raise ParseError(
                 f"{requested_quantile} is not a valid quantile. Must be one of {valid_quantiles}.",
                 code=400,
             )
-        if post_code:
-            if year:
-                if int(year) == 2025:
-                    lsoa_year = 2021
-                elif int(year) in [2019, 2017, 2020]:
-                    lsoa_year = 2011
-                else:
-                    logger.warning(
-                        "Invalid year supplied for quantile view: %s (postcode=%s)",
-                        year,
-                        post_code,
-                    )
-                    raise ParseError("Invalid year supplied.", code=400)
-            else:
-                lsoa_year = 2011
-            data = lsoa_for_postcode(
-                postcode=post_code, lsoa_year=lsoa_year
-            )  # this returns either the lsoa, soa or data zone code depending on country, though the key is called lsoa. the response also includes the country
 
-            status = data["status"]
-            response = data["response"]
-            if status == "error":
-                logger.warning(
-                    "Postcode lookup returned error for %s: %s", post_code, response
-                )
-                raise ParseError(response, code=400)
-            elif status == "terminated_postcode":
-                return Response(response, status=HTTPStatus.GONE)
-
-            lsoa_object = response
-
-            if lsoa_object["lsoa"]:
-                lsoa_code = lsoa_object["lsoa"]
-                if lsoa_object["country"] == "England":
-                    if year is None:
-                        year = 2019
-                    if int(year) in [2019, 2025]:
-                        if int(year) == 2025:
-                            lsoa = LSOA.objects.filter(
-                                lsoa_code=lsoa_code, year=2021
-                            ).get()
-                        elif int(year) == 2019:
-                            lsoa = LSOA.objects.filter(
-                                lsoa_code=lsoa_code, year=2011
-                            ).get()
-                        else:
-                            logger.warning(
-                                "Invalid England year in quantile view: %s (postcode=%s)",
-                                year,
-                                post_code,
-                            )
-                            raise ParseError(  # fallback, should not be hit
-                                "Year must be 2019 or 2025 for England.", code=400
-                            )
-                        imd = EnglishIndexMultipleDeprivation.objects.filter(
-                            lsoa=lsoa, year=year
-                        ).get()
-                        data = quantile_for_rank(
-                            rank=imd.imd_rank,
-                            requested_quantile=requested_quantile,
-                            country="england",
-                            year=year,
-                        )
-                        response = Response({"result": data})
-                    else:
-                        logger.warning(
-                            "Year must be 2019 or 2025 for England (supplied=%s, postcode=%s)",
-                            year,
-                            post_code,
-                        )
-                        raise ParseError(
-                            "Year must be 2019 or 2025 for England.", code=400
-                        )
-                elif lsoa_object["country"] == "Wales":
-                    if year is None:
-                        year = 2019
-                    if int(year) != 2019:
-                        logger.warning(
-                            "Year must be 2019 for Wales (supplied=%s, postcode=%s)",
-                            year,
-                            post_code,
-                        )
-                        raise ParseError("Year must be 2019 for Wales.", code=400)
-                    lsoa = LSOA.objects.filter(lsoa_code=lsoa_code, year=2011).get()
-                    imd = WelshIndexMultipleDeprivation.objects.filter(
-                        lsoa=lsoa, year=year
-                    ).get()
-                    data = quantile_for_rank(
-                        rank=imd.imd_rank,
-                        requested_quantile=requested_quantile,
-                        country="wales",
-                        year=year,
-                    )
-                    response = Response({"result": data})
-                elif lsoa_object["country"] == "Scotland":
-                    if year is None:
-                        year = 2020
-                    if int(year) != 2020:
-                        logger.warning(
-                            "Year must be 2020 for Scotland (supplied=%s, postcode=%s)",
-                            year,
-                            post_code,
-                        )
-                        raise ParseError("Year must be 2020 for Scotland.", code=400)
-                    data_zone = DataZone.objects.filter(
-                        data_zone_code=lsoa_code, year=2011
-                    ).get()
-                    imd = ScottishIndexMultipleDeprivation.objects.filter(
-                        data_zone=data_zone, year=year
-                    ).get()
-                    data = quantile_for_rank(
-                        rank=imd.imd_rank,
-                        requested_quantile=requested_quantile,
-                        country="scotland",
-                        year=year,
-                    )
-                    response = Response({"result": data})
-                elif lsoa_object["country"] == "Northern Ireland":
-                    if year is None:
-                        year = 2017
-                    if int(year) != 2017:
-                        logger.warning(
-                            "Year must be 2017 for Northern Ireland (supplied=%s, postcode=%s)",
-                            year,
-                            post_code,
-                        )
-                        raise ParseError(
-                            "Year must be 2017 for Northern Ireland.", code=400
-                        )
-                    soa = SOA.objects.filter(soa_code=lsoa_code, year=2001).get()
-                    imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
-                        soa=soa, year=year
-                    ).get()
-                    data = quantile_for_rank(
-                        rank=imd.imd_rank,
-                        requested_quantile=requested_quantile,
-                        country="northern_ireland",
-                        year=year,
-                    )
-                    response = Response({"result": data})
-                else:
-                    raise ParseError("No valid country supplied.", code=400)
-            else:
-                # postcode not valid
-                logger.warning("Invalid postcode supplied: %s", post_code)
-                raise ParseError("Invalid postcode supplied.", code=400)
-        else:
+        if not postcodes:
             logger.warning("Postcode not supplied in quantile request")
             raise ParseError("Postcode not supplied.", code=400)
 
-        return Response(response.data)
+        if len(postcodes) > MAX_BATCH_POSTCODES:
+            logger.warning(
+                "Too many postcodes supplied in quantile request: %s", len(postcodes)
+            )
+            raise ParseError(
+                f"Too many postcodes supplied. A maximum of {MAX_BATCH_POSTCODES} postcodes can be processed per request.",
+                code=400,
+            )
+
+        # Validate and normalize the year before any postcode lookups
+        year = None
+        if year_param is not None:
+            try:
+                year = int(year_param)
+            except (ValueError, TypeError):
+                logger.warning("Invalid year supplied for quantile view: %s", year_param)
+                raise ParseError("Invalid year supplied.", code=400)
+            if year not in (2019, 2017, 2020, 2025):
+                logger.warning("Invalid year supplied for quantile view: %s", year)
+                raise ParseError("Invalid year supplied.", code=400)
+
+        if len(postcodes) == 1:
+            return self._single_postcode_response(
+                postcode=postcodes[0],
+                year=year,
+                quantile=quantile,
+                include_full_indices=include_full_indices,
+            )
+
+        return self._batch_response(
+            postcodes=postcodes,
+            year=year,
+            quantile=quantile,
+            include_full_indices=include_full_indices,
+        )
+
+    def _postcodes_from_request(self):
+        """
+        Extract the list of postcodes from the request.
+
+        Accepts a single `postcode` parameter, comma-separated postcodes
+        (`postcode=A,B`) and/or repeated parameters (`postcode=A&postcode=B`).
+        """
+        postcodes = []
+        for value in self.request.query_params.getlist("postcode"):
+            for part in value.split(","):
+                postcode = part.strip()
+                if postcode:
+                    postcodes.append(postcode)
+        return postcodes
+
+    @staticmethod
+    def _boolean_param(request, name):
+        value = request.query_params.get(name, None)
+        if value is None:
+            return False
+        return value.strip().lower() in ("true", "1", "yes")
+
+    def _single_postcode_response(
+        self, postcode, year, quantile, include_full_indices
+    ):
+        """
+        Preserve the original single-postcode response behaviour: lookup errors
+        return 400, terminated postcodes return 410 with the terminated payload,
+        and success wraps the quantile data in a "result" object.
+        """
+        outcome = self._quantile_outcome_for_postcode(
+            postcode=postcode,
+            year=year,
+            quantile=quantile,
+            include_full_indices=include_full_indices,
+        )
+        if outcome["status"] == "error":
+            raise ParseError(outcome["error"], code=400)
+        if outcome["status"] == "terminated_postcode":
+            return Response(outcome["response"], status=HTTPStatus.GONE)
+        return Response({"result": outcome["result"]})
+
+    def _batch_response(self, postcodes, year, quantile, include_full_indices):
+        """
+        Resolve each postcode independently and return one result item per
+        postcode, in the order supplied. Postcodes that cannot be resolved are
+        returned with an error message rather than failing the whole request.
+        """
+        results = []
+        for postcode in postcodes:
+            try:
+                outcome = self._quantile_outcome_for_postcode(
+                    postcode=postcode,
+                    year=year,
+                    quantile=quantile,
+                    include_full_indices=include_full_indices,
+                )
+            except Exception:
+                logger.exception(
+                    "Unexpected error resolving postcode %s in batch quantile request",
+                    postcode,
+                )
+                results.append(
+                    self._batch_error_item(
+                        postcode,
+                        quantile,
+                        "Error processing postcode.",
+                        include_full_indices,
+                    )
+                )
+                continue
+
+            if outcome["status"] == "ok":
+                results.append({"postcode": postcode, **outcome["result"]})
+            elif outcome["status"] == "terminated_postcode":
+                results.append(
+                    self._batch_error_item(
+                        postcode,
+                        quantile,
+                        "Terminated postcode.",
+                        include_full_indices,
+                    )
+                )
+            else:
+                results.append(
+                    self._batch_error_item(
+                        postcode, quantile, outcome["error"], include_full_indices
+                    )
+                )
+        return Response({"results": results})
+
+    @staticmethod
+    def _batch_error_item(postcode, quantile, error_message, include_full_indices):
+        """
+        Build a uniform error item so every entry in a batch response has the
+        same shape for tabular rendering.
+        """
+        item = {
+            "postcode": postcode,
+            "rank": None,
+            "requested_quantile": quantile,
+            "requested_quantile_name": QUANTILE_NAMES.get(quantile),
+            "data_quantile": None,
+            "country": None,
+            "year": None,
+            "error": error_message,
+        }
+        if include_full_indices:
+            item["indices"] = None
+        return item
+
+    @staticmethod
+    def _error_outcome(message):
+        return {
+            "status": "error",
+            "error": message,
+            "result": None,
+            "response": None,
+        }
+
+    def _quantile_outcome_for_postcode(
+        self, postcode, year, quantile, include_full_indices
+    ):
+        """
+        Resolve the deprivation quantile outcome for a single postcode.
+
+        Returns a dict describing the outcome so batch requests can continue
+        past individual postcode failures:
+
+        - status "ok": `result` holds the quantile data (plus `indices` when
+          `include_full_indices` is set)
+        - status "error": `error` holds the error message
+        - status "terminated_postcode": `response` holds the terminated postcode payload
+
+        Unexpected exceptions (e.g. a missing IMD row) propagate to the caller.
+        """
+        # England 2025 IMD data is mapped to 2021 LSOAs; all other datasets use 2011 boundaries
+        lsoa_year = 2021 if year == 2025 else 2011
+
+        data = lsoa_for_postcode(postcode=postcode, lsoa_year=lsoa_year)
+        status = data["status"]
+        response = data["response"]
+
+        if status == "error":
+            logger.warning(
+                "Postcode lookup returned error for %s: %s", postcode, response
+            )
+            return self._error_outcome(response)
+        if status == "terminated_postcode":
+            logger.info("Postcode terminated for %s", postcode)
+            return {
+                "status": "terminated_postcode",
+                "error": None,
+                "result": None,
+                "response": response,
+            }
+
+        lsoa_object = response
+
+        if not lsoa_object["lsoa"]:
+            # postcode not valid
+            logger.warning("Invalid postcode supplied: %s", postcode)
+            return self._error_outcome("Invalid postcode supplied.")
+
+        lsoa_code = lsoa_object["lsoa"]
+        country = lsoa_object["country"]
+
+        if country == "England":
+            imd_year = year if year is not None else 2019
+            if imd_year not in (2019, 2025):
+                logger.warning(
+                    "Year must be 2019 or 2025 for England (supplied=%s, postcode=%s)",
+                    imd_year,
+                    postcode,
+                )
+                return self._error_outcome("Year must be 2019 or 2025 for England.")
+            lsoa = LSOA.objects.filter(
+                lsoa_code=lsoa_code, year=2021 if imd_year == 2025 else 2011
+            ).get()
+            imd = EnglishIndexMultipleDeprivation.objects.filter(
+                lsoa=lsoa, year=imd_year
+            ).get()
+            result = quantile_for_rank(
+                rank=imd.imd_rank,
+                requested_quantile=quantile,
+                country="england",
+                year=imd_year,
+            )
+        elif country == "Wales":
+            imd_year = year if year is not None else 2019
+            if imd_year != 2019:
+                logger.warning(
+                    "Year must be 2019 for Wales (supplied=%s, postcode=%s)",
+                    imd_year,
+                    postcode,
+                )
+                return self._error_outcome("Year must be 2019 for Wales.")
+            lsoa = LSOA.objects.filter(lsoa_code=lsoa_code, year=2011).get()
+            imd = WelshIndexMultipleDeprivation.objects.filter(
+                lsoa=lsoa, year=imd_year
+            ).get()
+            result = quantile_for_rank(
+                rank=imd.imd_rank,
+                requested_quantile=quantile,
+                country="wales",
+                year=imd_year,
+            )
+        elif country == "Scotland":
+            imd_year = year if year is not None else 2020
+            if imd_year != 2020:
+                logger.warning(
+                    "Year must be 2020 for Scotland (supplied=%s, postcode=%s)",
+                    imd_year,
+                    postcode,
+                )
+                return self._error_outcome("Year must be 2020 for Scotland.")
+            data_zone = DataZone.objects.filter(
+                data_zone_code=lsoa_code, year=2011
+            ).get()
+            imd = ScottishIndexMultipleDeprivation.objects.filter(
+                data_zone=data_zone, year=imd_year
+            ).get()
+            result = quantile_for_rank(
+                rank=imd.imd_rank,
+                requested_quantile=quantile,
+                country="scotland",
+                year=imd_year,
+            )
+        elif country == "Northern Ireland":
+            imd_year = year if year is not None else 2017
+            if imd_year != 2017:
+                logger.warning(
+                    "Year must be 2017 for Northern Ireland (supplied=%s, postcode=%s)",
+                    imd_year,
+                    postcode,
+                )
+                return self._error_outcome("Year must be 2017 for Northern Ireland.")
+            soa = SOA.objects.filter(soa_code=lsoa_code, year=2001).get()
+            imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
+                soa=soa, year=imd_year
+            ).get()
+            result = quantile_for_rank(
+                rank=imd.imd_rank,
+                requested_quantile=quantile,
+                country="northern_ireland",
+                year=imd_year,
+            )
+        else:
+            logger.warning("No valid country found for postcode: %s", postcode)
+            return self._error_outcome("No valid country supplied.")
+
+        if include_full_indices:
+            serializer_class = {
+                "England": self.english_serializer_class,
+                "Wales": self.welsh_serializer_class,
+                "Scotland": self.scottish_serializer_class,
+                "Northern Ireland": self.northern_ireland_serializer_class,
+            }[country]
+            result["indices"] = serializer_class(
+                instance=imd, context={"request": self.request}
+            ).data
+
+        return {
+            "status": "ok",
+            "error": None,
+            "result": result,
+            "response": None,
+        }
