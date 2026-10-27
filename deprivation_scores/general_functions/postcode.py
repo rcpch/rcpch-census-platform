@@ -2,6 +2,7 @@ from typing import Literal, TypedDict
 import requests
 from django.conf import settings
 import logging
+from urllib.parse import quote
 
 
 logger = logging.getLogger(__name__)
@@ -13,7 +14,9 @@ def get_postcode_info(postcode: str):
 
     try:
         response = requests.get(
-            url=f"{settings.POSTCODES_IO_API_URL}/postcodes/{postcode}",
+            # quote() stops user-supplied input from altering the path or query
+            # string of the outbound postcodes.io request
+            url=f"{settings.POSTCODES_IO_API_URL}/postcodes/{quote(postcode, safe='')}",
             headers={"Ocp-Apim-Subscription-Key": settings.POSTCODES_IO_API_KEY},
         )
         response.raise_for_status()
@@ -32,7 +35,7 @@ def get_terminated_postcode_info(postcode: str):
 
     try:
         response = requests.get(
-            url=f"{settings.POSTCODES_IO_API_URL}/terminated_postcodes/{postcode}",
+            url=f"{settings.POSTCODES_IO_API_URL}/terminated_postcodes/{quote(postcode, safe='')}",
             headers={"Ocp-Apim-Subscription-Key": settings.POSTCODES_IO_API_KEY},
         )
         response.raise_for_status()
@@ -81,6 +84,14 @@ def lsoa_for_postcode(postcode, lsoa_year=None):
     :param postcode: Description
     :param lsoa_year: Description
     """
+    # UK postcodes are at most 8 characters including the space; reject
+    # anything longer before it reaches the outbound lookup or the logs
+    if len(postcode) > 20:
+        logger.warning("Over-long postcode rejected (%d chars supplied)", len(postcode))
+        return {
+            "status": "error",
+            "response": "Invalid postcode supplied.",
+        }
     try:
         data = get_postcode_data(postcode)
     except Exception as e:

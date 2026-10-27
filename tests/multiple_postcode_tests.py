@@ -221,6 +221,38 @@ class TestQuantileBatchMultiplePostcodes:
         )
         assert response.status_code == 400
 
+    def test_over_long_postcode_returns_error_item(self, api_client):
+        """Postcodes longer than any valid UK postcode are rejected per item."""
+        response = api_client.get(
+            INDEX_OF_MULTIPLE_DEPRIVATION_QUANTILE_URL,
+            {"postcode": f"SE1 7PB,{'X' * 500}", "quantile": 10, "year": 2019},
+        )
+        assert response.status_code == 200
+        results = response.json()["results"]
+        assert results[0]["error"] is None
+        assert results[0]["rank"] == 21865
+        assert results[1]["error"] == "Invalid postcode supplied."
+
+    def test_single_over_long_postcode_returns_400(self, api_client):
+        """A single over-long postcode is rejected with the legacy 400."""
+        response = api_client.get(
+            INDEX_OF_MULTIPLE_DEPRIVATION_QUANTILE_URL,
+            {"postcode": "X" * 500, "quantile": 10},
+        )
+        assert response.status_code == 400
+
+    def test_path_traversal_postcode_is_an_ordinary_lookup_failure(self, api_client):
+        """Malicious-looking postcodes never break the batch; they error per item."""
+        response = api_client.get(
+            INDEX_OF_MULTIPLE_DEPRIVATION_QUANTILE_URL,
+            {"postcode": "../../admin,SE1 7PB", "quantile": 10, "year": 2019},
+        )
+        assert response.status_code == 200
+        results = response.json()["results"]
+        assert results[0]["error"] == "Could not get LSOA from postcode."
+        assert results[1]["error"] is None
+        assert results[1]["rank"] == 21865
+
 
 class TestQuantileBatchIncludeFullIndices:
     """Tests for the include_full_indices option."""

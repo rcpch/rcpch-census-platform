@@ -462,24 +462,33 @@
           if (value !== null && value !== undefined && value !== '') {
             const card = document.createElement('div');
             card.className = 'bg-base-100 border border-gray-200 rounded-lg p-4';
-            
-            // Handle nested objects
-            let displayValue;
+
+            // Built via DOM with textContent so API-provided values can never
+            // be interpreted as HTML
+            const label = document.createElement('div');
+            label.className = 'text-xs font-semibold text-gray-600 mb-1';
+            label.textContent = formatFieldName(field);
+
+            const valueEl = document.createElement('div');
+            valueEl.className = 'text-xl font-bold';
+            valueEl.style.color = '#0d0d58';
+
             if (typeof value === 'object' && !Array.isArray(value)) {
-              // For objects, display as formatted JSON
-              displayValue = `<pre class="text-sm overflow-auto">${JSON.stringify(value, null, 2)}</pre>`;
+              // For objects, display as formatted JSON text
+              const pre = document.createElement('pre');
+              pre.className = 'text-sm overflow-auto';
+              pre.textContent = JSON.stringify(value, null, 2);
+              valueEl.appendChild(pre);
             } else if (Array.isArray(value)) {
               // For arrays, display as list
-              displayValue = value.join(', ');
+              valueEl.textContent = value.join(', ');
             } else {
               // For primitives, display as-is
-              displayValue = value;
+              valueEl.textContent = value;
             }
-            
-            card.innerHTML = `
-              <div class="text-xs font-semibold text-gray-600 mb-1">${formatFieldName(field)}</div>
-              <div class="text-xl font-bold" style="color: #0d0d58;">${displayValue}</div>
-            `;
+
+            card.appendChild(label);
+            card.appendChild(valueEl);
             grid.appendChild(card);
           }
         });
@@ -737,12 +746,22 @@
     }
 
     function displayError(message) {
-      resultsDiv.innerHTML = `
-        <div class="alert alert-error">
-          <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          <span><strong>Error:</strong> ${message}</span>
-        </div>
-      `;
+      resultsDiv.innerHTML = '';
+
+      const alert = document.createElement('div');
+      alert.className = 'alert alert-error';
+      // Static icon markup only; the message is set via textContent so
+      // API-provided error text can never be interpreted as HTML
+      alert.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+
+      const label = document.createElement('span');
+      const strong = document.createElement('strong');
+      strong.textContent = 'Error: ';
+      label.appendChild(strong);
+      label.appendChild(document.createTextNode(message));
+      alert.appendChild(label);
+
+      resultsDiv.appendChild(alert);
       resultsDiv.classList.remove('hidden');
     }
 
