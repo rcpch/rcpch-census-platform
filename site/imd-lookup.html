@@ -224,12 +224,17 @@
     }
 
     // API base URL with optional ?apiBase= override for local testing
-    // (mirrors the map page's tilesBase override pattern)
+    // (mirrors the map page's tilesBase override pattern).
+    // Local runtimes default to the local Django API, mirroring the map
+    // page's local tiles default; deployed sites use the production APIM API.
     function getApiBaseUrl() {
       const params = new URLSearchParams(window.location.search);
       const fromQuery = params.get('apiBase');
       if (fromQuery) {
         return fromQuery.replace(/\/+$/, '') + '/';
+      }
+      if (isLocalRuntime()) {
+        return 'http://localhost:8000/';
       }
       return 'https://api.rcpch.ac.uk/deprivation/v2/';
     }
