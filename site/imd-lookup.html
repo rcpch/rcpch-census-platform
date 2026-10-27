@@ -515,8 +515,12 @@
       summary.textContent = `${items.length} postcode${items.length === 1 ? '' : 's'} looked up` + (errorCount ? ` — ${errorCount} could not be resolved` : '');
       resultsDiv.appendChild(summary);
 
-      const table = buildBatchTable(items);
-      resultsDiv.appendChild(table);
+      const table = buildBatchTable(items, opts);
+      // Wide tables (full indices) scroll horizontally within the page
+      const tableWrapper = document.createElement('div');
+      tableWrapper.className = 'overflow-x-auto';
+      tableWrapper.appendChild(table);
+      resultsDiv.appendChild(tableWrapper);
 
       // Copy button (TSV) so the table can be pasted straight into Excel
       const copyButton = document.createElement('button');
@@ -534,23 +538,6 @@
         }, 2000);
       });
       resultsDiv.appendChild(copyButton);
-
-      // Full indices per postcode, kept outside the table so copying the
-      // table into Excel stays clean
-      if (opts.batchIndices) {
-        const indicesWithValues = items.filter(item => item.indices);
-        if (indicesWithValues.length > 0) {
-          const heading = document.createElement('h3');
-          heading.className = 'text-lg font-bold mt-8 mb-2';
-          heading.style.color = '#0d0d58';
-          heading.textContent = 'Full indices by postcode';
-          resultsDiv.appendChild(heading);
-
-          indicesWithValues.forEach(item => {
-            resultsDiv.appendChild(buildIndicesDetails(item));
-          });
-        }
-      }
 
       appendRawResponseDetails({ results: items });
     }
@@ -574,31 +561,63 @@
       displayBatchResults([item], endpoint, { isBatch: false, batchIndices: false });
     }
 
-    function buildBatchTable(items) {
+    function buildBatchTable(items, opts) {
       const quantileName = items[0] && items[0].requested_quantile_name
         ? capitalize(items[0].requested_quantile_name)
         : 'Quantile';
       const hasErrors = items.some(item => item.error);
+      const includeIndices = !!(opts && opts.batchIndices);
+
+      // Union of flattened indices keys across items, in first-seen order, so
+      // a single-nation batch keeps the API's natural field ordering and a
+      // mixed-nation batch simply appends each nation's extra fields
+      const indicesColumns = [];
+      if (includeIndices) {
+        const seen = new Set();
+        items.forEach(item => {
+          if (!item.indices) return;
+          flattenObject(item.indices).forEach(([key]) => {
+            if (!seen.has(key)) {
+              seen.add(key);
+              indicesColumns.push(key);
+            }
+          });
+        });
+      }
+
+      const headers = ['Postcode', 'Country', 'IMD Rank', quantileName, 'Year'];
+      if (hasErrors) {
+        headers.push('Error');
+      }
+      headers.push(...indicesColumns);
 
       const table = document.createElement('table');
       table.className = 'table table-zebra table-sm bg-base-100';
 
       const thead = document.createElement('thead');
       const headerRow = document.createElement('tr');
-      ['Postcode', 'Country', 'IMD Rank', quantileName, 'Year'].concat(hasErrors ? ['Error'] : []).forEach(label => {
+      headers.forEach((label, index) => {
         const th = document.createElement('th');
         th.textContent = label;
+        if (index === 0) {
+          // keep the postcode visible while the table scrolls horizontally
+          th.className = 'sticky left-0 bg-base-200';
+        }
         headerRow.appendChild(th);
       });
       thead.appendChild(headerRow);
       table.appendChild(thead);
 
       const tbody = document.createElement('tbody');
-      items.forEach(item => {
+      items.forEach((item, rowIndex) => {
         const row = document.createElement('tr');
         if (item.error) {
           row.style.backgroundColor = '#fef3c7'; // amber highlight for problem rows
         }
+
+        const flattened = includeIndices && item.indices
+          ? new Map(flattenObject(item.indices))
+          : null;
 
         const cells = [
           item.postcode,
@@ -610,10 +629,23 @@
         if (hasErrors) {
           cells.push(item.error || '');
         }
+        indicesColumns.forEach(column => {
+          cells.push(flattened && flattened.has(column) ? flattened.get(column) : '');
+        });
 
-        cells.forEach(value => {
+        cells.forEach((value, cellIndex) => {
           const td = document.createElement('td');
           td.textContent = value;
+          if (cellIndex === 0) {
+            // sticky postcode column; match the zebra band (or the amber error
+            // highlight) so the sticky cell blends into its row
+            td.className = 'sticky left-0';
+            if (item.error) {
+              td.style.backgroundColor = '#fef3c7';
+            } else {
+              td.classList.add(rowIndex % 2 === 1 ? 'bg-base-200' : 'bg-base-100');
+            }
+          }
           row.appendChild(td);
         });
         tbody.appendChild(row);
@@ -623,57 +655,13 @@
       return table;
     }
 
-    function buildIndicesDetails(item) {
-      const details = document.createElement('details');
-      details.className = 'mb-2 border border-gray-200 rounded-lg';
-
-      const summary = document.createElement('summary');
-      summary.className = 'cursor-pointer px-4 py-2 text-sm font-semibold';
-      summary.style.color = '#0d0d58';
-      const country = item.country ? (countryLabels[item.country] || capitalize(item.country)) : '';
-      summary.textContent = `${item.postcode}${country ? ' — ' + country : ''}`;
-      details.appendChild(summary);
-
-      const wrapper = document.createElement('div');
-      wrapper.className = 'px-4 pb-4';
-
-      const table = document.createElement('table');
-      table.className = 'table table-sm table-zebra';
-
-      const thead = document.createElement('thead');
-      const headerRow = document.createElement('tr');
-      ['Field', 'Value'].forEach(label => {
-        const th = document.createElement('th');
-        th.textContent = label;
-        headerRow.appendChild(th);
-      });
-      thead.appendChild(headerRow);
-      table.appendChild(thead);
-
-      const tbody = document.createElement('tbody');
-      flattenObject(item.indices).forEach(([key, value]) => {
-        const row = document.createElement('tr');
-        const keyCell = document.createElement('td');
-        keyCell.className = 'font-mono text-xs';
-        keyCell.textContent = key;
-        const valueCell = document.createElement('td');
-        valueCell.textContent = value;
-        row.appendChild(keyCell);
-        row.appendChild(valueCell);
-        tbody.appendChild(row);
-      });
-      table.appendChild(tbody);
-      wrapper.appendChild(table);
-      details.appendChild(wrapper);
-
-      return details;
-    }
-
     // Flatten nested objects (e.g. data_zone.data_zone_code) into dotted-key
-    // rows so the full indices render as a flat, copyable table
+    // rows so the full indices render as flat, copyable columns. Key order
+    // follows the API response so single-nation batches keep the natural
+    // field ordering.
     function flattenObject(obj, prefix = '') {
       const rows = [];
-      Object.keys(obj || {}).sort().forEach(key => {
+      Object.keys(obj || {}).forEach(key => {
         const value = obj[key];
         const path = prefix ? `${prefix}.${key}` : key;
         if (value !== null && value !== undefined && value !== '') {
