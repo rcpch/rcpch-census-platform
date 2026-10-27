@@ -385,6 +385,26 @@
         }
         
         if (!response.ok) {
+          // A single postcode that cannot be resolved (400) or is terminated
+          // (410) is logged against that postcode in the results table —
+          // matching the batch error-row UX — instead of failing the whole
+          // page. Request-level failures still raise the generic error alert.
+          if (postcodes.length === 1 && (response.status === 400 || response.status === 410)) {
+            let detail = null;
+            try {
+              const body = await response.json();
+              if (body && typeof body.detail === 'string') {
+                detail = body.detail;
+              }
+            } catch (parseError) {
+              // non-JSON body — fall through to the generic error alert
+            }
+            if (detail !== null || response.status === 410) {
+              displaySinglePostcodeError(postcodes[0], detail || 'Terminated postcode.', endpoint);
+              return;
+            }
+          }
+
           const errorText = await response.text();
           throw new Error(`API returned ${response.status}: ${errorText}`);
         }
@@ -471,10 +491,17 @@
     }
 
     function displayBatchResults(items, endpoint, opts) {
+      // Reset the results container: single-postcode error rows bypass
+      // displayResults, so this must be self-contained
+      resultsDiv.innerHTML = '';
+      resultsDiv.classList.remove('hidden');
+
       const title = document.createElement('h2');
       title.className = 'text-2xl font-bold mb-2';
       title.style.color = '#0d0d58';
-      title.textContent = endpoint === 'indices' ? 'Full IMD Indices (batch)' : 'IMD Quantile Results';
+      title.textContent = endpoint === 'indices'
+        ? (opts.isBatch ? 'Full IMD Indices (batch)' : 'Full IMD Indices')
+        : 'IMD Quantile Results';
       resultsDiv.appendChild(title);
 
       const summary = document.createElement('p');
@@ -521,6 +548,25 @@
       }
 
       appendRawResponseDetails({ results: items });
+    }
+
+    // Render a failed single-postcode lookup as a one-row error table so the
+    // error is logged against the postcode, matching the batch error-row UX
+    function displaySinglePostcodeError(postcode, message, endpoint) {
+      const quantileOption = quantileSelect.selectedOptions[0];
+      const item = {
+        postcode: postcode,
+        rank: null,
+        requested_quantile: parseInt(quantileSelect.value, 10),
+        requested_quantile_name: quantileOption
+          ? quantileOption.textContent.toLowerCase()
+          : 'quantile',
+        data_quantile: null,
+        country: null,
+        year: null,
+        error: message,
+      };
+      displayBatchResults([item], endpoint, { isBatch: false, batchIndices: false });
     }
 
     function buildBatchTable(items) {
