@@ -421,7 +421,9 @@ and Northern Ireland (```rcpch-census-engine.azurewebsites.net/api/v1/indices_of
 }
 ```
 
-The endpoint for deprivation quantile: It accepts a postcode and a quantile_type, one of [2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20]
+The endpoint for deprivation quantile: It accepts a postcode (or a list of postcodes) and a quantile_type, one of [2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20]
+
+### Single postcode
 
 ```
 {{base_url}}/index_of_multiple_deprivation_quantile?quantile=5&postcode=SY10 0AA
@@ -437,10 +439,93 @@ returns:
         "requested_quantile_name": "quintile",
         "data_quantile": 3,
         "country": "wales",
+        "year": 2019,
         "error": null
     }
 }
 ```
+
+### Multiple postcodes (batch)
+
+`postcode` also accepts a list of postcodes — either comma-separated in one parameter or as repeated `postcode` parameters (maximum 100 per request). The endpoint is country-agnostic: each postcode's country is detected automatically and its result is calculated against that nation's deprivation dataset, so a single request can mix English, Welsh, Scottish and Northern Irish postcodes.
+
+If `year` is omitted, each postcode uses the default year for its nation (2019 England and Wales, 2020 Scotland, 2017 Northern Ireland). If `year` is supplied and is not available for a postcode's nation, that postcode is returned with an `error` message rather than failing the whole request. Postcodes that cannot be resolved (unknown or terminated) are likewise returned as per-item errors.
+
+Multiple postcodes return a `results` list in the order supplied — one object per postcode, ready to render as a table in a consuming UI:
+
+```
+{{base_url}}/index_of_multiple_deprivation_quantile?quantile=10&postcode=SE1 7PB,CF10 3NQ,KW1 4AA,BT52 1PF
+```
+
+```json
+{
+    "results": [
+        {
+            "postcode": "SE1 7PB",
+            "rank": 21865,
+            "requested_quantile": 10,
+            "requested_quantile_name": "decile",
+            "data_quantile": 7,
+            "country": "england",
+            "year": 2019,
+            "error": null
+        },
+        {
+            "postcode": "CF10 3NQ",
+            "rank": 833,
+            "requested_quantile": 10,
+            "requested_quantile_name": "decile",
+            "data_quantile": 5,
+            "country": "wales",
+            "year": 2019,
+            "error": null
+        },
+        {
+            "postcode": "XX1 1XX",
+            "rank": null,
+            "requested_quantile": 10,
+            "requested_quantile_name": "decile",
+            "data_quantile": null,
+            "country": null,
+            "year": null,
+            "error": "Could not get LSOA from postcode."
+        }
+    ]
+}
+```
+
+### Full indices
+
+Add `include_full_indices=true` to return the full deprivation indices for each postcode's area (the same per-country shape as `/indices_of_multiple_deprivation`) under an `indices` key, alongside the quantile:
+
+```
+{{base_url}}/index_of_multiple_deprivation_quantile?quantile=10&postcode=SE1 7PB&include_full_indices=true
+```
+
+```json
+{
+    "result": {
+        "rank": 21865,
+        "requested_quantile": 10,
+        "requested_quantile_name": "decile",
+        "data_quantile": 7,
+        "country": "england",
+        "year": 2019,
+        "error": null,
+        "indices": {
+            "imd_score": "...",
+            "imd_rank": 21865,
+            "imd_decile": 7,
+            "income_score": "...",
+            "income_rank": 28159,
+            "...": "...",
+            "type": "England"
+        }
+    }
+}
+```
+
+In batch mode the `indices` object is embedded in each item of the `results` list; items that could not be resolved carry `"indices": null`.
 
 **ACKNOWLEDGEMENT**
 The postcode look up is powered by an RCPCH hosted instance of [postcodes.io](api.postcodes.io)
