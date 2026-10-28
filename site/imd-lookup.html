@@ -105,10 +105,10 @@
           <span class="label-text font-semibold">Dataset Year</span>
         </label>
         <select id="year" class="select select-bordered w-full">
-          <option value="">Default (latest available per nation)</option>
+          <option value="latest">Latest available per nation</option>
         </select>
         <label class="label">
-          <span class="label-text-alt text-gray-500">If a specific year is chosen, postcodes from nations that do not publish that dataset are reported as errors in the results.</span>
+          <span class="label-text-alt text-gray-500">Latest uses the most recent dataset for each nation (2025 England, 2019 Wales, 2020 Scotland, 2017 Northern Ireland). If a specific year is chosen, postcodes from nations that do not publish that dataset are reported as errors in the results.</span>
         </label>
       </div>
 
@@ -249,10 +249,10 @@
       yearSelect.innerHTML = '';
 
       const defaultOption = document.createElement('option');
-      defaultOption.value = '';
+      defaultOption.value = 'latest';
       defaultOption.textContent = country
-        ? 'Default (latest available for this nation)'
-        : 'Default (latest available per nation)';
+        ? 'Latest available for this nation'
+        : 'Latest available per nation';
       yearSelect.appendChild(defaultOption);
 
       const years = country && yearsByCountry[country] ? yearsByCountry[country] : allYears;
@@ -267,7 +267,7 @@
       if (country && years.length === 1) {
         yearSelect.value = years[0];
       } else {
-        yearSelect.value = '';
+        yearSelect.value = 'latest';
       }
     }
 

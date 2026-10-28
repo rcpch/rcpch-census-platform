@@ -609,10 +609,21 @@ class UKIndexMultipleDeprivationView(APIView):
             ),
             OpenApiParameter(
                 name="year",
-                description="Year of Index of Multiple Deprivation dataset to use",
+                description=(
+                    "Year of Index of Multiple Deprivation dataset to use: one of 2019, 2017, "
+                    "2020, 2025, or 'latest' for the most recent dataset per nation (2025 "
+                    "England, 2019 Wales, 2020 Scotland, 2017 Northern Ireland). If omitted, "
+                    "the historical default for the postcode's nation is used (2019 England "
+                    "and Wales, 2020 Scotland, 2017 Northern Ireland)."
+                ),
                 required=False,
-                type=OpenApiTypes.INT,
+                type=OpenApiTypes.STR,
                 examples=[
+                    OpenApiExample(
+                        name="latest",
+                        description="Latest dataset available per nation",
+                        value="latest",
+                    ),
                     OpenApiExample(
                         name="2017",
                         description="Use 2017 dataset for Northern Ireland",
@@ -656,18 +667,29 @@ class UKIndexMultipleDeprivationView(APIView):
 
         `postcode`: string **[Mandatory]**
 
+        `year`: integer or 'latest' **[Optional]** - year of the Index of Multiple Deprivation dataset to use. If omitted, the historical default for the postcode's nation is used (2019 England and Wales, 2020 Scotland, 2017 Northern Ireland). The special value `latest` selects the most recent dataset per nation (2025 England, 2019 Wales, 2020 Scotland, 2017 Northern Ireland).
+
         """
         post_code = self.request.query_params.get("postcode", None)
-        year = self.request.query_params.get("year", None)
+        year_param = self.request.query_params.get("year", None)
+        year = None
+        latest = False
+        lsoa_year = 2011
         if post_code:
-            if year:
-                if int(year) == 2025:
-                    lsoa_year = 2021
-                elif int(year) in [2019, 2017, 2020]:
-                    lsoa_year = 2011
+            if year_param:
+                if str(year_param).strip().lower() == "latest":
+                    latest = True
                 else:
-                    logger.warning("Invalid year supplied: %s", year)
-                    raise ParseError("Invalid year supplied.", code=400)
+                    try:
+                        year = int(year_param)
+                    except (ValueError, TypeError):
+                        logger.warning("Invalid year supplied: %s", year_param)
+                        raise ParseError("Invalid year supplied.", code=400)
+                    if year == 2025:
+                        lsoa_year = 2021
+                    elif year not in [2019, 2017, 2020]:
+                        logger.warning("Invalid year supplied: %s", year)
+                        raise ParseError("Invalid year supplied.", code=400)
             else:
                 lsoa_year = 2011
             data = lsoa_for_postcode(
@@ -687,27 +709,23 @@ class UKIndexMultipleDeprivationView(APIView):
             if lsoa_object["lsoa"]:
                 lsoa_code = lsoa_object["lsoa"]
                 if lsoa_object["country"] == "England":
-                    if year is None:
-                        year = 2019
-                    if int(year) in [2019, 2025]:
-                        if int(year) == 2025:
-                            lsoa = LSOA.objects.filter(
-                                lsoa_code=lsoa_code, year=2021
-                            ).get()
-                        elif int(year) == 2019:
-                            lsoa = LSOA.objects.filter(
-                                lsoa_code=lsoa_code, year=2011
-                            ).get()
-                        else:
-                            logger.warning("Invalid year supplied: %s", year)
-                            raise ParseError(  # fallback, should not be hit
-                                "Year must be 2019 or 2025 for England.", code=400
-                            )
+                    imd_year = 2025 if latest else (year if year is not None else 2019)
+                    if imd_year in [2019, 2025]:
+                        # select the boundary vintage matching the dataset year
+                        lsoa_code = (
+                            lsoa_object["lsoa21"]
+                            if imd_year == 2025
+                            else lsoa_object["lsoa11"]
+                        )
+                        lsoa = LSOA.objects.filter(
+                            lsoa_code=lsoa_code,
+                            year=2021 if imd_year == 2025 else 2011,
+                        ).get()
                         imd = EnglishIndexMultipleDeprivation.objects.filter(
-                            lsoa=lsoa, year=int(year)
+                            lsoa=lsoa, year=imd_year
                         ).get()
                     else:
-                        logger.warning("Invalid year supplied: %s", year)
+                        logger.warning("Invalid year supplied: %s", imd_year)
                         raise ParseError(
                             "Year must be 2019 or 2025 for England.", code=400
                         )
@@ -715,45 +733,42 @@ class UKIndexMultipleDeprivationView(APIView):
                         instance=imd, context={"request": request}
                     )
                 elif lsoa_object["country"] == "Wales":
-                    if year is None:
-                        year = 2019
-                    if int(year) != 2019:
+                    imd_year = year if year is not None else 2019
+                    if imd_year != 2019:
                         logger.warning(
                             "Invalid year supplied for Wales IMD postcode request: %s",
-                            year,
+                            imd_year,
                         )
                         raise ParseError("Year must be 2019 for Wales.", code=400)
                     lsoa = LSOA.objects.filter(lsoa_code=lsoa_code, year=2011).get()
                     imd = WelshIndexMultipleDeprivation.objects.filter(
-                        lsoa=lsoa, year=2019
+                        lsoa=lsoa, year=imd_year
                     ).get()
                     response = self.welsh_serializer_class(
                         instance=imd, context={"request": request}
                     )
                 elif lsoa_object["country"] == "Scotland":
-                    if year is None:
-                        year = 2020
-                    if int(year) != 2020:
+                    imd_year = year if year is not None else 2020
+                    if imd_year != 2020:
                         raise ParseError("Year must be 2020 for Scotland.", code=400)
                     lsoa = DataZone.objects.filter(
                         data_zone_code=lsoa_code, year=2011
                     ).get()
                     imd = ScottishIndexMultipleDeprivation.objects.filter(
-                        data_zone=lsoa, year=2020
+                        data_zone=lsoa, year=imd_year
                     ).get()
                     response = self.scottish_serializer_class(
                         instance=imd, context={"request": request}
                     )
                 elif lsoa_object["country"] == "Northern Ireland":
-                    if year is None:
-                        year = 2017
-                    if int(year) != 2017:
+                    imd_year = year if year is not None else 2017
+                    if imd_year != 2017:
                         raise ParseError(
                             "Year must be 2017 for Northern Ireland.", code=400
                         )
                     lsoa = SOA.objects.filter(soa_code=lsoa_code, year=2001).get()
                     imd = NorthernIrelandIndexMultipleDeprivation.objects.filter(
-                        soa=lsoa, year=2017
+                        soa=lsoa, year=imd_year
                     ).get()
                     response = self.northern_ireland_serializer_class(
                         instance=imd, context={"request": request}
@@ -808,13 +823,20 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
             OpenApiParameter(
                 name="year",
                 description=(
-                    "Year of Index of Multiple Deprivation dataset to use. If omitted, each "
-                    "postcode uses the default year for its nation (2019 England and Wales, "
-                    "2020 Scotland, 2017 Northern Ireland)."
+                    "Year of Index of Multiple Deprivation dataset to use: one of 2019, 2017, "
+                    "2020, 2025, or 'latest' for the most recent dataset per nation (2025 "
+                    "England, 2019 Wales, 2020 Scotland, 2017 Northern Ireland). If omitted, "
+                    "each postcode uses the historical default for its nation (2019 England "
+                    "and Wales, 2020 Scotland, 2017 Northern Ireland)."
                 ),
                 required=False,
-                type=OpenApiTypes.INT,
+                type=OpenApiTypes.STR,
                 examples=[
+                    OpenApiExample(
+                        name="latest",
+                        description="Latest dataset available per nation",
+                        value="latest",
+                    ),
                     OpenApiExample(
                         name="2019",
                         description="Use 2019 dataset for England and Wales",
@@ -918,7 +940,7 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
 
         `quantile`: integer **[Mandatory]**, one of [2, 3, 4, 5, 6, 7, 8, 10, 12, 18, 20]
 
-        `year`: integer **[Optional]**, year of the Index of Multiple Deprivation dataset to use. If omitted, each postcode uses the default year for its nation (2019 England and Wales, 2020 Scotland, 2017 Northern Ireland). If supplied, postcodes from nations that do not publish that dataset year are returned with an error.
+        `year`: integer or 'latest' **[Optional]**, year of the Index of Multiple Deprivation dataset to use. If omitted, each postcode uses the default year for its nation (2019 England and Wales, 2020 Scotland, 2017 Northern Ireland). The special value `latest` selects the most recent dataset per nation (2025 England, 2019 Wales, 2020 Scotland, 2017 Northern Ireland). If a specific year is supplied, postcodes from nations that do not publish that dataset year are returned with an error.
 
         `include_full_indices`: boolean **[Optional]** - when true, each result also includes the full deprivation indices for the postcode's area under `indices`.
         """
@@ -957,17 +979,22 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                 code=400,
             )
 
-        # Validate and normalize the year before any postcode lookups
+        # Validate and normalize the year before any postcode lookups.
+        # "latest" resolves to the most recent dataset per nation; omitting the
+        # parameter keeps the historical default (2019 England and Wales).
         year = None
         if year_param is not None:
-            try:
-                year = int(year_param)
-            except (ValueError, TypeError):
-                logger.warning("Invalid year supplied for quantile view: %s", year_param)
-                raise ParseError("Invalid year supplied.", code=400)
-            if year not in (2019, 2017, 2020, 2025):
-                logger.warning("Invalid year supplied for quantile view: %s", year)
-                raise ParseError("Invalid year supplied.", code=400)
+            if year_param.strip().lower() == "latest":
+                year = "latest"
+            else:
+                try:
+                    year = int(year_param)
+                except (ValueError, TypeError):
+                    logger.warning("Invalid year supplied for quantile view: %s", year_param)
+                    raise ParseError("Invalid year supplied.", code=400)
+                if year not in (2019, 2017, 2020, 2025):
+                    logger.warning("Invalid year supplied for quantile view: %s", year)
+                    raise ParseError("Invalid year supplied.", code=400)
 
         if len(postcodes) == 1:
             return self._single_postcode_response(
@@ -1152,7 +1179,7 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
         country = lsoa_object["country"]
 
         if country == "England":
-            imd_year = year if year is not None else 2019
+            imd_year = 2025 if year == "latest" else (year if isinstance(year, int) else 2019)
             if imd_year not in (2019, 2025):
                 logger.warning(
                     "Year must be 2019 or 2025 for England (supplied=%s, postcode=%s)",
@@ -1160,6 +1187,10 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                     postcode,
                 )
                 return self._error_outcome("Year must be 2019 or 2025 for England.")
+            # select the boundary vintage matching the dataset year
+            lsoa_code = (
+                lsoa_object["lsoa21"] if imd_year == 2025 else lsoa_object["lsoa11"]
+            )
             lsoa = LSOA.objects.filter(
                 lsoa_code=lsoa_code, year=2021 if imd_year == 2025 else 2011
             ).get()
@@ -1173,7 +1204,7 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                 year=imd_year,
             )
         elif country == "Wales":
-            imd_year = year if year is not None else 2019
+            imd_year = year if isinstance(year, int) else 2019
             if imd_year != 2019:
                 logger.warning(
                     "Year must be 2019 for Wales (supplied=%s, postcode=%s)",
@@ -1192,7 +1223,7 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                 year=imd_year,
             )
         elif country == "Scotland":
-            imd_year = year if year is not None else 2020
+            imd_year = year if isinstance(year, int) else 2020
             if imd_year != 2020:
                 logger.warning(
                     "Year must be 2020 for Scotland (supplied=%s, postcode=%s)",
@@ -1213,7 +1244,7 @@ class UKIndexMultipleDeprivationQuantileView(APIView):
                 year=imd_year,
             )
         elif country == "Northern Ireland":
-            imd_year = year if year is not None else 2017
+            imd_year = year if isinstance(year, int) else 2017
             if imd_year != 2017:
                 logger.warning(
                     "Year must be 2017 for Northern Ireland (supplied=%s, postcode=%s)",

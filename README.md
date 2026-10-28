@@ -236,8 +236,8 @@ docker compose -f docker-compose.dev-init.yml exec web python manage.py spectacu
 
 The full list of endpoints can be viewed in the openAPI spec above, but the key endpoints that are important are: 
 
-1.  ```/indices_of_multiple_deprivation/```: takes a UK postcode (mandatory) and returns deprivation score and quantiles for that LSOA. It optionally accepts a year for the request IMD dataset, defaulting to 2019 for England and Wales, 2020 for Scotland and 2017 for Northern Ireland
-2.  ```/index_of_multiple_deprivation_quantile/```: takes a UK postcode (mandatory) and a requested quantile (mandatory) and returns a deprivation quantile. Also accepts a  year as above.
+1.  ```/indices_of_multiple_deprivation/```: takes a UK postcode (mandatory) and returns deprivation score and quantiles for that LSOA. It optionally accepts a year for the request IMD dataset, defaulting to 2019 for England and Wales, 2020 for Scotland and 2017 for Northern Ireland. The special value ```year=latest``` selects the most recent dataset per nation (2025 England, 2019 Wales, 2020 Scotland, 2017 Northern Ireland)
+2.  ```/index_of_multiple_deprivation_quantile/```: takes a UK postcode (mandatory) and a requested quantile (mandatory) and returns a deprivation quantile. Also accepts a year as above.
 
 example:
 SW1A 1AA (Buckingham Palace):
@@ -449,7 +449,7 @@ returns:
 
 `postcode` also accepts a list of postcodes — either comma-separated in one parameter or as repeated `postcode` parameters (maximum 100 per request). The endpoint is country-agnostic: each postcode's country is detected automatically and its result is calculated against that nation's deprivation dataset, so a single request can mix English, Welsh, Scottish and Northern Irish postcodes.
 
-If `year` is omitted, each postcode uses the default year for its nation (2019 England and Wales, 2020 Scotland, 2017 Northern Ireland). If `year` is supplied and is not available for a postcode's nation, that postcode is returned with an `error` message rather than failing the whole request. Postcodes that cannot be resolved (unknown or terminated) are likewise returned as per-item errors.
+If `year` is omitted, each postcode uses the default year for its nation (2019 England and Wales, 2020 Scotland, 2017 Northern Ireland). Pass `year=latest` to use the most recent dataset per nation instead (2025 England, 2019 Wales, 2020 Scotland, 2017 Northern Ireland). If `year` is supplied and is not available for a postcode's nation, that postcode is returned with an `error` message rather than failing the whole request. Postcodes that cannot be resolved (unknown or terminated) are likewise returned as per-item errors.
 
 Multiple postcodes return a `results` list in the order supplied — one object per postcode, ready to render as a table in a consuming UI:
 
