@@ -2177,3 +2177,38 @@ class TestIndexOfMultipleDeprivationQuantile2025:
         assert response.status_code == 200
         data = response.json()["result"]
         assert data["country"] == "england"
+
+
+@pytest.mark.django_db
+class TestIndicesOfYearLatest:
+    """Tests for year=latest on the indices_of_multiple_deprivation endpoint."""
+
+    def test_year_latest_returns_2025_data_for_england(self, api_client):
+        """year=latest resolves England to the 2025 dataset."""
+        response = api_client.get(
+            INDICES_OF_MULTIPLE_DEPRIVATION_URL,
+            {"postcode": "SE1 7PB", "year": "latest"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["imd_rank"] == 23019
+        assert data["year"] == 2025
+
+    def test_year_latest_case_insensitive(self, api_client):
+        response = api_client.get(
+            INDICES_OF_MULTIPLE_DEPRIVATION_URL,
+            {"postcode": "SE1 7PB", "year": "LATEST"},
+        )
+        assert response.status_code == 200
+        assert response.json()["imd_rank"] == 23019
+
+    def test_year_latest_for_wales_returns_2019(self, api_client):
+        """Wales has no dataset newer than WIMD 2019."""
+        response = api_client.get(
+            INDICES_OF_MULTIPLE_DEPRIVATION_URL,
+            {"postcode": "CF10 3NQ", "year": "latest"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["imd_rank"] == 833
+        assert data["year"] == 2019

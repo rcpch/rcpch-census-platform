@@ -212,6 +212,47 @@ class TestQuantileBatchMultiplePostcodes:
         )
         assert response.status_code == 400
 
+    def test_year_latest_uses_latest_dataset_per_nation(self, api_client):
+        """year=latest resolves each nation to its most recent dataset."""
+        response = api_client.get(
+            INDEX_OF_MULTIPLE_DEPRIVATION_QUANTILE_URL,
+            {
+                "postcode": "SE1 7PB,CF10 3NQ,KW1 4AA,BT52 1PF",
+                "quantile": 10,
+                "year": "latest",
+            },
+        )
+        assert response.status_code == 200
+        by_postcode = {r["postcode"]: r for r in response.json()["results"]}
+        assert by_postcode["SE1 7PB"]["year"] == 2025
+        assert by_postcode["SE1 7PB"]["rank"] == 23019
+        assert by_postcode["SE1 7PB"]["data_quantile"] == 7
+        assert by_postcode["CF10 3NQ"]["year"] == 2019
+        assert by_postcode["CF10 3NQ"]["rank"] == 833
+        assert by_postcode["KW1 4AA"]["year"] == 2020
+        assert by_postcode["KW1 4AA"]["rank"] == 1555
+        assert by_postcode["BT52 1PF"]["year"] == 2017
+        assert by_postcode["BT52 1PF"]["rank"] == 137
+
+    def test_year_latest_case_insensitive(self, api_client):
+        response = api_client.get(
+            INDEX_OF_MULTIPLE_DEPRIVATION_QUANTILE_URL,
+            {"postcode": "SE1 7PB", "quantile": 10, "year": "LATEST"},
+        )
+        assert response.status_code == 200
+        assert response.json()["result"]["rank"] == 23019
+
+    def test_omitting_year_still_defaults_to_2019_for_england(self, api_client):
+        """The historical default is preserved for consumers that omit year."""
+        response = api_client.get(
+            INDEX_OF_MULTIPLE_DEPRIVATION_QUANTILE_URL,
+            {"postcode": "SE1 7PB", "quantile": 10},
+        )
+        assert response.status_code == 200
+        result = response.json()["result"]
+        assert result["year"] == 2019
+        assert result["rank"] == 21865
+
     def test_too_many_postcodes_returns_400(self, api_client):
         """Batch requests above the maximum number of postcodes are rejected."""
         postcodes = ",".join(["SE1 7PB"] * 101)
